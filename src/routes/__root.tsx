@@ -114,12 +114,31 @@ function RootShell({ children }: { children: React.ReactNode }) {
   );
 }
 
+function AppShell() {
+  const { profile } = useStore();
+  const { pathname } = useLocation();
+  useEffect(() => {
+    document.documentElement.classList.toggle("dark", !!profile.darkMode);
+  }, [profile.darkMode]);
+
+  const hideNav = pathname.startsWith("/profile");
+
+  return (
+    <div className="min-h-screen bg-background">
+      <div className="max-w-md mx-auto pb-24">
+        <Outlet />
+      </div>
+      {!hideNav && <BottomNav />}
+    </div>
+  );
+}
+
 function RootComponent() {
   const { queryClient } = Route.useRouteContext();
 
   return (
     <QueryClientProvider client={queryClient}>
-      <Outlet />
+      <AppShell />
     </QueryClientProvider>
   );
 }
