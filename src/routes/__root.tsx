@@ -2,11 +2,15 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import {
   Outlet,
   Link,
+  useLocation,
   createRootRouteWithContext,
   useRouter,
   HeadContent,
   Scripts,
 } from "@tanstack/react-router";
+import { useEffect } from "react";
+import { BottomNav } from "@/components/BottomNav";
+import { useStore } from "@/lib/basgiath-store";
 
 import appCss from "../styles.css?url";
 
