@@ -162,6 +162,8 @@ function Library() {
               coverUrl: r.coverUrl,
               totalPages: r.totalPages,
               currentPage: 0,
+              format: (r as any).format ?? "book",
+              durationMinutes: (r as any).durationMinutes,
             });
             setSearching(false);
           }}

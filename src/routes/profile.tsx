@@ -1,19 +1,19 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useStore } from "@/lib/basgiath-store";
-import { ChevronLeft, Moon, Sun, Trash2 } from "lucide-react";
+import { useAuth } from "@/lib/auth-context";
+import { ChevronLeft, Settings } from "lucide-react";
 
 export const Route = createFileRoute("/profile")({
   component: Profile,
 });
 
 function Profile() {
-  const { profile, updateProfile, books, margins, goals } = useStore();
+  const { books, margins, goals } = useStore();
+  const { user } = useAuth();
 
-  function clearAll() {
-    if (!confirm("Erase all books, margins, and goals? This can't be undone.")) return;
-    localStorage.removeItem("basgiath:v1");
-    location.reload();
-  }
+  const finishedBooks = books.filter((b) => b.status === "finished").length;
+  const currentYear = new Date().getFullYear();
+  const readsThisYear = books.reduce((sum, b) => sum + b.reads.filter((r) => new Date(r.finishedAt).getFullYear() === currentYear).length, 0);
 
   return (
     <div>
@@ -23,49 +23,37 @@ function Profile() {
         </Link>
       </div>
 
-      <header className="px-5 pt-2 pb-6">
-        <h1 className="font-display text-3xl text-primary">Profile</h1>
+      <header className="px-5 pt-2 pb-6 flex items-start justify-between">
+        <div>
+          <h1 className="font-display text-3xl text-primary">{user?.displayName ?? "Profile"}</h1>
+          <p className="text-sm text-muted-foreground mt-1">@{user?.username}</p>
+        </div>
+        <Link to="/settings" className="p-2 text-muted-foreground hover:text-foreground rounded-lg hover:bg-muted">
+          <Settings className="h-5 w-5" />
+        </Link>
       </header>
 
       <section className="px-5 space-y-4">
         <div className="bg-card border border-border rounded-lg p-4">
-          <label className="text-xs text-muted-foreground">Display name</label>
-          <input
-            value={profile.name}
-            onChange={(e) => updateProfile({ name: e.target.value })}
-            className="w-full mt-1 bg-muted rounded-md px-3 py-2 text-sm outline-none"
-          />
-        </div>
-
-        <div className="bg-card border border-border rounded-lg p-4 flex items-center justify-between">
-          <div>
-            <p className="text-sm font-medium">Dark mode</p>
-            <p className="text-xs text-muted-foreground">Easier on the eyes at night.</p>
-          </div>
-          <button
-            onClick={() => updateProfile({ darkMode: !profile.darkMode })}
-            className={`relative h-7 w-12 rounded-full transition-colors ${
-              profile.darkMode ? "bg-primary" : "bg-muted"
-            }`}
-            aria-pressed={profile.darkMode}
-          >
-            <span
-              className={`absolute top-0.5 h-6 w-6 rounded-full bg-card shadow flex items-center justify-center transition-all ${
-                profile.darkMode ? "left-[1.375rem]" : "left-0.5"
-              }`}
-            >
-              {profile.darkMode ? <Moon className="h-3 w-3" /> : <Sun className="h-3 w-3" />}
-            </span>
-          </button>
-        </div>
-
-        <div className="bg-card border border-border rounded-lg p-4">
-          <p className="text-sm font-medium mb-2">Your reading</p>
+          <p className="text-sm font-medium mb-3">Reading stats</p>
           <div className="grid grid-cols-3 gap-2 text-center">
             <div>
               <p className="font-display text-2xl text-primary">{books.length}</p>
-              <p className="text-[11px] text-muted-foreground">books</p>
+              <p className="text-[11px] text-muted-foreground">total books</p>
             </div>
+            <div>
+              <p className="font-display text-2xl text-primary">{finishedBooks}</p>
+              <p className="text-[11px] text-muted-foreground">finished</p>
+            </div>
+            <div>
+              <p className="font-display text-2xl text-primary">{readsThisYear}</p>
+              <p className="text-[11px] text-muted-foreground">this year</p>
+            </div>
+          </div>
+        </div>
+
+        <div className="bg-card border border-border rounded-lg p-4">
+          <div className="grid grid-cols-3 gap-2 text-center">
             <div>
               <p className="font-display text-2xl text-primary">{margins.length}</p>
               <p className="text-[11px] text-muted-foreground">margins</p>
@@ -74,19 +62,22 @@ function Profile() {
               <p className="font-display text-2xl text-primary">{goals.length}</p>
               <p className="text-[11px] text-muted-foreground">goals</p>
             </div>
+            <div>
+              <p className="font-display text-2xl text-primary">{books.filter((b) => b.format === "audiobook").length}</p>
+              <p className="text-[11px] text-muted-foreground">audiobooks</p>
+            </div>
           </div>
         </div>
 
-        <button
-          onClick={clearAll}
-          className="w-full inline-flex items-center justify-center gap-1.5 border border-destructive/30 text-destructive rounded-lg py-2.5 text-sm hover:bg-destructive/5"
+        <Link
+          to="/settings"
+          className="flex items-center justify-between w-full bg-card border border-border rounded-lg p-4 hover:bg-muted/30 transition-colors"
         >
-          <Trash2 className="h-4 w-4" /> Erase all data
-        </button>
-
-        <p className="text-[11px] text-muted-foreground/80 text-center pt-2">
-          Basgiath stores everything locally on your device.
-        </p>
+          <div className="flex items-center gap-2 text-sm font-medium">
+            <Settings className="h-4 w-4 text-muted-foreground" /> Settings
+          </div>
+          <ChevronLeft className="h-4 w-4 text-muted-foreground rotate-180" />
+        </Link>
       </section>
     </div>
   );

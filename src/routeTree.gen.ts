@@ -9,13 +9,20 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
+import { Route as SettingsRouteImport } from './routes/settings'
 import { Route as ProfileRouteImport } from './routes/profile'
 import { Route as MarginsRouteImport } from './routes/margins'
+import { Route as LoginRouteImport } from './routes/login'
 import { Route as LibraryRouteImport } from './routes/library'
 import { Route as GoalsRouteImport } from './routes/goals'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as BookIdRouteImport } from './routes/book.$id'
 
+const SettingsRoute = SettingsRouteImport.update({
+  id: '/settings',
+  path: '/settings',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ProfileRoute = ProfileRouteImport.update({
   id: '/profile',
   path: '/profile',
@@ -24,6 +31,11 @@ const ProfileRoute = ProfileRouteImport.update({
 const MarginsRoute = MarginsRouteImport.update({
   id: '/margins',
   path: '/margins',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const LoginRoute = LoginRouteImport.update({
+  id: '/login',
+  path: '/login',
   getParentRoute: () => rootRouteImport,
 } as any)
 const LibraryRoute = LibraryRouteImport.update({
@@ -51,16 +63,20 @@ export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/goals': typeof GoalsRoute
   '/library': typeof LibraryRoute
+  '/login': typeof LoginRoute
   '/margins': typeof MarginsRoute
   '/profile': typeof ProfileRoute
+  '/settings': typeof SettingsRoute
   '/book/$id': typeof BookIdRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/goals': typeof GoalsRoute
   '/library': typeof LibraryRoute
+  '/login': typeof LoginRoute
   '/margins': typeof MarginsRoute
   '/profile': typeof ProfileRoute
+  '/settings': typeof SettingsRoute
   '/book/$id': typeof BookIdRoute
 }
 export interface FileRoutesById {
@@ -68,22 +84,42 @@ export interface FileRoutesById {
   '/': typeof IndexRoute
   '/goals': typeof GoalsRoute
   '/library': typeof LibraryRoute
+  '/login': typeof LoginRoute
   '/margins': typeof MarginsRoute
   '/profile': typeof ProfileRoute
+  '/settings': typeof SettingsRoute
   '/book/$id': typeof BookIdRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/goals' | '/library' | '/margins' | '/profile' | '/book/$id'
+  fullPaths:
+    | '/'
+    | '/goals'
+    | '/library'
+    | '/login'
+    | '/margins'
+    | '/profile'
+    | '/settings'
+    | '/book/$id'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/goals' | '/library' | '/margins' | '/profile' | '/book/$id'
+  to:
+    | '/'
+    | '/goals'
+    | '/library'
+    | '/login'
+    | '/margins'
+    | '/profile'
+    | '/settings'
+    | '/book/$id'
   id:
     | '__root__'
     | '/'
     | '/goals'
     | '/library'
+    | '/login'
     | '/margins'
     | '/profile'
+    | '/settings'
     | '/book/$id'
   fileRoutesById: FileRoutesById
 }
@@ -91,13 +127,22 @@ export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   GoalsRoute: typeof GoalsRoute
   LibraryRoute: typeof LibraryRoute
+  LoginRoute: typeof LoginRoute
   MarginsRoute: typeof MarginsRoute
   ProfileRoute: typeof ProfileRoute
+  SettingsRoute: typeof SettingsRoute
   BookIdRoute: typeof BookIdRoute
 }
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
+    '/settings': {
+      id: '/settings'
+      path: '/settings'
+      fullPath: '/settings'
+      preLoaderRoute: typeof SettingsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/profile': {
       id: '/profile'
       path: '/profile'
@@ -110,6 +155,13 @@ declare module '@tanstack/react-router' {
       path: '/margins'
       fullPath: '/margins'
       preLoaderRoute: typeof MarginsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/login': {
+      id: '/login'
+      path: '/login'
+      fullPath: '/login'
+      preLoaderRoute: typeof LoginRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/library': {
@@ -147,8 +199,10 @@ const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   GoalsRoute: GoalsRoute,
   LibraryRoute: LibraryRoute,
+  LoginRoute: LoginRoute,
   MarginsRoute: MarginsRoute,
   ProfileRoute: ProfileRoute,
+  SettingsRoute: SettingsRoute,
   BookIdRoute: BookIdRoute,
 }
 export const routeTree = rootRouteImport
