@@ -32,10 +32,19 @@ waitForPort = 5000
 outputType = "webview"
 
 [[ports]]
+localPort = 4173
+externalPort = 3000
+
+[[ports]]
 localPort = 5000
 externalPort = 80
 
+[[ports]]
+localPort = 5001
+externalPort = 3001
+
 [deployment]
-deploymentTarget = "static"
+deploymentTarget = "autoscale"
 build = ["bun", "run", "build"]
-publicDir = "dist/client"
+publicDir = "dist"
+run = ["bun", "run", "start"]
