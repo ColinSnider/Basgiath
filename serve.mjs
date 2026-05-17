@@ -24,47 +24,42 @@ const MIME = {
   ".webp": "image/webp",
 };
 
-// Import the compiled worker (Cloudflare Worker fetch handler)
 const worker = (await import("./dist/server/index.js")).default;
 
-// Mock the ASSETS binding that CF Workers provides automatically
-// The worker uses this to serve static files from dist/client
-const ASSETS = {
-  async fetch(request) {
-    const url = new URL(typeof request === "string" ? request : request.url);
-    const candidates = [
-      url.pathname,
-      url.pathname.endsWith("/") ? url.pathname + "index.html" : null,
-      "/index.html",
-    ].filter(Boolean);
-
-    for (const p of candidates) {
-      try {
-        const filePath = join(CLIENT_DIR, p);
-        const s = await stat(filePath);
-        if (!s.isFile()) continue;
-        const data = await readFile(filePath);
-        const ext = extname(filePath);
-        return new Response(data, {
-          headers: {
-            "Content-Type": MIME[ext] ?? "application/octet-stream",
-            ...(p.startsWith("/assets/")
-              ? { "Cache-Control": "public, max-age=31536000, immutable" }
-              : {}),
-          },
-        });
-      } catch {
-        // try next candidate
-      }
+async function tryStatic(pathname) {
+  try {
+    const filePath = join(CLIENT_DIR, pathname);
+    const s = await stat(filePath);
+    if (!s.isFile()) return null;
+    const ext = extname(filePath);
+    const headers = {
+      "Content-Type": MIME[ext] ?? "application/octet-stream",
+    };
+    if (pathname.startsWith("/assets/")) {
+      headers["Cache-Control"] = "public, max-age=31536000, immutable";
     }
-    return new Response("Not Found", { status: 404 });
-  },
-};
+    return { data: await readFile(filePath), headers };
+  } catch {
+    return null;
+  }
+}
 
 const server = createServer(async (req, res) => {
   try {
-    const url = `http://localhost${req.url}`;
+    const pathname = (req.url ?? "/").split("?")[0];
 
+    // Serve static assets directly — CF Workers handles this before the worker;
+    // we must intercept it here before passing to the worker fetch handler.
+    if (pathname.startsWith("/assets/") || extname(pathname)) {
+      const file = await tryStatic(pathname);
+      if (file) {
+        res.writeHead(200, file.headers);
+        res.end(file.data);
+        return;
+      }
+    }
+
+    const url = `http://localhost${req.url}`;
     const headers = new Headers();
     for (const [k, v] of Object.entries(req.headers)) {
       if (Array.isArray(v)) v.forEach((val) => headers.append(k, val));
@@ -84,10 +79,8 @@ const server = createServer(async (req, res) => {
       body: body ?? null,
     });
 
-    const env = { ASSETS };
     const ctx = { waitUntil: () => {}, passThroughOnException: () => {} };
-
-    const response = await worker.fetch(request, env, ctx);
+    const response = await worker.fetch(request, {}, ctx);
 
     res.statusCode = response.status;
     response.headers.forEach((value, key) => res.setHeader(key, value));

@@ -102,13 +102,14 @@ function AppShell() {
   }, [settings.fontScale]);
 
   // Redirect to login if not authenticated (after loading)
+  // Exception: "/" shows the landing page, so no redirect needed there
   useEffect(() => {
-    if (!loading && !user && pathname !== "/login") {
+    if (!loading && !user && pathname !== "/login" && pathname !== "/") {
       navigate({ to: "/login" });
     }
   }, [loading, user, pathname, navigate]);
 
-  const hideNav = pathname.startsWith("/profile") || pathname.startsWith("/settings") || pathname === "/login";
+  const hideNav = pathname.startsWith("/profile") || pathname.startsWith("/settings") || pathname === "/login" || (pathname === "/" && !user);
 
   if (loading) {
     return (

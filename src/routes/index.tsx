@@ -3,7 +3,7 @@ import { AppHeader } from "@/components/AppHeader";
 import { BookCover } from "@/components/BookCover";
 import { useStore, readsInYear, totalReads } from "@/lib/basgiath-store";
 import { useAuth } from "@/lib/auth-context";
-import { BookOpen, Sparkles, Plus, Target, ChevronLeft, ChevronRight } from "lucide-react";
+import { BookOpen, Sparkles, Plus, Target, ChevronLeft, ChevronRight, BookMarked, NotebookPen, BarChart3 } from "lucide-react";
 import { useState, useEffect } from "react";
 import { BookSearch } from "@/components/BookSearch";
 
@@ -21,7 +21,82 @@ function startOf(timeframe: "week" | "month" | "year") {
   return d;
 }
 
-function Home() {
+function LandingPage() {
+  return (
+    <div className="min-h-screen bg-background flex flex-col">
+      {/* Hero */}
+      <div className="flex-1 flex flex-col items-center justify-center px-6 pt-16 pb-10 text-center">
+        <div className="w-16 h-16 rounded-2xl bg-primary/10 flex items-center justify-center mb-6">
+          <BookOpen className="h-8 w-8 text-primary" />
+        </div>
+
+        <h1 className="font-display text-5xl text-primary tracking-tight">Basgiath</h1>
+        <p className="mt-3 text-lg text-muted-foreground max-w-xs leading-relaxed">
+          A quiet place to track the books that shape you.
+        </p>
+
+        <div className="mt-8 flex flex-col gap-3 w-full max-w-xs">
+          <Link
+            to="/login"
+            className="w-full rounded-xl bg-primary py-3.5 text-center text-sm font-semibold text-primary-foreground hover:bg-primary/90 transition-colors"
+          >
+            Start reading
+          </Link>
+          <Link
+            to="/login"
+            className="w-full rounded-xl border border-border py-3.5 text-center text-sm font-medium text-foreground hover:bg-muted/50 transition-colors"
+          >
+            Sign in
+          </Link>
+        </div>
+      </div>
+
+      {/* Features */}
+      <div className="px-6 pb-16 space-y-4 max-w-md mx-auto w-full">
+        <Feature
+          icon={<BookMarked className="h-5 w-5 text-primary" />}
+          title="Track your library"
+          desc="Log every book you've read, are reading, or want to read — with progress, format, and finish dates."
+        />
+        <Feature
+          icon={<NotebookPen className="h-5 w-5 text-primary" />}
+          title="Capture margins"
+          desc="Save quotes and notes while you read. Every thought, in one place."
+        />
+        <Feature
+          icon={<BarChart3 className="h-5 w-5 text-primary" />}
+          title="Set reading goals"
+          desc="Weekly, monthly, or yearly — see your progress at a glance on the dashboard."
+        />
+        <Feature
+          icon={<Target className="h-5 w-5 text-primary" />}
+          title="Books & audiobooks"
+          desc="Track pages or listening time. Backdated reads supported."
+        />
+      </div>
+
+      <p className="text-center text-xs text-muted-foreground pb-8">
+        Your reading data is private and tied to your account.
+      </p>
+    </div>
+  );
+}
+
+function Feature({ icon, title, desc }: { icon: React.ReactNode; title: string; desc: string }) {
+  return (
+    <div className="flex gap-4 items-start bg-card border border-border rounded-xl p-4">
+      <div className="mt-0.5 shrink-0 w-9 h-9 rounded-lg bg-primary/8 flex items-center justify-center">
+        {icon}
+      </div>
+      <div>
+        <p className="text-sm font-semibold">{title}</p>
+        <p className="text-xs text-muted-foreground mt-0.5 leading-relaxed">{desc}</p>
+      </div>
+    </div>
+  );
+}
+
+function Dashboard() {
   const { books, goals, addBook } = useStore();
   const { user } = useAuth();
   const [searching, setSearching] = useState(false);
@@ -32,7 +107,6 @@ function Home() {
   const finishedThisYear = books.reduce((sum, b) => sum + readsInYear(b, year), 0);
   const totalAllReads = books.reduce((sum, b) => sum + totalReads(b), 0);
 
-  // Auto-rotate goals every 4 seconds
   useEffect(() => {
     if (goals.length <= 1) return;
     const id = setInterval(() => setGoalIdx((i) => (i + 1) % goals.length), 4000);
@@ -70,14 +144,12 @@ function Home() {
         <div className="rounded-xl bg-gradient-to-br from-primary to-primary/85 text-primary-foreground p-5 shadow-lg ring-1 ring-gold/30 relative overflow-hidden">
           <Sparkles className="absolute -right-2 -top-2 h-20 w-20 text-gold/20" />
 
-          {/* Book count */}
           <p className="text-xs uppercase tracking-[0.18em] text-gold/90 font-medium">This year</p>
           <p className="font-display text-5xl mt-1">{finishedThisYear}</p>
           <p className="text-sm text-primary-foreground/80 mt-1">
             books finished · {totalAllReads} lifetime reads
           </p>
 
-          {/* Goal carousel */}
           {goals.length > 0 && activeGoal && progress !== null && (
             <div className="mt-4">
               <div className="flex items-center justify-between text-[11px] text-primary-foreground/80 mb-1.5">
@@ -193,4 +265,12 @@ function Home() {
       )}
     </>
   );
+}
+
+function Home() {
+  const { user, loading } = useAuth();
+
+  if (loading) return null;
+  if (!user) return <LandingPage />;
+  return <Dashboard />;
 }
