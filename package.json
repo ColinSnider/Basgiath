@@ -14,7 +14,6 @@
     "db:push": "drizzle-kit push"
   },
   "dependencies": {
-    "@cloudflare/vite-plugin": "^1.25.5",
     "@hookform/resolvers": "^5.2.2",
     "@radix-ui/react-accordion": "^1.2.12",
     "@radix-ui/react-alert-dialog": "^1.1.15",
@@ -42,29 +41,18 @@
     "@radix-ui/react-toggle": "^1.1.10",
     "@radix-ui/react-toggle-group": "^1.1.11",
     "@radix-ui/react-tooltip": "^1.2.8",
-    "@tailwindcss/vite": "^4.2.1",
     "@tanstack/react-query": "^5.83.0",
     "@tanstack/react-router": "^1.168.25",
     "@tanstack/react-start": "^1.167.50",
-    "@tanstack/router-plugin": "^1.167.28",
-    "@types/connect-pg-simple": "^7.0.3",
-    "@types/express-session": "^1.19.0",
-    "@types/memoizee": "^0.4.12",
-    "@types/passport": "^1.0.17",
     "bcryptjs": "^3.0.3",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "cmdk": "^1.1.1",
-    "connect-pg-simple": "^10.0.0",
     "date-fns": "^4.1.0",
     "drizzle-orm": "^0.45.2",
     "embla-carousel-react": "^8.6.0",
-    "express-session": "^1.19.0",
     "input-otp": "^1.4.2",
     "lucide-react": "^0.575.0",
-    "memoizee": "^0.4.17",
-    "openid-client": "^6.8.4",
-    "passport": "^0.7.0",
     "pg": "^8.20.0",
     "react": "^19.2.0",
     "react-day-picker": "^9.14.0",
@@ -77,13 +65,12 @@
     "tailwindcss": "^4.2.1",
     "tw-animate-css": "^1.3.4",
     "vaul": "^1.1.2",
-    "vite-tsconfig-paths": "^6.0.2",
     "zod": "^3.24.2"
   },
   "devDependencies": {
+    "@tailwindcss/vite": "^4.2.1",
+    "@tanstack/router-plugin": "1.167.28",
     "@eslint/js": "^9.32.0",
-    "@lovable.dev/vite-tanstack-config": "^1.7.0",
-    "@types/bcryptjs": "^3.0.0",
     "@types/node": "^22.16.5",
     "@types/pg": "^8.20.0",
     "@types/react": "^19.2.0",
@@ -99,6 +86,7 @@
     "prettier": "^3.7.3",
     "typescript": "^5.8.3",
     "typescript-eslint": "^8.56.1",
-    "vite": "^7.3.1"
+    "vite": "^7.3.1",
+    "vite-tsconfig-paths": "^6.0.2"
   }
 }

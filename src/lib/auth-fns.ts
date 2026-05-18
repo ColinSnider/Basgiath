@@ -36,7 +36,7 @@ export const login = createServerFn({ method: "POST" })
   .handler(async ({ data }) => {
     const [user] = await db.select().from(users).where(eq(users.username, data.username.toLowerCase()));
     if (!user) throw new Error("Invalid username or password");
-    if (!user.password) throw new Error("This account uses Replit to sign in.");
+    if (!user.password) throw new Error("This account does not have a password set.");
     const valid = await bcryptjs.compare(data.password, user.password);
     if (!valid) throw new Error("Invalid username or password");
     const sessionId = newSessionId();
