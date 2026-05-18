@@ -3,7 +3,14 @@ import { login as loginFn, register as registerFn, logout as logoutFn, getMe } f
 
 const SESSION_KEY = "basgiath:session";
 
-export type AuthUser = { id: number; username: string; displayName: string; email?: string };
+export type AuthUser = {
+  id: number;
+  username: string;
+  displayName: string;
+  email?: string;
+  profileImageUrl?: string;
+  isReplitUser?: boolean;
+};
 
 type AuthCtx = {
   user: AuthUser | null;
@@ -28,7 +35,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (!stored) { setLoading(false); return; }
     getMe({ data: { sessionId: stored } })
       .then((u) => {
-        if (u) { setUser(u); setSessionId(stored); }
+        if (u) { setUser(u as AuthUser); setSessionId(stored); }
         else { localStorage.removeItem(SESSION_KEY); }
       })
       .catch(() => { localStorage.removeItem(SESSION_KEY); })
@@ -39,14 +46,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const res = await loginFn({ data: { username, password } });
     localStorage.setItem(SESSION_KEY, res.sessionId);
     setSessionId(res.sessionId);
-    setUser(res.user);
+    setUser(res.user as AuthUser);
   }, []);
 
   const register = useCallback(async (username: string, password: string, displayName: string, email?: string) => {
     const res = await registerFn({ data: { username, password, displayName, email } });
     localStorage.setItem(SESSION_KEY, res.sessionId);
     setSessionId(res.sessionId);
-    setUser(res.user);
+    setUser(res.user as AuthUser);
   }, []);
 
   const logout = useCallback(async () => {

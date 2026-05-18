@@ -4,9 +4,11 @@ import { relations } from "drizzle-orm";
 export const users = pgTable("users", {
   id: serial("id").primaryKey(),
   username: text("username").notNull().unique(),
-  password: text("password").notNull(),
+  password: text("password"),
   displayName: text("display_name").notNull().default("Reader"),
   email: text("email"),
+  replitId: text("replit_id").unique(),
+  profileImageUrl: text("profile_image_url"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
