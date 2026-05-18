@@ -101,6 +101,25 @@ function AppShell() {
     document.documentElement.style.fontSize = scale === "sm" ? "14px" : scale === "lg" ? "18px" : "16px";
   }, [settings.fontScale]);
 
+  // Apply accent color as CSS variables on :root
+  useEffect(() => {
+    const root = document.documentElement;
+    const THEMES: Record<string, { light: [string, string]; dark: [string, string] }> = {
+      default: { light: ["oklch(0.34 0.11 18)", "oklch(0.97 0.012 80)"], dark: ["oklch(0.5 0.14 20)", "oklch(0.98 0.01 80)"] },
+      sage:    { light: ["oklch(0.35 0.07 155)", "oklch(0.97 0.01 130)"], dark: ["oklch(0.52 0.09 155)", "oklch(0.98 0.01 130)"] },
+      ocean:   { light: ["oklch(0.33 0.09 245)", "oklch(0.97 0.01 245)"], dark: ["oklch(0.5 0.12 245)", "oklch(0.98 0.01 245)"] },
+      sunset:  { light: ["oklch(0.42 0.12 40)", "oklch(0.97 0.012 60)"], dark: ["oklch(0.58 0.14 40)", "oklch(0.98 0.01 60)"] },
+      slate:   { light: ["oklch(0.35 0.025 255)", "oklch(0.97 0.005 255)"], dark: ["oklch(0.52 0.03 255)", "oklch(0.98 0.005 255)"] },
+      violet:  { light: ["oklch(0.33 0.16 295)", "oklch(0.97 0.01 295)"], dark: ["oklch(0.52 0.18 295)", "oklch(0.98 0.01 295)"] },
+    };
+    const theme = THEMES[settings.accentColor] ?? THEMES.default;
+    const isDark = settings.darkMode;
+    const [primary, primaryFg] = isDark ? theme.dark : theme.light;
+    root.style.setProperty("--primary", primary);
+    root.style.setProperty("--primary-foreground", primaryFg);
+    root.style.setProperty("--ring", primary);
+  }, [settings.accentColor, settings.darkMode]);
+
   // Redirect to login if not authenticated (after loading)
   // Exception: "/" shows the landing page, so no redirect needed there
   useEffect(() => {

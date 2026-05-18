@@ -3,16 +3,17 @@ import { login as loginFn, register as registerFn, logout as logoutFn, getMe } f
 
 const SESSION_KEY = "basgiath:session";
 
-export type AuthUser = { id: number; username: string; displayName: string };
+export type AuthUser = { id: number; username: string; displayName: string; email?: string };
 
 type AuthCtx = {
   user: AuthUser | null;
   sessionId: string | null;
   loading: boolean;
   login: (username: string, password: string) => Promise<void>;
-  register: (username: string, password: string, displayName: string) => Promise<void>;
+  register: (username: string, password: string, displayName: string, email?: string) => Promise<void>;
   logout: () => Promise<void>;
   updateDisplayName: (name: string) => void;
+  updateEmail: (email: string) => void;
 };
 
 const AuthContext = createContext<AuthCtx | null>(null);
@@ -41,8 +42,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUser(res.user);
   }, []);
 
-  const register = useCallback(async (username: string, password: string, displayName: string) => {
-    const res = await registerFn({ data: { username, password, displayName } });
+  const register = useCallback(async (username: string, password: string, displayName: string, email?: string) => {
+    const res = await registerFn({ data: { username, password, displayName, email } });
     localStorage.setItem(SESSION_KEY, res.sessionId);
     setSessionId(res.sessionId);
     setUser(res.user);
@@ -60,8 +61,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUser((u) => (u ? { ...u, displayName: name } : u));
   }, []);
 
+  const updateEmail = useCallback((email: string) => {
+    setUser((u) => (u ? { ...u, email } : u));
+  }, []);
+
   return (
-    <AuthContext.Provider value={{ user, sessionId, loading, login, register, logout, updateDisplayName }}>
+    <AuthContext.Provider value={{ user, sessionId, loading, login, register, logout, updateDisplayName, updateEmail }}>
       {children}
     </AuthContext.Provider>
   );

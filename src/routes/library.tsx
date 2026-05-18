@@ -162,8 +162,12 @@ function Library() {
               coverUrl: r.coverUrl,
               totalPages: r.totalPages,
               currentPage: 0,
-              format: (r as any).format ?? "book",
-              durationMinutes: (r as any).durationMinutes,
+              format: r.format ?? "book",
+              durationMinutes: r.durationMinutes,
+              status: r.status ?? "reading",
+              reads: r.finishedAt ? [{ finishedAt: r.finishedAt }] : [],
+              addedAt: r.addedAt,
+              extraReads: r.extraReads,
             });
             setSearching(false);
           }}

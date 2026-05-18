@@ -1,8 +1,8 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useStore } from "@/lib/basgiath-store";
 import { useAuth } from "@/lib/auth-context";
-import { updateDisplayName, changePassword } from "@/lib/auth-fns";
-import { ChevronLeft, Moon, Sun, Trash2, Type, Palette, Layout, KeyRound, Loader2 } from "lucide-react";
+import { updateDisplayName, changePassword, updateEmail as updateEmailFn } from "@/lib/auth-fns";
+import { ChevronLeft, Moon, Sun, Trash2, Type, Palette, Layout, KeyRound, Loader2, Mail } from "lucide-react";
 import { useState } from "react";
 
 export const Route = createFileRoute("/settings")({
@@ -10,21 +10,25 @@ export const Route = createFileRoute("/settings")({
 });
 
 const ACCENT_COLORS = [
-  { id: "default", label: "Crimson", class: "bg-[#5a1a25]" },
-  { id: "sage", label: "Sage", class: "bg-[#3a5c4a]" },
-  { id: "ocean", label: "Ocean", class: "bg-[#1a3a5c]" },
-  { id: "sunset", label: "Sunset", class: "bg-[#8b3a1a]" },
-  { id: "slate", label: "Slate", class: "bg-[#374151]" },
-  { id: "violet", label: "Violet", class: "bg-[#4c1d95]" },
+  { id: "default", label: "Crimson", hex: "#5a1a25" },
+  { id: "sage",    label: "Sage",    hex: "#3a5c4a" },
+  { id: "ocean",   label: "Ocean",   hex: "#1a3a5c" },
+  { id: "sunset",  label: "Sunset",  hex: "#8b3a1a" },
+  { id: "slate",   label: "Slate",   hex: "#374151" },
+  { id: "violet",  label: "Violet",  hex: "#4c1d95" },
 ];
 
 function Settings() {
   const { settings, updateSettings, clearAll } = useStore();
-  const { user, sessionId, updateDisplayName: updateLocalName, logout } = useAuth();
+  const { user, sessionId, updateDisplayName: updateLocalName, updateEmail: updateLocalEmail, logout } = useAuth();
   const navigate = useNavigate();
 
   const [nameVal, setNameVal] = useState(user?.displayName ?? "");
   const [nameSaving, setNameSaving] = useState(false);
+
+  const [emailVal, setEmailVal] = useState(user?.email ?? "");
+  const [emailSaving, setEmailSaving] = useState(false);
+  const [emailMsg, setEmailMsg] = useState<{ ok: boolean; text: string } | null>(null);
 
   const [curPw, setCurPw] = useState("");
   const [newPw, setNewPw] = useState("");
@@ -40,6 +44,22 @@ function Settings() {
       updateLocalName(nameVal.trim());
     } finally {
       setNameSaving(false);
+    }
+  }
+
+  async function saveEmail(e: React.FormEvent) {
+    e.preventDefault();
+    if (!sessionId || !emailVal.trim()) return;
+    setEmailSaving(true);
+    setEmailMsg(null);
+    try {
+      await updateEmailFn({ data: { sessionId, email: emailVal.trim() } });
+      updateLocalEmail(emailVal.trim());
+      setEmailMsg({ ok: true, text: "Email saved." });
+    } catch (err: any) {
+      setEmailMsg({ ok: false, text: err?.message ?? "Failed to save email." });
+    } finally {
+      setEmailSaving(false);
     }
   }
 
@@ -82,27 +102,58 @@ function Settings() {
       </header>
 
       <div className="px-5 space-y-5">
-        {/* Display name */}
-        <section className="bg-card border border-border rounded-lg p-4 space-y-3">
+        {/* Account */}
+        <section className="bg-card border border-border rounded-lg p-4 space-y-4">
           <div className="flex items-center gap-2 text-sm font-medium">
             <KeyRound className="h-4 w-4 text-muted-foreground" /> Account
           </div>
-          <form onSubmit={saveName} className="flex gap-2">
-            <input
-              value={nameVal}
-              onChange={(e) => setNameVal(e.target.value)}
-              placeholder="Display name"
-              className="flex-1 bg-muted rounded-md px-3 py-2 text-sm outline-none"
-            />
-            <button
-              type="submit"
-              disabled={nameSaving}
-              className="bg-primary text-primary-foreground text-sm rounded-md px-3 py-2 font-medium disabled:opacity-50 flex items-center gap-1"
-            >
-              {nameSaving && <Loader2 className="h-3 w-3 animate-spin" />} Save
-            </button>
+
+          <p className="text-xs text-muted-foreground -mt-1">Signed in as <span className="font-medium">@{user?.username}</span></p>
+
+          {/* Display name */}
+          <form onSubmit={saveName} className="space-y-1">
+            <label className="text-xs text-muted-foreground">Display name</label>
+            <div className="flex gap-2">
+              <input
+                value={nameVal}
+                onChange={(e) => setNameVal(e.target.value)}
+                placeholder="Display name"
+                className="flex-1 bg-muted rounded-md px-3 py-2 text-sm outline-none"
+              />
+              <button
+                type="submit"
+                disabled={nameSaving}
+                className="bg-primary text-primary-foreground text-sm rounded-md px-3 py-2 font-medium disabled:opacity-50 flex items-center gap-1"
+              >
+                {nameSaving && <Loader2 className="h-3 w-3 animate-spin" />} Save
+              </button>
+            </div>
           </form>
-          <p className="text-xs text-muted-foreground">Signed in as <span className="font-medium">@{user?.username}</span></p>
+
+          {/* Email */}
+          <form onSubmit={saveEmail} className="space-y-1">
+            <label className="text-xs text-muted-foreground flex items-center gap-1">
+              <Mail className="h-3 w-3" /> Email address
+            </label>
+            <div className="flex gap-2">
+              <input
+                type="email"
+                value={emailVal}
+                onChange={(e) => setEmailVal(e.target.value)}
+                placeholder="you@example.com"
+                className="flex-1 bg-muted rounded-md px-3 py-2 text-sm outline-none"
+              />
+              <button
+                type="submit"
+                disabled={emailSaving}
+                className="bg-primary text-primary-foreground text-sm rounded-md px-3 py-2 font-medium disabled:opacity-50 flex items-center gap-1"
+              >
+                {emailSaving && <Loader2 className="h-3 w-3 animate-spin" />} Save
+              </button>
+            </div>
+            {emailMsg && <p className={`text-xs ${emailMsg.ok ? "text-green-600" : "text-destructive"}`}>{emailMsg.text}</p>}
+            <p className="text-[11px] text-muted-foreground">Used for account recovery only. Never shared.</p>
+          </form>
         </section>
 
         {/* Password */}
@@ -159,17 +210,25 @@ function Settings() {
           </div>
 
           <div>
-            <p className="text-sm mb-2">Accent colour</p>
-            <div className="flex gap-2 flex-wrap">
+            <p className="text-sm mb-2.5">Accent colour</p>
+            <div className="flex gap-3 flex-wrap">
               {ACCENT_COLORS.map((c) => (
                 <button
                   key={c.id}
                   onClick={() => updateSettings({ accentColor: c.id })}
                   title={c.label}
-                  className={`h-8 w-8 rounded-full ${c.class} transition-all ${settings.accentColor === c.id ? "ring-2 ring-offset-2 ring-foreground/50 scale-110" : "opacity-70 hover:opacity-100"}`}
+                  style={{ backgroundColor: c.hex }}
+                  className={`h-9 w-9 rounded-full transition-all ${
+                    settings.accentColor === c.id
+                      ? "ring-2 ring-offset-2 ring-foreground/60 scale-110"
+                      : "opacity-60 hover:opacity-90 hover:scale-105"
+                  }`}
                 />
               ))}
             </div>
+            <p className="text-[11px] text-muted-foreground mt-2">
+              Current: <span className="font-medium capitalize">{ACCENT_COLORS.find(c => c.id === settings.accentColor)?.label ?? "Crimson"}</span>
+            </p>
           </div>
         </section>
 

@@ -14,6 +14,7 @@ function LoginPage() {
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [displayName, setDisplayName] = useState("");
+  const [email, setEmail] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -30,7 +31,7 @@ function LoginPage() {
       if (mode === "login") {
         await login(username, password);
       } else {
-        await register(username, password, displayName || username);
+        await register(username, password, displayName || username, email || undefined);
       }
       navigate({ to: "/" });
     } catch (err: any) {
@@ -90,6 +91,19 @@ function LoginPage() {
                 className="w-full mt-1 bg-muted rounded-md px-3 py-2 text-sm outline-none focus:ring-1 focus:ring-primary/40"
               />
             </div>
+            {mode === "register" && (
+              <div>
+                <label className="text-xs text-muted-foreground">Email <span className="text-muted-foreground/60">(optional)</span></label>
+                <input
+                  type="email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  placeholder="you@example.com"
+                  autoComplete="email"
+                  className="w-full mt-1 bg-muted rounded-md px-3 py-2 text-sm outline-none focus:ring-1 focus:ring-primary/40"
+                />
+              </div>
+            )}
             <div>
               <label className="text-xs text-muted-foreground">Password</label>
               <input

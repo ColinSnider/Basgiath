@@ -34,10 +34,14 @@ export const addBook = createServerFn({ method: "POST" })
     totalPages: z.number().optional(),
     durationMinutes: z.number().optional(),
     status: z.enum(["reading", "finished", "wishlist"]).optional(),
+    addedAt: z.string().optional(),
+    reads: z.array(z.object({ finishedAt: z.string() })).optional(),
   }))
   .handler(async ({ data }) => {
     const userId = await validateSession(data.sessionId);
     const id = crypto.randomUUID();
+    const reads = data.reads ?? [];
+    const addedAt = data.addedAt ? new Date(data.addedAt) : new Date();
     const [book] = await db.insert(books).values({
       id, userId,
       title: data.title,
@@ -49,7 +53,8 @@ export const addBook = createServerFn({ method: "POST" })
       currentPage: 0,
       currentMinute: 0,
       status: data.status ?? "reading",
-      reads: [],
+      reads,
+      addedAt,
     }).returning();
     return book;
   });

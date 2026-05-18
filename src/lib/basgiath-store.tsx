@@ -134,9 +134,13 @@ export function StoreProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => { reload(); }, [reload]);
 
-  const addBook = useCallback(async (b: Omit<Book, "id" | "reads" | "addedAt" | "status"> & Partial<Pick<Book, "status">>) => {
+  const addBook = useCallback(async (b: Omit<Book, "id" | "addedAt"> & { addedAt?: string; extraReads?: string[] }) => {
     if (!sessionId) return;
-    const row = await dataFns.addBook({ data: { sessionId, title: b.title, author: b.author, coverUrl: b.coverUrl ?? undefined, format: b.format ?? "book", totalPages: b.totalPages ?? undefined, durationMinutes: b.durationMinutes ?? undefined, status: b.status ?? "reading" } });
+    const reads: { finishedAt: string }[] = b.reads ?? [];
+    if (b.extraReads) {
+      for (const d of b.extraReads) reads.push({ finishedAt: d });
+    }
+    const row = await dataFns.addBook({ data: { sessionId, title: b.title, author: b.author, coverUrl: b.coverUrl ?? undefined, format: b.format ?? "book", totalPages: b.totalPages ?? undefined, durationMinutes: b.durationMinutes ?? undefined, status: b.status ?? "reading", addedAt: b.addedAt, reads } });
     setState((s) => ({ ...s, books: [...s.books, rowToBook(row)] }));
   }, [sessionId]);
 

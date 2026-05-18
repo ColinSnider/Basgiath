@@ -258,7 +258,7 @@ function Dashboard() {
         <BookSearch
           onClose={() => setSearching(false)}
           onPick={(r) => {
-            addBook({ title: r.title, author: r.author, coverUrl: r.coverUrl, totalPages: r.totalPages, currentPage: 0, format: (r as any).format ?? "book", durationMinutes: (r as any).durationMinutes });
+            addBook({ title: r.title, author: r.author, coverUrl: r.coverUrl, totalPages: r.totalPages, currentPage: 0, format: r.format ?? "book", durationMinutes: r.durationMinutes, status: r.status ?? "reading", reads: r.finishedAt ? [{ finishedAt: r.finishedAt }] : [], addedAt: r.addedAt, extraReads: r.extraReads });
             setSearching(false);
           }}
         />
