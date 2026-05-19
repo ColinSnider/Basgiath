@@ -12,6 +12,7 @@ import {
   FULL_AUTH_REQUIRED_MESSAGE,
   MISSING_OR_EXPIRED_SESSION_MESSAGE,
 } from "./session-auth.js";
+import { ensureUsernameAvailable, mapSignupDbError } from "./auth-signup.js";
 
 function newSessionId() {
   return crypto.randomUUID();
@@ -54,28 +55,35 @@ function userPublic(user: {
 export const register = createServerFn({ method: "POST" })
   .inputValidator(
     z.object({
-      username: z.string().min(3),
+      username: z.string(),
       password: z.string().min(6),
       displayName: z.string().min(1),
       email: z.string().email().optional(),
     }),
   )
   .handler(async ({ data }) => {
-    const [existing] = await db
-      .select({ id: users.id })
-      .from(users)
-      .where(eq(users.username, data.username.toLowerCase()));
-    if (existing) throw new Error("Username already taken");
+    const username = await ensureUsernameAvailable(data.username, async (normalizedUsername) => {
+      const [existing] = await db
+        .select({ id: users.id })
+        .from(users)
+        .where(eq(users.username, normalizedUsername));
+      return existing;
+    });
     const hashed = await bcryptjs.hash(data.password, authConfig.bcryptRounds);
-    const [user] = await db
-      .insert(users)
-      .values({
-        username: data.username.toLowerCase(),
-        password: hashed,
-        displayName: data.displayName,
-        email: data.email ?? null,
-      })
-      .returning(authUserPublicColumns);
+    let user;
+    try {
+      [user] = await db
+        .insert(users)
+        .values({
+          username,
+          password: hashed,
+          displayName: data.displayName,
+          email: data.email ?? null,
+        })
+        .returning(authUserPublicColumns);
+    } catch (error) {
+      throw mapSignupDbError(error);
+    }
     await db.insert(userSettings).values({ userId: user.id });
     const sessionId = newSessionId();
     await db.insert(sessions).values({
