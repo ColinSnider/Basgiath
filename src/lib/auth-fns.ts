@@ -4,20 +4,29 @@ import bcryptjs from "bcryptjs";
 import { db } from "../../server/db";
 import { users, sessions, userSettings } from "../../shared/schema";
 import { eq } from "drizzle-orm";
+import { authConfig, sessionExpiresAt } from "./auth-config";
 
 function newSessionId() {
   return crypto.randomUUID();
 }
 
+// Explicit column selection guards against schema mismatches (e.g. stale
+// columns like replit_id / profile_image_url that may still exist in the DB
+// but are no longer part of the Drizzle schema).
 const authUserPublicColumns = {
   id: users.id,
   username: users.username,
   displayName: users.displayName,
   email: users.email,
+  createdAt: users.createdAt,
 };
 
 const authUserCredentialColumns = {
-  ...authUserPublicColumns,
+  id: users.id,
+  username: users.username,
+  displayName: users.displayName,
+  email: users.email,
+  createdAt: users.createdAt,
   password: users.password,
 };
 
@@ -50,7 +59,7 @@ export const register = createServerFn({ method: "POST" })
       .from(users)
       .where(eq(users.username, data.username.toLowerCase()));
     if (existing) throw new Error("Username already taken");
-    const hashed = await bcryptjs.hash(data.password, 10);
+    const hashed = await bcryptjs.hash(data.password, authConfig.bcryptRounds);
     const [user] = await db
       .insert(users)
       .values({
@@ -65,7 +74,7 @@ export const register = createServerFn({ method: "POST" })
     await db.insert(sessions).values({
       id: sessionId,
       userId: user.id,
-      expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
+      expiresAt: sessionExpiresAt(),
     });
     return { sessionId, user: userPublic(user) };
   });
@@ -85,7 +94,7 @@ export const login = createServerFn({ method: "POST" })
     await db.insert(sessions).values({
       id: sessionId,
       userId: user.id,
-      expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
+      expiresAt: sessionExpiresAt(),
     });
     return { sessionId, user: userPublic(user) };
   });
@@ -154,7 +163,7 @@ export const changePassword = createServerFn({ method: "POST" })
     if (!user) throw new Error("User not found");
     const valid = await bcryptjs.compare(data.currentPassword, user.password);
     if (!valid) throw new Error("Current password is incorrect");
-    const hashed = await bcryptjs.hash(data.newPassword, 10);
+    const hashed = await bcryptjs.hash(data.newPassword, authConfig.bcryptRounds);
     await db.update(users).set({ password: hashed }).where(eq(users.id, session.userId));
     return { ok: true };
   });
