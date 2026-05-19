@@ -29,7 +29,7 @@ const worker = (await import("./dist/server/server.js")).default;
 function safeStaticPath(pathname) {
   const candidate = pathname.replace(/^\/+/, "");
   const normalized = normalize(candidate);
-  if (!normalized || normalized.startsWith("..") || normalized.includes("/../")) {
+  if (!normalized || normalized.startsWith("..")) {
     return null;
   }
   return join(CLIENT_DIR, normalized);
@@ -79,7 +79,7 @@ const server = createServer(async (req, res) => {
     }
 
     const forwardedProto = req.headers["x-forwarded-proto"];
-    const protocol = Array.isArray(forwardedProto) ? forwardedProto[0] : forwardedProto;
+    const protocol = typeof forwardedProto === "string" ? forwardedProto.split(",")[0]?.trim() : undefined;
     const host = req.headers.host ?? "localhost";
     const url = `${protocol ?? "http"}://${host}${req.url ?? "/"}`;
     const headers = new Headers();
