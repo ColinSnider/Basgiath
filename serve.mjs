@@ -1,6 +1,6 @@
 import { createServer } from "node:http";
 import { readFile, stat } from "node:fs/promises";
-import { join, extname, normalize } from "node:path";
+import { extname, join, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const __dirname = fileURLToPath(new URL(".", import.meta.url));
@@ -28,11 +28,12 @@ const worker = (await import("./dist/server/server.js")).default;
 
 function safeStaticPath(pathname) {
   const candidate = pathname.replace(/^\/+/, "");
-  const normalized = normalize(candidate);
-  if (!normalized || normalized.startsWith("..")) {
+  const filePath = resolve(CLIENT_DIR, candidate);
+  const staticRoot = `${resolve(CLIENT_DIR)}${sep}`;
+  if (filePath !== resolve(CLIENT_DIR) && !filePath.startsWith(staticRoot)) {
     return null;
   }
-  return join(CLIENT_DIR, normalized);
+  return filePath;
 }
 
 async function tryStatic(pathname) {
@@ -79,8 +80,8 @@ const server = createServer(async (req, res) => {
     }
 
     const forwardedProto = req.headers["x-forwarded-proto"];
-    const protocol =
-      typeof forwardedProto === "string" ? forwardedProto.split(",")[0].trim() || undefined : undefined;
+    const protocolCandidate = typeof forwardedProto === "string" ? forwardedProto.split(",")[0].trim() : "";
+    const protocol = protocolCandidate === "https" || protocolCandidate === "http" ? protocolCandidate : undefined;
     const host = req.headers.host ?? "localhost";
     const url = `${protocol ?? "http"}://${host}${req.url ?? "/"}`;
     const headers = new Headers();
