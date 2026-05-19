@@ -29,10 +29,13 @@ test("ensureUsernameAvailable throws for duplicate usernames", async () => {
   );
 });
 
-test("ensureUsernameAvailable throws for malformed or empty usernames", async () => {
-  assert.throws(() => normalizeSignupUsername(""), new Error(USERNAME_REQUIRED_MESSAGE));
-  assert.throws(() => normalizeSignupUsername("  "), new Error(USERNAME_REQUIRED_MESSAGE));
-  assert.throws(() => normalizeSignupUsername("ab"), new Error(USERNAME_MIN_LENGTH_MESSAGE));
+test("normalizeSignupUsername and ensureUsernameAvailable reject malformed or empty usernames", async () => {
+  assert.throws(() => normalizeSignupUsername(""), { message: USERNAME_REQUIRED_MESSAGE });
+  assert.throws(() => normalizeSignupUsername("  "), { message: USERNAME_REQUIRED_MESSAGE });
+  assert.throws(() => normalizeSignupUsername("ab"), { message: USERNAME_MIN_LENGTH_MESSAGE });
+  await assert.rejects(() => ensureUsernameAvailable("  ", async () => undefined), {
+    message: USERNAME_REQUIRED_MESSAGE,
+  });
 });
 
 test("mapSignupDbError maps the reported failed query regression to actionable signup guidance", () => {

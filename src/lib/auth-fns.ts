@@ -12,7 +12,7 @@ import {
   FULL_AUTH_REQUIRED_MESSAGE,
   MISSING_OR_EXPIRED_SESSION_MESSAGE,
 } from "./session-auth.js";
-import { ensureUsernameAvailable, mapSignupDbError } from "./auth-signup";
+import { ensureUsernameAvailable, mapSignupDbError } from "./auth-signup.js";
 
 function newSessionId() {
   return crypto.randomUUID();
@@ -55,7 +55,7 @@ function userPublic(user: {
 export const register = createServerFn({ method: "POST" })
   .inputValidator(
     z.object({
-      username: z.string().min(3, "Username must be at least 3 characters."),
+      username: z.string(),
       password: z.string().min(6),
       displayName: z.string().min(1),
       email: z.string().email().optional(),

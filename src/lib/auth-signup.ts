@@ -15,8 +15,10 @@ export function normalizeSignupUsername(username: string) {
 
 function errorChain(error: unknown) {
   const chain: unknown[] = [];
+  const visited = new Set<unknown>();
   let current: unknown = error;
-  while (current && !chain.includes(current)) {
+  while (current && !visited.has(current)) {
+    visited.add(current);
     chain.push(current);
     current =
       current instanceof Error && "cause" in current
@@ -56,7 +58,9 @@ export function mapSignupDbError(error: unknown) {
     return new Error(SIGNUP_SCHEMA_OUT_OF_DATE_MESSAGE);
   }
 
-  return error instanceof Error ? error : new Error("Unable to create account. Please try again.");
+  return error instanceof Error
+    ? error
+    : new Error("Unable to create account right now. Please try again.");
 }
 
 export async function ensureUsernameAvailable(
