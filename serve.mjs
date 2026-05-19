@@ -24,7 +24,7 @@ const MIME = {
   ".webp": "image/webp",
 };
 
-const worker = (await import("./dist/server/index.js")).default;
+const worker = (await import("./dist/server/server.js")).default;
 
 async function tryStatic(pathname) {
   try {
