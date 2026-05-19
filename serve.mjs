@@ -1,10 +1,12 @@
 import { createServer } from "node:http";
 import { readFile, stat } from "node:fs/promises";
-import { join, extname } from "node:path";
+import { extname, join, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const __dirname = fileURLToPath(new URL(".", import.meta.url));
 const CLIENT_DIR = join(__dirname, "dist/client");
+const RESOLVED_CLIENT_DIR = resolve(CLIENT_DIR);
+const STATIC_ROOT = `${RESOLVED_CLIENT_DIR}${sep}`;
 
 const MIME = {
   ".html": "text/html; charset=utf-8",
@@ -26,9 +28,19 @@ const MIME = {
 
 const worker = (await import("./dist/server/server.js")).default;
 
+function safeStaticPath(pathname) {
+  const candidate = pathname.replace(/^\/+/, "");
+  const filePath = resolve(CLIENT_DIR, candidate);
+  if (filePath === RESOLVED_CLIENT_DIR || !filePath.startsWith(STATIC_ROOT)) {
+    return null;
+  }
+  return filePath;
+}
+
 async function tryStatic(pathname) {
   try {
-    const filePath = join(CLIENT_DIR, pathname);
+    const filePath = safeStaticPath(pathname);
+    if (!filePath) return null;
     const s = await stat(filePath);
     if (!s.isFile()) return null;
     const ext = extname(filePath);
@@ -47,9 +59,18 @@ async function tryStatic(pathname) {
 const server = createServer(async (req, res) => {
   try {
     const pathname = (req.url ?? "/").split("?")[0];
+    if (pathname === "/healthz" || pathname === "/readyz") {
+      res.writeHead(200, { "Content-Type": "application/json; charset=utf-8" });
+      res.end(
+        JSON.stringify({
+          status: "ok",
+          uptimeSeconds: Math.floor(process.uptime()),
+        }),
+      );
+      return;
+    }
 
-    // Serve static assets directly — CF Workers handles this before the worker;
-    // we must intercept it here before passing to the worker fetch handler.
+    // Serve static assets directly before forwarding to the app worker.
     if (pathname.startsWith("/assets/") || extname(pathname)) {
       const file = await tryStatic(pathname);
       if (file) {
@@ -59,7 +80,11 @@ const server = createServer(async (req, res) => {
       }
     }
 
-    const url = `http://localhost${req.url}`;
+    const forwardedProto = req.headers["x-forwarded-proto"];
+    const protocolCandidate = typeof forwardedProto === "string" ? forwardedProto.split(",")[0].trim() : "";
+    const protocol = protocolCandidate === "https" || protocolCandidate === "http" ? protocolCandidate : undefined;
+    const host = req.headers.host ?? "localhost";
+    const url = `${protocol ?? "http"}://${host}${req.url ?? "/"}`;
     const headers = new Headers();
     for (const [k, v] of Object.entries(req.headers)) {
       if (Array.isArray(v)) v.forEach((val) => headers.append(k, val));
@@ -101,7 +126,8 @@ const server = createServer(async (req, res) => {
   }
 });
 
-const port = parseInt(process.env.PORT ?? "5000", 10);
+const parsedPort = Number.parseInt(process.env.PORT ?? "", 10);
+const port = Number.isFinite(parsedPort) && parsedPort > 0 ? parsedPort : 5000;
 server.listen(port, "0.0.0.0", () => {
   console.log(`Basgiath running on http://0.0.0.0:${port}`);
 });

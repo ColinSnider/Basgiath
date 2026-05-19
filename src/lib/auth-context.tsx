@@ -9,7 +9,6 @@ export type AuthUser = {
   displayName: string;
   email?: string;
   profileImageUrl?: string;
-  isReplitUser?: boolean;
 };
 
 type AuthCtx = {
