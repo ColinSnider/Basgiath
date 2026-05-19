@@ -1,5 +1,6 @@
 import { createContext, useContext, useState, useEffect, useCallback, type ReactNode } from "react";
 import { login as loginFn, register as registerFn, logout as logoutFn, getMe } from "./auth-fns";
+import { createGuestSessionId, guestUser, isGuestSessionId } from "./session-auth.js";
 
 const SESSION_KEY = "basgiath:session";
 
@@ -9,6 +10,7 @@ export type AuthUser = {
   displayName: string;
   email?: string;
   profileImageUrl?: string;
+  isGuest?: boolean;
 };
 
 type AuthCtx = {
@@ -16,7 +18,13 @@ type AuthCtx = {
   sessionId: string | null;
   loading: boolean;
   login: (username: string, password: string) => Promise<void>;
-  register: (username: string, password: string, displayName: string, email?: string) => Promise<void>;
+  continueAsGuest: () => Promise<void>;
+  register: (
+    username: string,
+    password: string,
+    displayName: string,
+    email?: string,
+  ) => Promise<void>;
   logout: () => Promise<void>;
   updateDisplayName: (name: string) => void;
   updateEmail: (email: string) => void;
@@ -31,13 +39,22 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     const stored = localStorage.getItem(SESSION_KEY);
-    if (!stored) { setLoading(false); return; }
+    if (!stored) {
+      setLoading(false);
+      return;
+    }
     getMe({ data: { sessionId: stored } })
       .then((u) => {
-        if (u) { setUser(u as AuthUser); setSessionId(stored); }
-        else { localStorage.removeItem(SESSION_KEY); }
+        if (u) {
+          setUser(u as AuthUser);
+          setSessionId(stored);
+        } else {
+          localStorage.removeItem(SESSION_KEY);
+        }
       })
-      .catch(() => { localStorage.removeItem(SESSION_KEY); })
+      .catch(() => {
+        localStorage.removeItem(SESSION_KEY);
+      })
       .finally(() => setLoading(false));
   }, []);
 
@@ -48,16 +65,30 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUser(res.user as AuthUser);
   }, []);
 
-  const register = useCallback(async (username: string, password: string, displayName: string, email?: string) => {
-    const res = await registerFn({ data: { username, password, displayName, email } });
-    localStorage.setItem(SESSION_KEY, res.sessionId);
-    setSessionId(res.sessionId);
-    setUser(res.user as AuthUser);
+  const register = useCallback(
+    async (username: string, password: string, displayName: string, email?: string) => {
+      const res = await registerFn({ data: { username, password, displayName, email } });
+      localStorage.setItem(SESSION_KEY, res.sessionId);
+      setSessionId(res.sessionId);
+      setUser(res.user as AuthUser);
+    },
+    [],
+  );
+
+  const continueAsGuest = useCallback(async () => {
+    const sid = createGuestSessionId();
+    localStorage.setItem(SESSION_KEY, sid);
+    setSessionId(sid);
+    setUser(guestUser() as AuthUser);
   }, []);
 
   const logout = useCallback(async () => {
     const sid = localStorage.getItem(SESSION_KEY);
-    if (sid) await logoutFn({ data: { sessionId: sid } }).catch(() => {});
+    if (sid && !isGuestSessionId(sid)) {
+      await logoutFn({ data: { sessionId: sid } }).catch(() => {
+        console.warn("Failed to clear session on the server during logout.");
+      });
+    }
     localStorage.removeItem(SESSION_KEY);
     setSessionId(null);
     setUser(null);
@@ -72,7 +103,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   return (
-    <AuthContext.Provider value={{ user, sessionId, loading, login, register, logout, updateDisplayName, updateEmail }}>
+    <AuthContext.Provider
+      value={{
+        user,
+        sessionId,
+        loading,
+        login,
+        continueAsGuest,
+        register,
+        logout,
+        updateDisplayName,
+        updateEmail,
+      }}
+    >
       {children}
     </AuthContext.Provider>
   );

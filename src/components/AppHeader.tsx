@@ -66,7 +66,7 @@ export function AppHeader({ title, subtitle }: { title: string; subtitle?: strin
               onClick={handleLogout}
               className="w-full flex items-center gap-2 px-3 py-2.5 text-sm hover:bg-muted transition-colors text-left text-destructive/80 hover:text-destructive border-t border-border mt-1"
             >
-              <LogOut className="h-4 w-4" /> Sign out
+              <LogOut className="h-4 w-4" /> {user?.isGuest ? "Exit guest mode" : "Sign out"}
             </button>
           </div>
         )}

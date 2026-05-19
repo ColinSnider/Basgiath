@@ -2,7 +2,19 @@ import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useStore } from "@/lib/basgiath-store";
 import { useAuth } from "@/lib/auth-context";
 import { updateDisplayName, changePassword, updateEmail as updateEmailFn } from "@/lib/auth-fns";
-import { ChevronLeft, Moon, Sun, Trash2, Type, Palette, Layout, KeyRound, Loader2, Mail } from "lucide-react";
+import { GUEST_BROWSE_MESSAGE } from "@/lib/session-auth.js";
+import {
+  ChevronLeft,
+  Moon,
+  Sun,
+  Trash2,
+  Type,
+  Palette,
+  Layout,
+  KeyRound,
+  Loader2,
+  Mail,
+} from "lucide-react";
 import { useState } from "react";
 
 export const Route = createFileRoute("/settings")({
@@ -11,20 +23,27 @@ export const Route = createFileRoute("/settings")({
 
 const ACCENT_COLORS = [
   { id: "default", label: "Crimson", hex: "#5a1a25" },
-  { id: "sage",    label: "Sage",    hex: "#3a5c4a" },
-  { id: "ocean",   label: "Ocean",   hex: "#1a3a5c" },
-  { id: "sunset",  label: "Sunset",  hex: "#8b3a1a" },
-  { id: "slate",   label: "Slate",   hex: "#374151" },
-  { id: "violet",  label: "Violet",  hex: "#4c1d95" },
+  { id: "sage", label: "Sage", hex: "#3a5c4a" },
+  { id: "ocean", label: "Ocean", hex: "#1a3a5c" },
+  { id: "sunset", label: "Sunset", hex: "#8b3a1a" },
+  { id: "slate", label: "Slate", hex: "#374151" },
+  { id: "violet", label: "Violet", hex: "#4c1d95" },
 ];
 
 function Settings() {
   const { settings, updateSettings, clearAll } = useStore();
-  const { user, sessionId, updateDisplayName: updateLocalName, updateEmail: updateLocalEmail, logout } = useAuth();
+  const {
+    user,
+    sessionId,
+    updateDisplayName: updateLocalName,
+    updateEmail: updateLocalEmail,
+    logout,
+  } = useAuth();
   const navigate = useNavigate();
 
   const [nameVal, setNameVal] = useState(user?.displayName ?? "");
   const [nameSaving, setNameSaving] = useState(false);
+  const [nameMsg, setNameMsg] = useState<{ ok: boolean; text: string } | null>(null);
 
   const [emailVal, setEmailVal] = useState(user?.email ?? "");
   const [emailSaving, setEmailSaving] = useState(false);
@@ -39,9 +58,16 @@ function Settings() {
     e.preventDefault();
     if (!sessionId || !nameVal.trim()) return;
     setNameSaving(true);
+    setNameMsg(null);
     try {
       await updateDisplayName({ data: { sessionId, displayName: nameVal.trim() } });
       updateLocalName(nameVal.trim());
+      setNameMsg({ ok: true, text: "Display name saved." });
+    } catch (err: unknown) {
+      setNameMsg({
+        ok: false,
+        text: err instanceof Error ? err.message : "Failed to save display name.",
+      });
     } finally {
       setNameSaving(false);
     }
@@ -56,8 +82,11 @@ function Settings() {
       await updateEmailFn({ data: { sessionId, email: emailVal.trim() } });
       updateLocalEmail(emailVal.trim());
       setEmailMsg({ ok: true, text: "Email saved." });
-    } catch (err: any) {
-      setEmailMsg({ ok: false, text: err?.message ?? "Failed to save email." });
+    } catch (err: unknown) {
+      setEmailMsg({
+        ok: false,
+        text: err instanceof Error ? err.message : "Failed to save email.",
+      });
     } finally {
       setEmailSaving(false);
     }
@@ -70,10 +99,14 @@ function Settings() {
     setPwMsg(null);
     try {
       await changePassword({ data: { sessionId, currentPassword: curPw, newPassword: newPw } });
-      setCurPw(""); setNewPw("");
+      setCurPw("");
+      setNewPw("");
       setPwMsg({ ok: true, text: "Password updated." });
-    } catch (err: any) {
-      setPwMsg({ ok: false, text: err?.message ?? "Failed to update password." });
+    } catch (err: unknown) {
+      setPwMsg({
+        ok: false,
+        text: err instanceof Error ? err.message : "Failed to update password.",
+      });
     } finally {
       setPwSaving(false);
     }
@@ -92,7 +125,10 @@ function Settings() {
   return (
     <div>
       <div className="px-3 pt-[max(env(safe-area-inset-top),0.75rem)] pb-2">
-        <Link to="/" className="inline-flex items-center text-sm text-muted-foreground hover:text-foreground">
+        <Link
+          to="/"
+          className="inline-flex items-center text-sm text-muted-foreground hover:text-foreground"
+        >
           <ChevronLeft className="h-5 w-5" /> Home
         </Link>
       </div>
@@ -108,7 +144,12 @@ function Settings() {
             <KeyRound className="h-4 w-4 text-muted-foreground" /> Account
           </div>
 
-          <p className="text-xs text-muted-foreground -mt-1">Signed in as <span className="font-medium">@{user?.username}</span></p>
+          <p className="text-xs text-muted-foreground -mt-1">
+            Signed in as <span className="font-medium">@{user?.username}</span>
+          </p>
+          {user?.isGuest && (
+            <p className="text-xs text-muted-foreground -mt-2">{GUEST_BROWSE_MESSAGE}</p>
+          )}
 
           {/* Display name */}
           <form onSubmit={saveName} className="space-y-1">
@@ -128,6 +169,11 @@ function Settings() {
                 {nameSaving && <Loader2 className="h-3 w-3 animate-spin" />} Save
               </button>
             </div>
+            {nameMsg && (
+              <p className={`text-xs ${nameMsg.ok ? "text-green-600" : "text-destructive"}`}>
+                {nameMsg.text}
+              </p>
+            )}
           </form>
 
           {/* Email */}
@@ -151,8 +197,14 @@ function Settings() {
                 {emailSaving && <Loader2 className="h-3 w-3 animate-spin" />} Save
               </button>
             </div>
-            {emailMsg && <p className={`text-xs ${emailMsg.ok ? "text-green-600" : "text-destructive"}`}>{emailMsg.text}</p>}
-            <p className="text-[11px] text-muted-foreground">Used for account recovery only. Never shared.</p>
+            {emailMsg && (
+              <p className={`text-xs ${emailMsg.ok ? "text-green-600" : "text-destructive"}`}>
+                {emailMsg.text}
+              </p>
+            )}
+            <p className="text-[11px] text-muted-foreground">
+              Used for account recovery only. Never shared.
+            </p>
           </form>
         </section>
 
@@ -176,7 +228,11 @@ function Settings() {
               placeholder="New password (min 6 chars)"
               className="w-full bg-muted rounded-md px-3 py-2 text-sm outline-none"
             />
-            {pwMsg && <p className={`text-xs ${pwMsg.ok ? "text-green-600" : "text-destructive"}`}>{pwMsg.text}</p>}
+            {pwMsg && (
+              <p className={`text-xs ${pwMsg.ok ? "text-green-600" : "text-destructive"}`}>
+                {pwMsg.text}
+              </p>
+            )}
             <button
               type="submit"
               disabled={pwSaving}
@@ -203,7 +259,9 @@ function Settings() {
               className={`relative h-7 w-12 rounded-full transition-colors ${settings.darkMode ? "bg-primary" : "bg-muted"}`}
               aria-pressed={settings.darkMode}
             >
-              <span className={`absolute top-0.5 h-6 w-6 rounded-full bg-card shadow flex items-center justify-center transition-all ${settings.darkMode ? "left-[1.375rem]" : "left-0.5"}`}>
+              <span
+                className={`absolute top-0.5 h-6 w-6 rounded-full bg-card shadow flex items-center justify-center transition-all ${settings.darkMode ? "left-[1.375rem]" : "left-0.5"}`}
+              >
                 {settings.darkMode ? <Moon className="h-3 w-3" /> : <Sun className="h-3 w-3" />}
               </span>
             </button>
@@ -227,7 +285,10 @@ function Settings() {
               ))}
             </div>
             <p className="text-[11px] text-muted-foreground mt-2">
-              Current: <span className="font-medium capitalize">{ACCENT_COLORS.find(c => c.id === settings.accentColor)?.label ?? "Crimson"}</span>
+              Current:{" "}
+              <span className="font-medium capitalize">
+                {ACCENT_COLORS.find((c) => c.id === settings.accentColor)?.label ?? "Crimson"}
+              </span>
             </p>
           </div>
         </section>
@@ -263,7 +324,9 @@ function Settings() {
               className={`relative h-7 w-12 rounded-full transition-colors ${settings.compactMode ? "bg-primary" : "bg-muted"}`}
               aria-pressed={settings.compactMode}
             >
-              <span className={`absolute top-0.5 h-6 w-6 rounded-full bg-card shadow transition-all ${settings.compactMode ? "left-[1.375rem]" : "left-0.5"}`} />
+              <span
+                className={`absolute top-0.5 h-6 w-6 rounded-full bg-card shadow transition-all ${settings.compactMode ? "left-[1.375rem]" : "left-0.5"}`}
+              />
             </button>
           </div>
         </section>
@@ -285,7 +348,7 @@ function Settings() {
           onClick={doLogout}
           className="w-full border border-border rounded-lg py-2.5 text-sm text-muted-foreground hover:text-foreground hover:border-foreground/30"
         >
-          Sign out
+          {user?.isGuest ? "Exit guest mode" : "Sign out"}
         </button>
       </div>
 

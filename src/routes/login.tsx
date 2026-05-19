@@ -2,13 +2,14 @@ import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useAuth } from "@/lib/auth-context";
 import { useState } from "react";
 import { Loader2 } from "lucide-react";
+import { GUEST_BROWSE_MESSAGE } from "@/lib/session-auth.js";
 
 export const Route = createFileRoute("/login")({
   component: LoginPage,
 });
 
 function LoginPage() {
-  const { login, register, user } = useAuth();
+  const { login, register, continueAsGuest, user } = useAuth();
   const navigate = useNavigate();
   const [mode, setMode] = useState<"login" | "register">("login");
   const [username, setUsername] = useState("");
@@ -18,7 +19,7 @@ function LoginPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  if (user) {
+  if (user && !user.isGuest) {
     navigate({ to: "/" });
     return null;
   }
@@ -36,6 +37,21 @@ function LoginPage() {
       navigate({ to: "/" });
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : "Something went wrong");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function handleContinueAsGuest() {
+    setError(null);
+    setLoading(true);
+    try {
+      await continueAsGuest();
+      navigate({ to: "/" });
+    } catch (err: unknown) {
+      setError(
+        err instanceof Error ? err.message : "Unable to continue as guest. Please try again.",
+      );
     } finally {
       setLoading(false);
     }
@@ -85,8 +101,7 @@ function LoginPage() {
             <>
               <div className="space-y-1">
                 <label className="text-sm font-medium text-foreground">
-                  Display Name{" "}
-                  <span className="text-muted-foreground font-normal">(optional)</span>
+                  Display Name <span className="text-muted-foreground font-normal">(optional)</span>
                 </label>
                 <input
                   value={displayName}
@@ -98,8 +113,7 @@ function LoginPage() {
 
               <div className="space-y-1">
                 <label className="text-sm font-medium text-foreground">
-                  Email{" "}
-                  <span className="text-muted-foreground font-normal">(optional)</span>
+                  Email <span className="text-muted-foreground font-normal">(optional)</span>
                 </label>
                 <input
                   type="email"
@@ -113,9 +127,7 @@ function LoginPage() {
             </>
           )}
 
-          {error && (
-            <p className="text-sm text-destructive">{error}</p>
-          )}
+          {error && <p className="text-sm text-destructive">{error}</p>}
 
           <button
             type="submit"
@@ -125,6 +137,25 @@ function LoginPage() {
             {loading && <Loader2 className="h-4 w-4 animate-spin" />}
             {mode === "login" ? "Sign In" : "Create Account"}
           </button>
+
+          {mode === "login" && (
+            <>
+              <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                <span className="h-px flex-1 bg-border" />
+                <span>Just browsing?</span>
+                <span className="h-px flex-1 bg-border" />
+              </div>
+              <button
+                type="button"
+                onClick={handleContinueAsGuest}
+                disabled={loading}
+                className="w-full border border-border rounded-md py-2.5 text-sm font-medium text-foreground hover:bg-muted/50 disabled:opacity-50"
+              >
+                Continue as Guest
+              </button>
+              <p className="text-xs text-muted-foreground">{GUEST_BROWSE_MESSAGE}</p>
+            </>
+          )}
         </form>
 
         <p className="text-sm text-center text-muted-foreground">
@@ -133,7 +164,10 @@ function LoginPage() {
               Don't have an account?{" "}
               <button
                 type="button"
-                onClick={() => { setMode("register"); setError(null); }}
+                onClick={() => {
+                  setMode("register");
+                  setError(null);
+                }}
                 className="text-primary hover:underline font-medium"
               >
                 Create one
@@ -144,7 +178,10 @@ function LoginPage() {
               Already have an account?{" "}
               <button
                 type="button"
-                onClick={() => { setMode("login"); setError(null); }}
+                onClick={() => {
+                  setMode("login");
+                  setError(null);
+                }}
                 className="text-primary hover:underline font-medium"
               >
                 Sign in

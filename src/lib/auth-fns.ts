@@ -5,6 +5,13 @@ import { db } from "../../server/db";
 import { users, sessions, userSettings } from "../../shared/schema";
 import { eq } from "drizzle-orm";
 import { authConfig, sessionExpiresAt } from "./auth-config";
+import {
+  guestUser,
+  isGuestSessionId,
+  isGuestSessionValid,
+  FULL_AUTH_REQUIRED_MESSAGE,
+  MISSING_OR_EXPIRED_SESSION_MESSAGE,
+} from "./session-auth.js";
 
 function newSessionId() {
   return crypto.randomUUID();
@@ -102,6 +109,10 @@ export const login = createServerFn({ method: "POST" })
 export const getMe = createServerFn({ method: "POST" })
   .inputValidator(z.object({ sessionId: z.string() }))
   .handler(async ({ data }) => {
+    if (isGuestSessionId(data.sessionId)) {
+      if (!isGuestSessionValid(data.sessionId)) return null;
+      return guestUser();
+    }
     const [session] = await db.select().from(sessions).where(eq(sessions.id, data.sessionId));
     if (!session || session.expiresAt < new Date()) return null;
     const [user] = await db
@@ -122,8 +133,10 @@ export const logout = createServerFn({ method: "POST" })
 export const updateDisplayName = createServerFn({ method: "POST" })
   .inputValidator(z.object({ sessionId: z.string(), displayName: z.string().min(1) }))
   .handler(async ({ data }) => {
+    if (isGuestSessionId(data.sessionId)) throw new Error(FULL_AUTH_REQUIRED_MESSAGE);
     const [session] = await db.select().from(sessions).where(eq(sessions.id, data.sessionId));
-    if (!session || session.expiresAt < new Date()) throw new Error("Unauthorized");
+    if (!session || session.expiresAt < new Date())
+      throw new Error(MISSING_OR_EXPIRED_SESSION_MESSAGE);
     const [user] = await db
       .update(users)
       .set({ displayName: data.displayName })
@@ -135,8 +148,10 @@ export const updateDisplayName = createServerFn({ method: "POST" })
 export const updateEmail = createServerFn({ method: "POST" })
   .inputValidator(z.object({ sessionId: z.string(), email: z.string().email() }))
   .handler(async ({ data }) => {
+    if (isGuestSessionId(data.sessionId)) throw new Error(FULL_AUTH_REQUIRED_MESSAGE);
     const [session] = await db.select().from(sessions).where(eq(sessions.id, data.sessionId));
-    if (!session || session.expiresAt < new Date()) throw new Error("Unauthorized");
+    if (!session || session.expiresAt < new Date())
+      throw new Error(MISSING_OR_EXPIRED_SESSION_MESSAGE);
     const [user] = await db
       .update(users)
       .set({ email: data.email })
@@ -154,8 +169,10 @@ export const changePassword = createServerFn({ method: "POST" })
     }),
   )
   .handler(async ({ data }) => {
+    if (isGuestSessionId(data.sessionId)) throw new Error(FULL_AUTH_REQUIRED_MESSAGE);
     const [session] = await db.select().from(sessions).where(eq(sessions.id, data.sessionId));
-    if (!session || session.expiresAt < new Date()) throw new Error("Unauthorized");
+    if (!session || session.expiresAt < new Date())
+      throw new Error(MISSING_OR_EXPIRED_SESSION_MESSAGE);
     const [user] = await db
       .select({ id: users.id, password: users.password })
       .from(users)
