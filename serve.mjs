@@ -79,7 +79,8 @@ const server = createServer(async (req, res) => {
     }
 
     const forwardedProto = req.headers["x-forwarded-proto"];
-    const protocol = typeof forwardedProto === "string" ? forwardedProto.split(",")[0]?.trim() : undefined;
+    const protocol =
+      typeof forwardedProto === "string" ? forwardedProto.split(",")[0].trim() || undefined : undefined;
     const host = req.headers.host ?? "localhost";
     const url = `${protocol ?? "http"}://${host}${req.url ?? "/"}`;
     const headers = new Headers();
