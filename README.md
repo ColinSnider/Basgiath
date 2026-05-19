@@ -102,13 +102,17 @@ npm run start
 2. Add a PostgreSQL service and copy its `DATABASE_URL` into the app service variables.
 3. Deploy. Railway uses `railway.json`:
    - Build: Railpack (`npm install` + `npm run build`)
-   - Start: `npm run db:migrate && npm run start`
-4. Verify health checks:
+   - Start: `npm run start`
+4. Run database migrations as a separate step before or after the first deploy. Do not include migrations in the web service start command. Use a one-off Railway job or run the command manually:
+   ```bash
+   npm run db:migrate
+   ```
+5. Verify health checks:
    - `GET /healthz`
    - `GET /readyz`
 
 ## Troubleshooting
 
-- `DATABASE_URL must be set`: set `DATABASE_URL` on the service before deploy.
-- Startup migration failed: confirm the database service is attached and reachable from the app.
+- `DATABASE_URL must be set`: set `DATABASE_URL` on the app service before deploying.
+- Migration errors: run `npm run db:migrate` as a separate one-off job or manual step, not as part of the web service startup.
 - App does not bind correctly: ensure Railway `PORT` is not overridden with an invalid value.
