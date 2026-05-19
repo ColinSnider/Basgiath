@@ -48,8 +48,8 @@ user_settings
 
 1. User fills in **username**, **password**, **displayName** (optional, defaults to username), and **email** (optional) on `/login` and submits the "Create Account" form.
 2. `src/routes/login.tsx` calls `register()` from `auth-context.tsx`, which calls the `register` server function in `auth-fns.ts`.
-3. Server validates input with Zod (`username` ≥ 3 chars, `password` ≥ 6 chars).
-4. Queries `users` table to confirm the username is not already taken (case-insensitive — username is lowercased before every read/write).
+3. Server validates input with Zod (`username` ≥ 3 chars, `password` ≥ 6 chars), trims username whitespace, and lowercases the canonical username before reads/writes.
+4. Queries `users` table to confirm the username is not already taken. Duplicate collisions return `"Username already taken"`. If the runtime DB schema is missing `users.username`, signup returns an actionable migration error.
 5. Hashes the password with `bcryptjs.hash(password, authConfig.bcryptRounds)`. `bcryptRounds` defaults to `10` and is overridable via the `AUTH_BCRYPT_ROUNDS` environment variable.
 6. Inserts a new row into the `users` table. Only the explicitly selected public columns are returned (guards against stale schema columns).
 7. Inserts a default row into `user_settings` for the new user.
