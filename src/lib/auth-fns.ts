@@ -11,8 +11,8 @@ function newSessionId() {
 }
 
 // Explicit column selection guards against schema mismatches (e.g. stale
-// columns like replit_id / profile_image_url that may still exist in the DB
-// but are no longer part of the Drizzle schema).
+// legacy columns that may still exist in the DB but are no longer part of the
+// Drizzle schema).
 const authUserPublicColumns = {
   id: users.id,
   username: users.username,

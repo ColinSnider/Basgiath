@@ -54,7 +54,12 @@ Create a `.env` file (or set environment variables another way):
 
 ```bash
 DATABASE_URL=postgresql://USER:PASSWORD@HOST:PORT/DB_NAME
+PORT=5000
+NODE_ENV=production
 ```
+
+- `DATABASE_URL` is required.
+- `PORT` is optional in local development and is provided automatically by Railway.
 
 ## Scripts
 
@@ -91,4 +96,19 @@ npm run build
 npm run start
 ```
 
-This repository is now organized for standard standalone local development without platform-specific auth tooling.
+## Railway deployment
+
+1. Create a new Railway project and connect this repository.
+2. Add a PostgreSQL service and copy its `DATABASE_URL` into the app service variables.
+3. Deploy. Railway uses `railway.json`:
+   - Build: Railpack (`npm install` + `npm run build`)
+   - Start: `npm run db:migrate && npm run start`
+4. Verify health checks:
+   - `GET /healthz`
+   - `GET /readyz`
+
+## Troubleshooting
+
+- `DATABASE_URL must be set`: set `DATABASE_URL` on the service before deploy.
+- Startup migration failed: confirm the database service is attached and reachable from the app.
+- App does not bind correctly: ensure Railway `PORT` is not overridden with an invalid value.
