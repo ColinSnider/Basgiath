@@ -7,6 +7,7 @@
   "deploy": {
     "runtime": "V2",
     "numReplicas": 1,
+    "startCommand": "npm run db:migrate && npm run start",
     "sleepApplication": false,
     "useLegacyStacker": false,
     "ipv6EgressEnabled": false,
