@@ -11,7 +11,9 @@ export const GUEST_BROWSE_MESSAGE =
  * @param {number} [ttlMs]
  */
 export function createGuestSessionId(nowMs = Date.now(), ttlMs = GUEST_SESSION_TTL_MS) {
-  const expiresAtMs = Math.max(0, Math.floor(nowMs + ttlMs));
+  const safeNowMs = Number.isFinite(nowMs) ? nowMs : Date.now();
+  const safeTtlMs = Number.isFinite(ttlMs) && ttlMs > 0 ? ttlMs : GUEST_SESSION_TTL_MS;
+  const expiresAtMs = Math.floor(safeNowMs + safeTtlMs);
   return `${GUEST_SESSION_PREFIX}${expiresAtMs}:${crypto.randomUUID()}`;
 }
 

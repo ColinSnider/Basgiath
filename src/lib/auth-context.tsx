@@ -84,7 +84,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const logout = useCallback(async () => {
     const sid = localStorage.getItem(SESSION_KEY);
-    if (sid && !isGuestSessionId(sid)) await logoutFn({ data: { sessionId: sid } }).catch(() => {});
+    if (sid && !isGuestSessionId(sid)) {
+      await logoutFn({ data: { sessionId: sid } }).catch(() => {
+        console.warn("Failed to clear session on the server during logout.");
+      });
+    }
     localStorage.removeItem(SESSION_KEY);
     setSessionId(null);
     setUser(null);
