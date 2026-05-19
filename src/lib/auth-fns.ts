@@ -62,13 +62,11 @@ export const register = createServerFn({ method: "POST" })
       .returning(authUserPublicColumns);
     await db.insert(userSettings).values({ userId: user.id });
     const sessionId = newSessionId();
-    await db
-      .insert(sessions)
-      .values({
-        id: sessionId,
-        userId: user.id,
-        expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
-      });
+    await db.insert(sessions).values({
+      id: sessionId,
+      userId: user.id,
+      expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
+    });
     return { sessionId, user: userPublic(user) };
   });
 
@@ -84,13 +82,11 @@ export const login = createServerFn({ method: "POST" })
     const valid = await bcryptjs.compare(data.password, user.password);
     if (!valid) throw new Error("Invalid username or password");
     const sessionId = newSessionId();
-    await db
-      .insert(sessions)
-      .values({
-        id: sessionId,
-        userId: user.id,
-        expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
-      });
+    await db.insert(sessions).values({
+      id: sessionId,
+      userId: user.id,
+      expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
+    });
     return { sessionId, user: userPublic(user) };
   });
 
@@ -123,7 +119,7 @@ export const updateDisplayName = createServerFn({ method: "POST" })
       .update(users)
       .set({ displayName: data.displayName })
       .where(eq(users.id, session.userId))
-      .returning();
+      .returning({ displayName: users.displayName });
     return { displayName: user.displayName };
   });
 
@@ -136,7 +132,7 @@ export const updateEmail = createServerFn({ method: "POST" })
       .update(users)
       .set({ email: data.email })
       .where(eq(users.id, session.userId))
-      .returning();
+      .returning({ email: users.email });
     return { email: user.email };
   });
 
@@ -156,7 +152,6 @@ export const changePassword = createServerFn({ method: "POST" })
       .from(users)
       .where(eq(users.id, session.userId));
     if (!user) throw new Error("User not found");
-    if (!user.password) throw new Error("This account does not have a password set.");
     const valid = await bcryptjs.compare(data.currentPassword, user.password);
     if (!valid) throw new Error("Current password is incorrect");
     const hashed = await bcryptjs.hash(data.newPassword, 10);
