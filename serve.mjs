@@ -5,6 +5,8 @@ import { fileURLToPath } from "node:url";
 
 const __dirname = fileURLToPath(new URL(".", import.meta.url));
 const CLIENT_DIR = join(__dirname, "dist/client");
+const RESOLVED_CLIENT_DIR = resolve(CLIENT_DIR);
+const STATIC_ROOT = `${RESOLVED_CLIENT_DIR}${sep}`;
 
 const MIME = {
   ".html": "text/html; charset=utf-8",
@@ -29,8 +31,7 @@ const worker = (await import("./dist/server/server.js")).default;
 function safeStaticPath(pathname) {
   const candidate = pathname.replace(/^\/+/, "");
   const filePath = resolve(CLIENT_DIR, candidate);
-  const staticRoot = `${resolve(CLIENT_DIR)}${sep}`;
-  if (filePath !== resolve(CLIENT_DIR) && !filePath.startsWith(staticRoot)) {
+  if (filePath === RESOLVED_CLIENT_DIR || !filePath.startsWith(STATIC_ROOT)) {
     return null;
   }
   return filePath;
