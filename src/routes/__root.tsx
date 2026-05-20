@@ -14,6 +14,12 @@ import { BottomNav } from "@/components/BottomNav";
 import { AuthProvider, useAuth } from "@/lib/auth-context";
 import { StoreProvider, useStore } from "@/lib/basgiath-store";
 import { shouldRequireLoginRedirect } from "@/lib/session-auth.js";
+import {
+  PRESET_THEMES,
+  FONT_CHOICES,
+  DISPLAY_FONT_CHOICES,
+  normalizeUserPreferences,
+} from "@/lib/user-preferences";
 
 import appCss from "../styles.css?url";
 
@@ -91,7 +97,7 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       { rel: "preconnect", href: "https://fonts.gstatic.com", crossOrigin: "anonymous" },
       {
         rel: "stylesheet",
-        href: "https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,500;0,600;0,700;1,400&family=Inter:wght@400;500;600&display=swap",
+        href: "https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Lora:wght@400;500;600&family=Merriweather:wght@400;700&family=Playfair+Display:ital,wght@0,400;0,500;0,600;0,700;1,400&family=Source+Sans+3:wght@400;500;600&display=swap",
       },
     ],
   }),
@@ -116,7 +122,7 @@ function RootShell({ children }: { children: React.ReactNode }) {
 }
 
 function AppShell() {
-  const { settings } = useStore();
+  const { settings, preferences } = useStore();
   const { user, loading } = useAuth();
   const { pathname } = useLocation();
   const navigate = useNavigate();
@@ -132,80 +138,36 @@ function AppShell() {
       scale === "sm" ? "14px" : scale === "lg" ? "18px" : "16px";
   }, [settings.fontScale]);
 
+  useEffect(() => {
+    const root = document.documentElement;
+    const prefs = normalizeUserPreferences(preferences);
+    if (!prefs.useCustomFont) {
+      root.style.removeProperty("--font-sans");
+      root.style.removeProperty("--font-display");
+      return;
+    }
+    const bodyFont = FONT_CHOICES.find((f) => f.id === prefs.bodyFont)?.cssVar;
+    const displayFont = DISPLAY_FONT_CHOICES.find((f) => f.id === prefs.displayFont)?.cssVar;
+    if (bodyFont) root.style.setProperty("--font-sans", bodyFont);
+    if (displayFont) root.style.setProperty("--font-display", displayFont);
+  }, [preferences]);
+
   // Apply accent color as CSS variables on :root
   useEffect(() => {
     const root = document.documentElement;
 
-    type ThemeEntry = {
-      light: [string, string];
-      dark: [string, string];
-      darkSurfaces: { bg: string; card: string; border: string; muted: string };
-    };
-
-    const THEMES: Record<string, ThemeEntry> = {
-      default: {
-        light: ["oklch(0.34 0.11 18)", "oklch(0.97 0.012 80)"],
-        dark: ["oklch(0.5 0.14 20)", "oklch(0.98 0.01 80)"],
-        darkSurfaces: {
-          bg: "oklch(0.16 0.02 20)",
-          card: "oklch(0.20 0.03 20)",
-          border: "oklch(0.30 0.03 20)",
-          muted: "oklch(0.26 0.04 20)",
-        },
-      },
-      sage: {
-        light: ["oklch(0.35 0.07 155)", "oklch(0.97 0.01 130)"],
-        dark: ["oklch(0.52 0.09 155)", "oklch(0.98 0.01 130)"],
-        darkSurfaces: {
-          bg: "oklch(0.15 0.018 155)",
-          card: "oklch(0.19 0.022 155)",
-          border: "oklch(0.28 0.026 155)",
-          muted: "oklch(0.24 0.030 155)",
-        },
-      },
-      ocean: {
-        light: ["oklch(0.33 0.09 245)", "oklch(0.97 0.01 245)"],
-        dark: ["oklch(0.5 0.12 245)", "oklch(0.98 0.01 245)"],
-        darkSurfaces: {
-          bg: "oklch(0.15 0.018 245)",
-          card: "oklch(0.19 0.022 245)",
-          border: "oklch(0.28 0.026 245)",
-          muted: "oklch(0.24 0.030 245)",
-        },
-      },
-      sunset: {
-        light: ["oklch(0.42 0.12 40)", "oklch(0.97 0.012 60)"],
-        dark: ["oklch(0.58 0.14 40)", "oklch(0.98 0.01 60)"],
-        darkSurfaces: {
-          bg: "oklch(0.15 0.018 40)",
-          card: "oklch(0.19 0.022 40)",
-          border: "oklch(0.28 0.026 40)",
-          muted: "oklch(0.24 0.030 40)",
-        },
-      },
-      slate: {
-        light: ["oklch(0.35 0.025 255)", "oklch(0.97 0.005 255)"],
-        dark: ["oklch(0.52 0.03 255)", "oklch(0.98 0.005 255)"],
-        darkSurfaces: {
-          bg: "oklch(0.15 0.012 255)",
-          card: "oklch(0.19 0.015 255)",
-          border: "oklch(0.28 0.018 255)",
-          muted: "oklch(0.24 0.020 255)",
-        },
-      },
-      violet: {
-        light: ["oklch(0.33 0.16 295)", "oklch(0.97 0.01 295)"],
-        dark: ["oklch(0.52 0.18 295)", "oklch(0.98 0.01 295)"],
-        darkSurfaces: {
-          bg: "oklch(0.15 0.022 295)",
-          card: "oklch(0.19 0.028 295)",
-          border: "oklch(0.28 0.032 295)",
-          muted: "oklch(0.24 0.036 295)",
-        },
-      },
-    };
-
-    const theme = THEMES[settings.accentColor] ?? THEMES.default;
+    const prefs = normalizeUserPreferences(preferences);
+    const customTheme = prefs.activeCustomThemeId
+      ? prefs.customThemes.find((t) => t.id === prefs.activeCustomThemeId)
+      : null;
+    const fallbackTheme = PRESET_THEMES.find((t) => t.id === settings.accentColor) ?? PRESET_THEMES[0];
+    const theme = customTheme
+      ? {
+          light: [customTheme.lightPrimary, customTheme.lightForeground] as [string, string],
+          dark: [customTheme.darkPrimary, customTheme.darkForeground] as [string, string],
+          darkSurfaces: fallbackTheme.darkSurfaces,
+        }
+      : fallbackTheme;
     const isDark = settings.darkMode;
     const [primary, primaryFg] = isDark ? theme.dark : theme.light;
 
@@ -237,7 +199,7 @@ function AppShell() {
         root.style.removeProperty(v);
       }
     }
-  }, [settings.accentColor, settings.darkMode]);
+  }, [settings.accentColor, settings.darkMode, preferences]);
 
   // Redirect to login if not authenticated (after loading)
   // Exception: "/" shows the landing page, so no redirect needed there
