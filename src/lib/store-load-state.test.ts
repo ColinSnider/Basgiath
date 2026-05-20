@@ -49,3 +49,76 @@ test("mergeLoadedStoreState preserves preferences during reload", () => {
   assert.equal(nextState.settings.fontScale, "md");
   assert.equal(nextState.dataLoading, false);
 });
+
+test("mergeLoadedStoreState honors valid fontScale and defaults invalid values to md", () => {
+  const baseState = {
+    books: [],
+    margins: [],
+    goals: [],
+    settings: {
+      darkMode: false,
+      accentColor: "default",
+      compactMode: false,
+      fontScale: "md",
+    },
+    preferences: {},
+    dataLoading: true,
+  };
+
+  const smallFontState = mergeLoadedStoreState({
+    previousState: baseState,
+    loadedData: {
+      books: [],
+      margins: [],
+      goals: [],
+      settings: {
+        darkMode: false,
+        accentColor: "default",
+        compactMode: false,
+        fontScale: "sm",
+      },
+    },
+    mapBook: (row) => row,
+    mapMargin: (row) => row,
+    mapGoal: (row) => row,
+  });
+  assert.equal(smallFontState.settings.fontScale, "sm");
+
+  const largeFontState = mergeLoadedStoreState({
+    previousState: baseState,
+    loadedData: {
+      books: [],
+      margins: [],
+      goals: [],
+      settings: {
+        darkMode: false,
+        accentColor: "default",
+        compactMode: false,
+        fontScale: "lg",
+      },
+    },
+    mapBook: (row) => row,
+    mapMargin: (row) => row,
+    mapGoal: (row) => row,
+  });
+  assert.equal(largeFontState.settings.fontScale, "lg");
+
+  const nullFontState = mergeLoadedStoreState({
+    previousState: baseState,
+    loadedData: {
+      books: [],
+      margins: [],
+      goals: [],
+      settings: {
+        darkMode: false,
+        accentColor: "default",
+        compactMode: false,
+        fontScale: null,
+      },
+    },
+    mapBook: (row) => row,
+    mapMargin: (row) => row,
+    mapGoal: (row) => row,
+  });
+  assert.equal(nullFontState.settings.fontScale, "md");
+});

@@ -2,7 +2,7 @@ type LoadedSettings = {
   darkMode: boolean;
   accentColor: string;
   compactMode: boolean;
-  fontScale?: "sm" | "md" | "lg" | null | undefined;
+  fontScale?: "sm" | "md" | "lg" | null;
 };
 
 type LoadedStoreData<RawBook, RawMargin, RawGoal> = {
