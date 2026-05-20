@@ -146,8 +146,12 @@ function AppShell() {
       root.style.removeProperty("--font-display");
       return;
     }
-    const bodyFont = FONT_CHOICES.find((f) => f.id === prefs.bodyFont)?.cssVar;
-    const displayFont = DISPLAY_FONT_CHOICES.find((f) => f.id === prefs.displayFont)?.cssVar;
+    const bodyFont =
+      FONT_CHOICES.find((f) => f.id === prefs.bodyFont)?.cssVar ??
+      FONT_CHOICES.find((f) => f.id === "inter")?.cssVar;
+    const displayFont =
+      DISPLAY_FONT_CHOICES.find((f) => f.id === prefs.displayFont)?.cssVar ??
+      DISPLAY_FONT_CHOICES.find((f) => f.id === "playfair")?.cssVar;
     if (bodyFont) root.style.setProperty("--font-sans", bodyFont);
     if (displayFont) root.style.setProperty("--font-display", displayFont);
   }, [preferences]);

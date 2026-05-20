@@ -184,7 +184,7 @@ function Settings() {
       setDataMsg({ ok: false, text: "Custom theme name is required." });
       return;
     }
-    const id = `custom-${Date.now().toString(36)}`;
+    const id = `custom-${crypto.randomUUID()}`;
     const nextThemes = [
       ...preferences.customThemes,
       {

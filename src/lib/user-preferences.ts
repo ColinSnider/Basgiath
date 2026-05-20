@@ -182,6 +182,14 @@ function isHex(value: unknown) {
   return typeof value === "string" && /^#(?:[0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/.test(value.trim());
 }
 
+function normalizeHex(value: string) {
+  const trimmed = value.trim();
+  if (trimmed.length === 4) {
+    return `#${trimmed[1]}${trimmed[1]}${trimmed[2]}${trimmed[2]}${trimmed[3]}${trimmed[3]}`;
+  }
+  return trimmed;
+}
+
 function normalizeOptionalString(value: unknown): string | null {
   if (value === null || value === undefined) return null;
   if (typeof value !== "string") return null;
@@ -204,10 +212,10 @@ function normalizeCustomTheme(theme: unknown, idx: number): CustomTheme {
   return {
     id,
     name,
-    lightPrimary: (theme.lightPrimary as string).trim(),
-    lightForeground: (theme.lightForeground as string).trim(),
-    darkPrimary: (theme.darkPrimary as string).trim(),
-    darkForeground: (theme.darkForeground as string).trim(),
+    lightPrimary: normalizeHex(theme.lightPrimary as string),
+    lightForeground: normalizeHex(theme.lightForeground as string),
+    darkPrimary: normalizeHex(theme.darkPrimary as string),
+    darkForeground: normalizeHex(theme.darkForeground as string),
   };
 }
 
@@ -324,4 +332,3 @@ export function parseImportJson(raw: string): ExportData {
     preferences: normalizeUserPreferences(parsed.preferences),
   };
 }
-

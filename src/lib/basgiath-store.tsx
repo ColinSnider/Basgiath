@@ -223,7 +223,11 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     const key = storageKey(user?.id);
     if (!key || typeof window === "undefined" || !preferencesLoaded.current) return;
-    window.localStorage.setItem(key, JSON.stringify(state.preferences));
+    try {
+      window.localStorage.setItem(key, JSON.stringify(state.preferences));
+    } catch {
+      // Keep runtime resilient if storage is unavailable or quota is exceeded.
+    }
   }, [state.preferences, user?.id]);
 
   const addBook = useCallback(
