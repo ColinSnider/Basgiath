@@ -50,7 +50,7 @@ test("mergeLoadedStoreState preserves preferences during reload", () => {
   assert.equal(nextState.dataLoading, false);
 });
 
-test("mergeLoadedStoreState honors valid fontScale and defaults invalid values to md", () => {
+test("mergeLoadedStoreState handles fontScale validation", () => {
   const baseState = {
     books: [],
     margins: [],
