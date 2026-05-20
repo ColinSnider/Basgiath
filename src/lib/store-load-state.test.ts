@@ -2,7 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { mergeLoadedStoreState } from "./store-load-state.ts";
 
-test("mergeLoadedStoreState preserves preferences while hydrating account data for homepage load", () => {
+test("mergeLoadedStoreState preserves preferences during reload", () => {
   const previousState = {
     books: [],
     margins: [],
@@ -43,6 +43,9 @@ test("mergeLoadedStoreState preserves preferences while hydrating account data f
   assert.deepEqual(nextState.books, [{ id: "book-1" }]);
   assert.deepEqual(nextState.margins, [{ id: "margin-1" }]);
   assert.deepEqual(nextState.goals, [{ id: "goal-1" }]);
+  assert.equal(nextState.settings.darkMode, true);
+  assert.equal(nextState.settings.accentColor, "sage");
+  assert.equal(nextState.settings.compactMode, true);
   assert.equal(nextState.settings.fontScale, "md");
   assert.equal(nextState.dataLoading, false);
 });
