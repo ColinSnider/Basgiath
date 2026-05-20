@@ -1,4 +1,12 @@
-import { useEffect, useState, useCallback, createContext, useContext, type ReactNode } from "react";
+import {
+  useEffect,
+  useState,
+  useCallback,
+  createContext,
+  useContext,
+  type ReactNode,
+  useRef,
+} from "react";
 import { useAuth } from "./auth-context";
 import * as dataFns from "./data-fns";
 import {
@@ -6,6 +14,12 @@ import {
   FULL_AUTH_REQUIRED_MESSAGE,
   MISSING_OR_EXPIRED_SESSION_MESSAGE,
 } from "./session-auth.js";
+import {
+  DEFAULT_PREFERENCES,
+  normalizeUserPreferences,
+  parseImportJson,
+  type UserPreferences,
+} from "./user-preferences";
 
 export type Book = {
   id: string;
@@ -51,6 +65,7 @@ type StoreState = {
   margins: MarginEntry[];
   goals: Goal[];
   settings: Settings;
+  preferences: UserPreferences;
   dataLoading: boolean;
 };
 
@@ -66,6 +81,9 @@ type StoreActions = {
   addGoal: (g: Omit<Goal, "id" | "createdAt">) => Promise<void>;
   removeGoal: (id: string) => Promise<void>;
   updateSettings: (patch: Partial<Settings>) => Promise<void>;
+  updatePreferences: (patch: Partial<UserPreferences>) => void;
+  importUserData: (rawJson: string) => Promise<void>;
+  exportUserData: () => string;
   clearAll: () => Promise<void>;
   reload: () => Promise<void>;
 };
@@ -83,8 +101,13 @@ const DEFAULT_STATE: StoreState = {
   margins: [],
   goals: [],
   settings: DEFAULT_SETTINGS,
+  preferences: DEFAULT_PREFERENCES,
   dataLoading: false,
 };
+
+function storageKey(userId: number | undefined) {
+  return userId ? `basgiath:preferences:v1:${userId}` : null;
+}
 
 function rowToBook(r: any): Book {
   return {
@@ -127,6 +150,7 @@ function rowToGoal(r: any): Goal {
 export function StoreProvider({ children }: { children: ReactNode }) {
   const { sessionId, user } = useAuth();
   const [state, setState] = useState<StoreState>({ ...DEFAULT_STATE, dataLoading: !!sessionId });
+  const preferencesLoaded = useRef(false);
 
   const promptAuth = useCallback((message: string) => {
     if (typeof window !== "undefined") window.alert(message);
@@ -176,6 +200,35 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     reload();
   }, [reload]);
+
+  useEffect(() => {
+    preferencesLoaded.current = false;
+    const key = storageKey(user?.id);
+    if (!key || typeof window === "undefined") {
+      setState((s) => ({ ...s, preferences: DEFAULT_PREFERENCES }));
+      preferencesLoaded.current = true;
+      return;
+    }
+    try {
+      const raw = window.localStorage.getItem(key);
+      const parsed = raw ? JSON.parse(raw) : null;
+      setState((s) => ({ ...s, preferences: normalizeUserPreferences(parsed) }));
+    } catch {
+      setState((s) => ({ ...s, preferences: DEFAULT_PREFERENCES }));
+    } finally {
+      preferencesLoaded.current = true;
+    }
+  }, [user?.id]);
+
+  useEffect(() => {
+    const key = storageKey(user?.id);
+    if (!key || typeof window === "undefined" || !preferencesLoaded.current) return;
+    try {
+      window.localStorage.setItem(key, JSON.stringify(state.preferences));
+    } catch {
+      // Keep runtime resilient if storage is unavailable or quota is exceeded.
+    }
+  }, [state.preferences, user?.id]);
 
   const addBook = useCallback(
     async (b: Omit<Book, "id" | "addedAt"> & { addedAt?: string; extraReads?: string[] }) => {
@@ -340,6 +393,49 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     [getWritableSessionId],
   );
 
+  const updatePreferences = useCallback((patch: Partial<UserPreferences>) => {
+    setState((s) => ({
+      ...s,
+      preferences: normalizeUserPreferences({ ...s.preferences, ...patch }),
+    }));
+  }, []);
+
+  const exportUserData = useCallback(() => {
+    return JSON.stringify(
+      {
+        version: 1,
+        exportedAt: new Date().toISOString(),
+        books: state.books,
+        margins: state.margins,
+        goals: state.goals,
+        settings: state.settings,
+        preferences: state.preferences,
+      },
+      null,
+      2,
+    );
+  }, [state.books, state.margins, state.goals, state.settings, state.preferences]);
+
+  const importUserData = useCallback(
+    async (rawJson: string) => {
+      const writableSessionId = getWritableSessionId();
+      if (!writableSessionId) return;
+      const parsed = parseImportJson(rawJson);
+      await dataFns.importUserData({
+        data: {
+          sessionId: writableSessionId,
+          books: parsed.books,
+          margins: parsed.margins,
+          goals: parsed.goals,
+          settings: parsed.settings,
+        },
+      });
+      setState((s) => ({ ...s, preferences: parsed.preferences }));
+      await reload();
+    },
+    [getWritableSessionId, reload],
+  );
+
   const clearAll = useCallback(async () => {
     const writableSessionId = getWritableSessionId();
     if (!writableSessionId) return;
@@ -360,6 +456,9 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         addGoal,
         removeGoal,
         updateSettings,
+        updatePreferences,
+        exportUserData,
+        importUserData,
         clearAll,
         reload,
       }}

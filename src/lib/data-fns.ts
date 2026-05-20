@@ -10,6 +10,48 @@ import {
   isGuestSessionValid,
 } from "./session-auth.js";
 
+const nullableText = z
+  .union([z.string(), z.null(), z.undefined()])
+  .transform((value) => {
+    if (value === null || value === undefined) return null;
+    const trimmed = value.trim();
+    if (!trimmed) return null;
+    if (trimmed.toLowerCase() === "none" || trimmed.toLowerCase() === "null") return null;
+    return trimmed;
+  });
+
+const importedBookSchema = z.object({
+  id: z.string().min(1),
+  title: z.string().min(1),
+  author: z.string().min(1),
+  coverUrl: nullableText.optional(),
+  format: z.enum(["book", "audiobook"]).default("book"),
+  totalPages: z.number().int().nonnegative().nullable().optional(),
+  currentPage: z.number().int().nonnegative().nullable().optional(),
+  durationMinutes: z.number().int().nonnegative().nullable().optional(),
+  currentMinute: z.number().int().nonnegative().nullable().optional(),
+  status: z.enum(["reading", "finished", "wishlist"]),
+  addedAt: z.string().datetime(),
+  reads: z.array(z.object({ finishedAt: z.string().datetime() })).default([]),
+});
+
+const importedMarginSchema = z.object({
+  id: z.string().min(1),
+  bookId: z.string().min(1),
+  type: z.enum(["note", "quote"]),
+  text: z.string().min(1),
+  page: z.number().int().nonnegative().nullable().optional(),
+  createdAt: z.string().datetime(),
+});
+
+const importedGoalSchema = z.object({
+  id: z.string().min(1),
+  metric: z.enum(["books", "pages", "minutes"]),
+  target: z.number().int().nonnegative(),
+  timeframe: z.enum(["week", "month", "year"]),
+  createdAt: z.string().datetime(),
+});
+
 async function validateSession(sessionId: string) {
   if (isGuestSessionId(sessionId)) throw new Error(FULL_AUTH_REQUIRED_MESSAGE);
   const [session] = await db.select().from(sessions).where(eq(sessions.id, sessionId));
@@ -221,5 +263,97 @@ export const clearAllData = createServerFn({ method: "POST" })
       db.delete(margins).where(eq(margins.userId, userId)),
       db.delete(goals).where(eq(goals.userId, userId)),
     ]);
+    return { ok: true };
+  });
+
+export const importUserData = createServerFn({ method: "POST" })
+  .inputValidator(
+    z.object({
+      sessionId: z.string(),
+      books: z.array(importedBookSchema),
+      margins: z.array(importedMarginSchema),
+      goals: z.array(importedGoalSchema),
+      settings: z.object({
+        darkMode: z.boolean(),
+        accentColor: z.string(),
+        compactMode: z.boolean(),
+        fontScale: z.enum(["sm", "md", "lg"]),
+      }),
+    }),
+  )
+  .handler(async ({ data }) => {
+    const userId = await validateSession(data.sessionId);
+    const bookIds = new Set(data.books.map((b) => b.id));
+    for (let i = 0; i < data.margins.length; i += 1) {
+      const margin = data.margins[i];
+      if (!bookIds.has(margin.bookId)) {
+        throw new Error(
+          `Import failed: margins[${i}] references missing bookId "${margin.bookId}".`,
+        );
+      }
+    }
+
+    await db.transaction(async (tx) => {
+      await tx.delete(margins).where(eq(margins.userId, userId));
+      await tx.delete(goals).where(eq(goals.userId, userId));
+      await tx.delete(books).where(eq(books.userId, userId));
+
+      if (data.books.length) {
+        await tx.insert(books).values(
+          data.books.map((book) => ({
+            id: book.id,
+            userId,
+            title: book.title,
+            author: book.author,
+            coverUrl: book.coverUrl ?? null,
+            format: book.format,
+            totalPages: book.totalPages ?? null,
+            currentPage: book.currentPage ?? 0,
+            durationMinutes: book.durationMinutes ?? null,
+            currentMinute: book.currentMinute ?? 0,
+            status: book.status,
+            reads: book.reads,
+            addedAt: new Date(book.addedAt),
+          })),
+        );
+      }
+
+      if (data.margins.length) {
+        await tx.insert(margins).values(
+          data.margins.map((margin) => ({
+            id: margin.id,
+            userId,
+            bookId: margin.bookId,
+            type: margin.type,
+            text: margin.text,
+            page: margin.page ?? null,
+            createdAt: new Date(margin.createdAt),
+          })),
+        );
+      }
+
+      if (data.goals.length) {
+        await tx.insert(goals).values(
+          data.goals.map((goal) => ({
+            id: goal.id,
+            userId,
+            metric: goal.metric,
+            target: goal.target,
+            timeframe: goal.timeframe,
+            createdAt: new Date(goal.createdAt),
+          })),
+        );
+      }
+
+      await tx
+        .update(userSettings)
+        .set({
+          darkMode: data.settings.darkMode,
+          accentColor: data.settings.accentColor,
+          compactMode: data.settings.compactMode,
+          fontScale: data.settings.fontScale,
+        })
+        .where(eq(userSettings.userId, userId));
+    });
     return { ok: true };
   });

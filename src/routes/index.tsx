@@ -10,6 +10,7 @@ import {
 import { useState, useEffect } from "react";
 import { BookSearch } from "@/components/BookSearch";
 import type { Book } from "@/lib/basgiath-store";
+import { normalizeDashboardTiles } from "@/lib/user-preferences";
 
 export const Route = createFileRoute("/")({
   component: Home,
@@ -144,7 +145,7 @@ function LandingPage() {
 
 /* ── main dashboard ── */
 function Dashboard() {
-  const { books, margins, goals, addBook } = useStore();
+  const { books, margins, goals, preferences, addBook } = useStore();
   const { user } = useAuth();
   const [searching, setSearching] = useState(false);
   const [goalIdx, setGoalIdx] = useState(0);
@@ -194,159 +195,191 @@ function Dashboard() {
     <>
       <AppHeader title="Basgiath" subtitle={`${greeting()}, ${firstName}.`} />
 
-      {/* ── Hero stats card ── */}
-      <section className="px-5">
-        <div className="rounded-2xl bg-gradient-to-br from-primary to-primary/80 text-primary-foreground p-5 shadow-lg ring-1 ring-black/10 relative overflow-hidden">
-          <Sparkles className="absolute -right-3 -top-3 h-24 w-24 text-white/10 pointer-events-none" />
-          <p className="text-[11px] uppercase tracking-[0.2em] text-primary-foreground/70 font-medium">{year} in books</p>
-          <div className="flex items-end gap-3 mt-1">
-            <span className="font-display text-6xl leading-none">{finishedThisYear}</span>
-            <span className="text-sm text-primary-foreground/70 mb-1.5">finished · {totalAllReads} lifetime</span>
-          </div>
+      <section className="px-5 mt-1 mb-4 grid grid-cols-2 gap-3">
+        {normalizeDashboardTiles(preferences.dashboardTiles).map((tile) => {
+          if (tile.widgetId === "notes" && recentMargins.length === 0) return null;
+          if (tile.widgetId === "finished" && recentlyFinished.length === 0) return null;
 
-          {activeGoal && goalPct !== null && (
-            <div className="mt-4 space-y-1.5">
-              <div className="flex items-center justify-between text-[11px] text-primary-foreground/75">
-                <span className="flex items-center gap-1.5">
-                  <Target className="h-3 w-3" />
-                  <span className="capitalize">{activeGoal.timeframe}ly · {goalLabel}</span>
-                </span>
-                <div className="flex items-center gap-1.5">
-                  {goals.length > 1 && (
-                    <>
-                      <button onClick={() => setGoalIdx((i) => (i - 1 + goals.length) % goals.length)} className="hover:text-white"><ChevronLeft className="h-3.5 w-3.5" /></button>
-                      <span>{goalIdx + 1}/{goals.length}</span>
-                      <button onClick={() => setGoalIdx((i) => (i + 1) % goals.length)} className="hover:text-white"><ChevronRight className="h-3.5 w-3.5" /></button>
-                    </>
-                  )}
-                  <span className="font-semibold ml-1">{goalPct}%</span>
+          const content =
+            tile.widgetId === "hero" ? (
+              <div className="rounded-2xl bg-gradient-to-br from-primary to-primary/80 text-primary-foreground p-5 shadow-lg ring-1 ring-black/10 relative overflow-hidden">
+                <Sparkles className="absolute -right-3 -top-3 h-24 w-24 text-white/10 pointer-events-none" />
+                <p className="text-[11px] uppercase tracking-[0.2em] text-primary-foreground/70 font-medium">
+                  {year} in books
+                </p>
+                <div className="flex items-end gap-3 mt-1">
+                  <span className="font-display text-6xl leading-none">{finishedThisYear}</span>
+                  <span className="text-sm text-primary-foreground/70 mb-1.5">
+                    finished · {totalAllReads} lifetime
+                  </span>
                 </div>
-              </div>
-              <div className="h-1.5 rounded-full bg-white/15 overflow-hidden">
-                <div className="h-full bg-gold rounded-full transition-all duration-700" style={{ width: `${goalPct}%` }} />
-              </div>
-              {goals.length > 1 && (
-                <div className="flex justify-center gap-1 pt-1">
-                  {goals.map((_, i) => (
-                    <button key={i} onClick={() => setGoalIdx(i)} className={`h-1 rounded-full transition-all ${i === goalIdx ? "w-4 bg-gold" : "w-1 bg-white/25"}`} />
-                  ))}
-                </div>
-              )}
-            </div>
-          )}
-          {goals.length === 0 && (
-            <Link to="/goals" className="inline-block mt-4 text-[11px] text-gold/90 hover:text-gold underline underline-offset-2">
-              Set a reading goal →
-            </Link>
-          )}
-        </div>
-      </section>
-
-      {/* ── Quick stat pills ── */}
-      <section className="px-5 mt-4 flex gap-2.5">
-        <StatPill label="Reading" value={reading.length} to="/library" />
-        <StatPill label="Finished" value={finished.length} to="/library" />
-        <StatPill label="Wishlist" value={wishlist.length} to="/library" />
-      </section>
-
-      {/* ── Currently reading ── */}
-      <section className="mt-7">
-        <div className="px-5 flex items-center justify-between mb-3">
-          <h2 className="font-display text-xl">Reading now</h2>
-          <button
-            onClick={() => setSearching(true)}
-            className="text-xs font-medium text-primary inline-flex items-center gap-1 hover:text-primary/80 transition-colors"
-          >
-            <Plus className="h-3.5 w-3.5" /> Add
-          </button>
-        </div>
-
-        {reading.length === 0 ? (
-          <div className="mx-5 rounded-xl border border-dashed border-border bg-card/50 p-6 text-center">
-            <BookOpen className="h-7 w-7 mx-auto text-muted-foreground mb-2" />
-            <p className="text-sm text-muted-foreground">Nothing on your bookmark yet.</p>
-            <button onClick={() => setSearching(true)} className="mt-3 text-sm font-medium text-primary hover:underline">
-              Find a book →
-            </button>
-          </div>
-        ) : (
-          <div className="pl-5 flex gap-3 overflow-x-auto pb-1 scrollbar-none" style={{ scrollSnapType: "x mandatory" }}>
-            {reading.map((b) => (
-              <div key={b.id} style={{ scrollSnapAlign: "start" }}>
-                <ReadingCard book={b} />
-              </div>
-            ))}
-            <div className="shrink-0 w-5" />
-          </div>
-        )}
-      </section>
-
-      {/* ── Recent margins ── */}
-      {recentMargins.length > 0 && (
-        <section className="px-5 mt-7">
-          <div className="flex items-center justify-between mb-3">
-            <h2 className="font-display text-xl">Recent notes</h2>
-            <Link to="/margins" className="text-xs font-medium text-primary hover:text-primary/80 transition-colors">
-              See all
-            </Link>
-          </div>
-          <div className="space-y-2.5">
-            {recentMargins.map((m) => {
-              const book = books.find((b) => b.id === m.bookId);
-              return (
-                <div key={m.id} className="bg-card border border-border rounded-xl p-4 flex gap-3 items-start">
-                  <div className="shrink-0 mt-0.5 w-7 h-7 rounded-lg bg-primary/8 flex items-center justify-center">
-                    {m.type === "quote"
-                      ? <Quote className="h-3.5 w-3.5 text-primary" />
-                      : <StickyNote className="h-3.5 w-3.5 text-primary" />}
+                {activeGoal && goalPct !== null && (
+                  <div className="mt-4 space-y-1.5">
+                    <div className="flex items-center justify-between text-[11px] text-primary-foreground/75">
+                      <span className="flex items-center gap-1.5">
+                        <Target className="h-3 w-3" />
+                        <span className="capitalize">
+                          {activeGoal.timeframe}ly · {goalLabel}
+                        </span>
+                      </span>
+                      <div className="flex items-center gap-1.5">
+                        {goals.length > 1 && (
+                          <>
+                            <button
+                              onClick={() => setGoalIdx((i) => (i - 1 + goals.length) % goals.length)}
+                              className="hover:text-white"
+                            >
+                              <ChevronLeft className="h-3.5 w-3.5" />
+                            </button>
+                            <span>
+                              {goalIdx + 1}/{goals.length}
+                            </span>
+                            <button
+                              onClick={() => setGoalIdx((i) => (i + 1) % goals.length)}
+                              className="hover:text-white"
+                            >
+                              <ChevronRight className="h-3.5 w-3.5" />
+                            </button>
+                          </>
+                        )}
+                        <span className="font-semibold ml-1">{goalPct}%</span>
+                      </div>
+                    </div>
+                    <div className="h-1.5 rounded-full bg-white/15 overflow-hidden">
+                      <div
+                        className="h-full bg-gold rounded-full transition-all duration-700"
+                        style={{ width: `${goalPct}%` }}
+                      />
+                    </div>
                   </div>
-                  <div className="min-w-0">
-                    <p className="text-sm leading-relaxed line-clamp-3 text-foreground">{m.text}</p>
-                    {book && (
-                      <p className="text-[11px] text-muted-foreground mt-1.5 truncate">
-                        — <span className="italic">{book.title}</span>
-                        {m.page ? `, p. ${m.page}` : ""}
+                )}
+                {goals.length === 0 && (
+                  <Link
+                    to="/goals"
+                    className="inline-block mt-4 text-[11px] text-gold/90 hover:text-gold underline underline-offset-2"
+                  >
+                    Set a reading goal →
+                  </Link>
+                )}
+              </div>
+            ) : tile.widgetId === "stats" ? (
+              <div className="flex gap-2.5">
+                <StatPill label="Reading" value={reading.length} to="/library" />
+                <StatPill label="Finished" value={finished.length} to="/library" />
+                <StatPill label="Wishlist" value={wishlist.length} to="/library" />
+              </div>
+            ) : tile.widgetId === "reading" ? (
+              <div className="rounded-xl border border-border bg-card p-3">
+                <div className="flex items-center justify-between mb-3">
+                  <h2 className="font-display text-xl">Reading now</h2>
+                  <button
+                    onClick={() => setSearching(true)}
+                    className="text-xs font-medium text-primary inline-flex items-center gap-1 hover:text-primary/80 transition-colors"
+                  >
+                    <Plus className="h-3.5 w-3.5" /> Add
+                  </button>
+                </div>
+                {reading.length === 0 ? (
+                  <div className="rounded-xl border border-dashed border-border bg-card/50 p-6 text-center">
+                    <BookOpen className="h-7 w-7 mx-auto text-muted-foreground mb-2" />
+                    <p className="text-sm text-muted-foreground">Nothing on your bookmark yet.</p>
+                    <button
+                      onClick={() => setSearching(true)}
+                      className="mt-3 text-sm font-medium text-primary hover:underline"
+                    >
+                      Find a book →
+                    </button>
+                  </div>
+                ) : (
+                  <div className="flex gap-3 overflow-x-auto pb-1 scrollbar-none">
+                    {reading.map((b) => (
+                      <ReadingCard key={b.id} book={b} />
+                    ))}
+                  </div>
+                )}
+              </div>
+            ) : tile.widgetId === "notes" ? (
+              <div className="rounded-xl border border-border bg-card p-3 space-y-2.5">
+                <div className="flex items-center justify-between">
+                  <h2 className="font-display text-xl">Recent notes</h2>
+                  <Link
+                    to="/margins"
+                    className="text-xs font-medium text-primary hover:text-primary/80 transition-colors"
+                  >
+                    See all
+                  </Link>
+                </div>
+                {recentMargins.map((m) => {
+                  const book = books.find((b) => b.id === m.bookId);
+                  return (
+                    <div key={m.id} className="border border-border rounded-xl p-3 flex gap-3 items-start">
+                      <div className="shrink-0 mt-0.5 w-7 h-7 rounded-lg bg-primary/8 flex items-center justify-center">
+                        {m.type === "quote" ? (
+                          <Quote className="h-3.5 w-3.5 text-primary" />
+                        ) : (
+                          <StickyNote className="h-3.5 w-3.5 text-primary" />
+                        )}
+                      </div>
+                      <div className="min-w-0">
+                        <p className="text-sm leading-relaxed line-clamp-3 text-foreground">{m.text}</p>
+                        {book && (
+                          <p className="text-[11px] text-muted-foreground mt-1.5 truncate">
+                            — <span className="italic">{book.title}</span>
+                            {m.page ? `, p. ${m.page}` : ""}
+                          </p>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            ) : (
+              <div className="rounded-xl border border-border bg-card p-3 space-y-2">
+                <div className="flex items-center justify-between">
+                  <h2 className="font-display text-xl">Recently finished</h2>
+                  <Link
+                    to="/library"
+                    className="text-xs font-medium text-primary hover:text-primary/80 transition-colors"
+                  >
+                    Library
+                  </Link>
+                </div>
+                {recentlyFinished.map(({ book, at }) => (
+                  <Link
+                    key={book.id}
+                    to="/book/$id"
+                    params={{ id: book.id }}
+                    className="flex items-center gap-3 border border-border rounded-xl p-3 hover:shadow-sm transition-shadow"
+                  >
+                    <BookCover book={book} size="sm" />
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-semibold truncate">{book.title}</p>
+                      <p className="text-xs text-muted-foreground truncate">{book.author}</p>
+                      <p className="text-[10px] text-muted-foreground/70 mt-0.5">
+                        Finished{" "}
+                        {at.toLocaleDateString(undefined, {
+                          month: "short",
+                          day: "numeric",
+                          year: at.getFullYear() !== new Date().getFullYear() ? "numeric" : undefined,
+                        })}
                       </p>
-                    )}
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        </section>
-      )}
+                    </div>
+                    <CheckCircle2 className="h-4 w-4 text-primary/50 shrink-0" />
+                  </Link>
+                ))}
+              </div>
+            );
 
-      {/* ── Recently finished ── */}
-      {recentlyFinished.length > 0 && (
-        <section className="px-5 mt-7 mb-4">
-          <div className="flex items-center justify-between mb-3">
-            <h2 className="font-display text-xl">Recently finished</h2>
-            <Link to="/library" className="text-xs font-medium text-primary hover:text-primary/80 transition-colors">
-              Library
-            </Link>
-          </div>
-          <div className="space-y-2">
-            {recentlyFinished.map(({ book, at }) => (
-              <Link
-                key={book.id}
-                to="/book/$id"
-                params={{ id: book.id }}
-                className="flex items-center gap-3 bg-card border border-border rounded-xl p-3 hover:shadow-sm transition-shadow"
-              >
-                <BookCover book={book} size="sm" />
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm font-semibold truncate">{book.title}</p>
-                  <p className="text-xs text-muted-foreground truncate">{book.author}</p>
-                  <p className="text-[10px] text-muted-foreground/70 mt-0.5">
-                    Finished {at.toLocaleDateString(undefined, { month: "short", day: "numeric", year: at.getFullYear() !== new Date().getFullYear() ? "numeric" : undefined })}
-                  </p>
-                </div>
-                <CheckCircle2 className="h-4 w-4 text-primary/50 shrink-0" />
-              </Link>
-            ))}
-          </div>
-        </section>
-      )}
+          return (
+            <div
+              key={tile.widgetId}
+              className={tile.width === "full" ? "col-span-2" : "col-span-1"}
+            >
+              {content}
+            </div>
+          );
+        })}
+      </section>
 
       {searching && (
         <BookSearch

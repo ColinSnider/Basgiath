@@ -14,24 +14,37 @@ import {
   KeyRound,
   Loader2,
   Mail,
+  Download,
+  Upload,
+  MoveUp,
+  MoveDown,
+  Pencil,
+  Plus,
 } from "lucide-react";
 import { useState } from "react";
+import {
+  PRESET_THEMES,
+  FONT_CHOICES,
+  DISPLAY_FONT_CHOICES,
+  WIDGET_ORDER,
+  normalizeDashboardTiles,
+  type DashboardWidgetId,
+} from "@/lib/user-preferences";
 
 export const Route = createFileRoute("/settings")({
   component: Settings,
 });
 
-const ACCENT_COLORS = [
-  { id: "default", label: "Crimson", hex: "#5a1a25" },
-  { id: "sage", label: "Sage", hex: "#3a5c4a" },
-  { id: "ocean", label: "Ocean", hex: "#1a3a5c" },
-  { id: "sunset", label: "Sunset", hex: "#8b3a1a" },
-  { id: "slate", label: "Slate", hex: "#374151" },
-  { id: "violet", label: "Violet", hex: "#4c1d95" },
-];
-
 function Settings() {
-  const { settings, updateSettings, clearAll } = useStore();
+  const {
+    settings,
+    preferences,
+    updateSettings,
+    updatePreferences,
+    importUserData,
+    exportUserData,
+    clearAll,
+  } = useStore();
   const {
     user,
     sessionId,
@@ -53,6 +66,16 @@ function Settings() {
   const [newPw, setNewPw] = useState("");
   const [pwSaving, setPwSaving] = useState(false);
   const [pwMsg, setPwMsg] = useState<{ ok: boolean; text: string } | null>(null);
+  const [dataMsg, setDataMsg] = useState<{ ok: boolean; text: string } | null>(null);
+  const [importing, setImporting] = useState(false);
+  const [customThemeDraft, setCustomThemeDraft] = useState({
+    name: "",
+    lightPrimary: "#5a1a25",
+    lightForeground: "#f8f5ec",
+    darkPrimary: "#a63a4e",
+    darkForeground: "#fff7eb",
+  });
+  const [layoutEditorOpen, setLayoutEditorOpen] = useState(false);
 
   async function saveName(e: React.FormEvent) {
     e.preventDefault();
@@ -120,6 +143,100 @@ function Settings() {
   async function doClear() {
     if (!confirm("Erase all your books, margins, and goals? This can't be undone.")) return;
     await clearAll();
+  }
+
+  function doExportJson() {
+    try {
+      const payload = exportUserData();
+      const blob = new Blob([payload], { type: "application/json" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `basgiath-export-${new Date().toISOString().split("T")[0]}.json`;
+      a.click();
+      URL.revokeObjectURL(url);
+      setDataMsg({ ok: true, text: "Export complete. JSON file downloaded." });
+    } catch {
+      setDataMsg({ ok: false, text: "Export failed. Please try again." });
+    }
+  }
+
+  async function onImportFile(file: File | null) {
+    if (!file) return;
+    setImporting(true);
+    setDataMsg(null);
+    try {
+      const text = await file.text();
+      await importUserData(text);
+      setDataMsg({ ok: true, text: "Import complete. Your data and settings were restored." });
+    } catch (error) {
+      setDataMsg({
+        ok: false,
+        text: error instanceof Error ? error.message : "Import failed. Please check your JSON file.",
+      });
+    } finally {
+      setImporting(false);
+    }
+  }
+
+  function createCustomTheme() {
+    if (!customThemeDraft.name.trim()) {
+      setDataMsg({ ok: false, text: "Custom theme name is required." });
+      return;
+    }
+    const id = `custom-${crypto.randomUUID()}`;
+    const nextThemes = [
+      ...preferences.customThemes,
+      {
+        id,
+        name: customThemeDraft.name.trim(),
+        lightPrimary: customThemeDraft.lightPrimary,
+        lightForeground: customThemeDraft.lightForeground,
+        darkPrimary: customThemeDraft.darkPrimary,
+        darkForeground: customThemeDraft.darkForeground,
+      },
+    ];
+    updatePreferences({ customThemes: nextThemes, activeCustomThemeId: id });
+    setDataMsg({ ok: true, text: "Custom theme saved." });
+  }
+
+  function removeCustomTheme(id: string) {
+    const nextThemes = preferences.customThemes.filter((theme) => theme.id !== id);
+    updatePreferences({
+      customThemes: nextThemes,
+      activeCustomThemeId: preferences.activeCustomThemeId === id ? null : preferences.activeCustomThemeId,
+    });
+  }
+
+  function moveTile(widgetId: DashboardWidgetId, direction: -1 | 1) {
+    const current = [...preferences.dashboardTiles];
+    const idx = current.findIndex((tile) => tile.widgetId === widgetId);
+    const targetIdx = idx + direction;
+    if (idx < 0 || targetIdx < 0 || targetIdx >= current.length) return;
+    const [tile] = current.splice(idx, 1);
+    current.splice(targetIdx, 0, tile);
+    updatePreferences({ dashboardTiles: normalizeDashboardTiles(current) });
+  }
+
+  function toggleTileWidth(widgetId: DashboardWidgetId) {
+    updatePreferences({
+      dashboardTiles: preferences.dashboardTiles.map((tile) =>
+        tile.widgetId === widgetId
+          ? { ...tile, width: tile.width === "full" ? "half" : "full" }
+          : tile,
+      ),
+    });
+  }
+
+  function toggleTile(widgetId: DashboardWidgetId) {
+    const hasTile = preferences.dashboardTiles.some((tile) => tile.widgetId === widgetId);
+    if (hasTile) {
+      const next = preferences.dashboardTiles.filter((tile) => tile.widgetId !== widgetId);
+      updatePreferences({ dashboardTiles: normalizeDashboardTiles(next) });
+      return;
+    }
+    const next = [...preferences.dashboardTiles, { widgetId, width: "half" as const }];
+    updatePreferences({ dashboardTiles: normalizeDashboardTiles(next) });
   }
 
   return (
@@ -270,14 +387,17 @@ function Settings() {
           <div>
             <p className="text-sm mb-2.5">Accent colour</p>
             <div className="flex gap-3 flex-wrap">
-              {ACCENT_COLORS.map((c) => (
+              {PRESET_THEMES.map((c) => (
                 <button
                   key={c.id}
-                  onClick={() => updateSettings({ accentColor: c.id })}
+                  onClick={() => {
+                    updateSettings({ accentColor: c.id });
+                    updatePreferences({ activeCustomThemeId: null });
+                  }}
                   title={c.label}
                   style={{ backgroundColor: c.hex }}
                   className={`h-9 w-9 rounded-full transition-all ${
-                    settings.accentColor === c.id
+                    settings.accentColor === c.id && !preferences.activeCustomThemeId
                       ? "ring-2 ring-offset-2 ring-foreground/60 scale-110"
                       : "opacity-60 hover:opacity-90 hover:scale-105"
                   }`}
@@ -287,9 +407,73 @@ function Settings() {
             <p className="text-[11px] text-muted-foreground mt-2">
               Current:{" "}
               <span className="font-medium capitalize">
-                {ACCENT_COLORS.find((c) => c.id === settings.accentColor)?.label ?? "Crimson"}
+                {preferences.activeCustomThemeId
+                  ? preferences.customThemes.find((t) => t.id === preferences.activeCustomThemeId)?.name ??
+                    "Custom theme"
+                  : PRESET_THEMES.find((c) => c.id === settings.accentColor)?.label ?? "Crimson"}
               </span>
             </p>
+          </div>
+
+          <div className="space-y-2">
+            <p className="text-sm">Custom themes</p>
+            {preferences.customThemes.length > 0 && (
+              <div className="space-y-2">
+                {preferences.customThemes.map((theme) => (
+                  <div
+                    key={theme.id}
+                    className="flex items-center justify-between rounded-md border border-border px-2.5 py-2"
+                  >
+                    <button
+                      onClick={() => updatePreferences({ activeCustomThemeId: theme.id })}
+                      className={`text-xs ${preferences.activeCustomThemeId === theme.id ? "font-semibold text-foreground" : "text-muted-foreground"}`}
+                    >
+                      {theme.name}
+                    </button>
+                    <button
+                      onClick={() => removeCustomTheme(theme.id)}
+                      className="text-xs text-destructive hover:underline"
+                    >
+                      Remove
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+            <div className="grid grid-cols-2 gap-2">
+              <input
+                value={customThemeDraft.name}
+                onChange={(e) => setCustomThemeDraft((s) => ({ ...s, name: e.target.value }))}
+                className="col-span-2 bg-muted rounded-md px-3 py-2 text-xs outline-none"
+                placeholder="Theme name"
+              />
+              {(
+                [
+                  ["lightPrimary", "Light primary"],
+                  ["lightForeground", "Light text"],
+                  ["darkPrimary", "Dark primary"],
+                  ["darkForeground", "Dark text"],
+                ] as const
+              ).map(([key, label]) => (
+                <label key={key} className="text-[11px] text-muted-foreground">
+                  {label}
+                  <input
+                    type="color"
+                    value={customThemeDraft[key]}
+                    onChange={(e) =>
+                      setCustomThemeDraft((s) => ({ ...s, [key]: e.target.value }))
+                    }
+                    className="mt-1 h-8 w-full rounded border border-border bg-card p-1"
+                  />
+                </label>
+              ))}
+            </div>
+            <button
+              onClick={createCustomTheme}
+              className="inline-flex items-center gap-1 rounded-md border border-border px-3 py-1.5 text-xs hover:bg-muted/50"
+            >
+              <Plus className="h-3.5 w-3.5" /> Save custom theme
+            </button>
           </div>
         </section>
 
@@ -311,6 +495,64 @@ function Settings() {
                   {s === "sm" ? "Small" : s === "md" ? "Default" : "Large"}
                 </button>
               ))}
+            </div>
+          </div>
+
+          <div className="space-y-2">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm">Custom fonts</p>
+                <p className="text-xs text-muted-foreground">Override default body and title fonts.</p>
+              </div>
+              <button
+                onClick={() => updatePreferences({ useCustomFont: !preferences.useCustomFont })}
+                className={`relative h-7 w-12 rounded-full transition-colors ${preferences.useCustomFont ? "bg-primary" : "bg-muted"}`}
+                aria-pressed={preferences.useCustomFont}
+              >
+                <span
+                  className={`absolute top-0.5 h-6 w-6 rounded-full bg-card shadow transition-all ${preferences.useCustomFont ? "left-[1.375rem]" : "left-0.5"}`}
+                />
+              </button>
+            </div>
+            <div className="grid grid-cols-2 gap-2">
+              <label className="text-xs text-muted-foreground">
+                Body font
+                <select
+                  disabled={!preferences.useCustomFont}
+                  value={preferences.bodyFont}
+                  onChange={(e) =>
+                    updatePreferences({
+                      bodyFont: e.target.value as (typeof preferences)["bodyFont"],
+                    })
+                  }
+                  className="mt-1 w-full bg-muted rounded-md px-2 py-1.5 text-xs outline-none disabled:opacity-50"
+                >
+                  {FONT_CHOICES.map((font) => (
+                    <option key={font.id} value={font.id}>
+                      {font.label}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label className="text-xs text-muted-foreground">
+                Display font
+                <select
+                  disabled={!preferences.useCustomFont}
+                  value={preferences.displayFont}
+                  onChange={(e) =>
+                    updatePreferences({
+                      displayFont: e.target.value as (typeof preferences)["displayFont"],
+                    })
+                  }
+                  className="mt-1 w-full bg-muted rounded-md px-2 py-1.5 text-xs outline-none disabled:opacity-50"
+                >
+                  {DISPLAY_FONT_CHOICES.map((font) => (
+                    <option key={font.id} value={font.id}>
+                      {font.label}
+                    </option>
+                  ))}
+                </select>
+              </label>
             </div>
           </div>
 
@@ -336,6 +578,87 @@ function Settings() {
           <div className="flex items-center gap-2 text-sm font-medium">
             <Layout className="h-4 w-4 text-muted-foreground" /> Data
           </div>
+          <div className="grid grid-cols-2 gap-2">
+            <button
+              onClick={doExportJson}
+              className="inline-flex items-center justify-center gap-1.5 border border-border rounded-lg py-2 text-sm hover:bg-muted/40"
+            >
+              <Download className="h-4 w-4" /> Export JSON
+            </button>
+            <label className="inline-flex cursor-pointer items-center justify-center gap-1.5 border border-border rounded-lg py-2 text-sm hover:bg-muted/40">
+              <Upload className="h-4 w-4" /> {importing ? "Importing…" : "Import JSON"}
+              <input
+                type="file"
+                accept="application/json,.json"
+                className="sr-only"
+                onChange={(e) => onImportFile(e.target.files?.[0] ?? null)}
+              />
+            </label>
+          </div>
+          {dataMsg && (
+            <p className={`text-xs ${dataMsg.ok ? "text-green-600" : "text-destructive"}`}>
+              {dataMsg.text}
+            </p>
+          )}
+          <button
+            onClick={() => setLayoutEditorOpen((v) => !v)}
+            className="w-full inline-flex items-center justify-center gap-1.5 border border-border rounded-lg py-2 text-sm hover:bg-muted/40"
+          >
+            <Pencil className="h-4 w-4" /> {layoutEditorOpen ? "Close widget layout" : "Edit widget layout"}
+          </button>
+          {layoutEditorOpen && (
+            <div className="space-y-2 rounded-md border border-border p-2.5">
+              {preferences.dashboardTiles.map((tile, idx) => (
+                <div key={tile.widgetId} className="flex items-center justify-between gap-2 text-xs">
+                  <button
+                    onClick={() => toggleTile(tile.widgetId)}
+                    className="text-left hover:underline capitalize"
+                  >
+                    {tile.widgetId}
+                  </button>
+                  <div className="flex items-center gap-1">
+                    <button
+                      onClick={() => moveTile(tile.widgetId, -1)}
+                      disabled={idx === 0}
+                      className="rounded border border-border p-1 disabled:opacity-40"
+                    >
+                      <MoveUp className="h-3.5 w-3.5" />
+                    </button>
+                    <button
+                      onClick={() => moveTile(tile.widgetId, 1)}
+                      disabled={idx === preferences.dashboardTiles.length - 1}
+                      className="rounded border border-border p-1 disabled:opacity-40"
+                    >
+                      <MoveDown className="h-3.5 w-3.5" />
+                    </button>
+                    <button
+                      onClick={() => toggleTileWidth(tile.widgetId)}
+                      className="rounded border border-border px-2 py-1"
+                    >
+                      {tile.width === "full" ? "Full" : "Half"}
+                    </button>
+                  </div>
+                </div>
+              ))}
+              <div className="pt-1 text-[11px] text-muted-foreground">
+                Add or remove widgets:
+                <div className="mt-1 flex flex-wrap gap-1">
+                  {WIDGET_ORDER.map((widgetId) => {
+                    const active = preferences.dashboardTiles.some((tile) => tile.widgetId === widgetId);
+                    return (
+                      <button
+                        key={widgetId}
+                        onClick={() => toggleTile(widgetId)}
+                        className={`rounded-full border px-2 py-0.5 capitalize ${active ? "border-primary text-primary" : "border-border text-muted-foreground"}`}
+                      >
+                        {widgetId}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            </div>
+          )}
           <button
             onClick={doClear}
             className="w-full inline-flex items-center justify-center gap-1.5 border border-destructive/30 text-destructive rounded-lg py-2.5 text-sm hover:bg-destructive/5"

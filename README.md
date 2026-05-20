@@ -17,6 +17,9 @@ Basgiath is a full-stack TypeScript reading companion for tracking books, readin
 - Margins (quotes and notes)
 - Reading goals
 - Account and appearance settings
+- JSON import/export for user data and settings
+- Custom fonts, expanded theme colors, and custom themes
+- Modular homepage widgets with editable 2-column layout
 
 ## Project structure
 
@@ -88,6 +91,22 @@ NODE_ENV=production
    ```
 
 The app runs on `http://localhost:5000` by default.
+
+## Settings data and personalization
+
+- **Data export/import** (Settings > Data):
+  - Export your books, margins, goals, app settings, and UI preferences as JSON.
+  - Import a JSON export to restore app state.
+  - Imports validate shape and provide actionable errors when fields are missing or malformed.
+- **Font settings**:
+  - Toggle custom fonts on/off.
+  - Configure body and display font selections.
+- **Appearance themes**:
+  - Choose from expanded preset accent themes.
+  - Create and apply custom themes with user-defined colors.
+- **Homepage widgets**:
+  - Edit widget visibility/order/size in a 2-column grid.
+  - Widgets support half-width and full-width layout options and are persisted per user.
 
 ## Production
 
