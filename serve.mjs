@@ -2,11 +2,33 @@ import { createServer } from "node:http";
 import { readFile, stat } from "node:fs/promises";
 import { extname, join, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
+import { drizzle } from "drizzle-orm/node-postgres";
+import { migrate } from "drizzle-orm/node-postgres/migrator";
+import pg from "pg";
 
 const __dirname = fileURLToPath(new URL(".", import.meta.url));
 const CLIENT_DIR = join(__dirname, "dist/client");
 const RESOLVED_CLIENT_DIR = resolve(CLIENT_DIR);
 const STATIC_ROOT = `${RESOLVED_CLIENT_DIR}${sep}`;
+
+// Run pending Drizzle migrations before accepting any traffic.
+async function runMigrations() {
+  if (!process.env.DATABASE_URL) {
+    console.warn("DATABASE_URL is not set — skipping migrations.");
+    return;
+  }
+  const { Pool } = pg;
+  const pool = new Pool({ connectionString: process.env.DATABASE_URL });
+  try {
+    const db = drizzle(pool);
+    await migrate(db, { migrationsFolder: join(__dirname, "migrations") });
+    console.log("Database migrations applied successfully.");
+  } finally {
+    await pool.end();
+  }
+}
+
+await runMigrations();
 
 const MIME = {
   ".html": "text/html; charset=utf-8",

@@ -8,6 +8,7 @@
     "runtime": "V2",
     "numReplicas": 1,
     "startCommand": "npm run start",
+    "preDeployCommand": "npm run db:migrate",
     "sleepApplication": false,
     "useLegacyStacker": false,
     "ipv6EgressEnabled": false,
