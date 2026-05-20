@@ -20,6 +20,7 @@ import {
   parseImportJson,
   type UserPreferences,
 } from "./user-preferences";
+import { mergeLoadedStoreState } from "./store-load-state";
 
 export type Book = {
   id: string;
@@ -180,18 +181,15 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     setState((s) => ({ ...s, dataLoading: true }));
     try {
       const res = await dataFns.loadData({ data: { sessionId } });
-      setState({
-        books: res.books.map(rowToBook),
-        margins: res.margins.map(rowToMargin),
-        goals: res.goals.map(rowToGoal),
-        settings: {
-          darkMode: res.settings.darkMode,
-          accentColor: res.settings.accentColor,
-          compactMode: res.settings.compactMode,
-          fontScale: (res.settings.fontScale as "sm" | "md" | "lg") ?? "md",
-        },
-        dataLoading: false,
-      });
+      setState((s) =>
+        mergeLoadedStoreState({
+          previousState: s,
+          loadedData: res,
+          mapBook: rowToBook,
+          mapMargin: rowToMargin,
+          mapGoal: rowToGoal,
+        }),
+      );
     } catch {
       setState((s) => ({ ...s, dataLoading: false }));
     }
