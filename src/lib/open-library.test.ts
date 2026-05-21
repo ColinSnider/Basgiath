@@ -29,6 +29,13 @@ test("buildSearchUrl trims whitespace from the query", () => {
   assert.equal(parsed.searchParams.get("q"), "gatsby");
 });
 
+
+test("buildSearchUrl includes an optional language parameter when provided", () => {
+  const url = buildSearchUrl("dune", "eng");
+  const parsed = new URL(url);
+  assert.equal(parsed.searchParams.get("language"), "eng");
+});
+
 // --- mapDoc: non-object inputs ---
 
 test("mapDoc returns null for null", () => {
@@ -111,6 +118,8 @@ test("mapDoc maps a fully populated doc to a SearchResult", () => {
   assert.equal(result.author, "F. Scott Fitzgerald");
   assert.equal(result.coverUrl, "https://covers.openlibrary.org/b/id/123456-M.jpg");
   assert.equal(result.totalPages, 180);
+  assert.equal(result.source, "openlibrary");
+  assert.equal(result.sourceUrl, "https://openlibrary.org/works/OL123W");
 });
 
 test("mapDoc trims whitespace from title and author", () => {
@@ -218,4 +227,26 @@ test("mapDoc fallback key handles special characters and long titles", () => {
   assert.ok(result !== null);
   assert.ok(result.key.length <= 54); // "doc-" (4) + max 50 slug chars
   assert.ok(result.key.startsWith("doc-"));
+});
+
+
+test("mapDoc maps additional Open Library metadata", () => {
+  const result = mapDoc({
+    key: "/works/OL999W",
+    title: "Metadata Book",
+    author_name: ["Author"],
+    language: ["eng", "spa"],
+    first_publish_year: 1999,
+    publish_year: [2000, 2005],
+    edition_count: 12,
+    isbn: ["123", "456"],
+    publisher: ["Pub A", "Pub B"],
+  });
+  assert.ok(result !== null);
+  assert.deepEqual(result.languageCodes, ["eng", "spa"]);
+  assert.equal(result.firstPublishYear, 1999);
+  assert.equal(result.publishYear, 2005);
+  assert.equal(result.editionCount, 12);
+  assert.deepEqual(result.isbn, ["123", "456"]);
+  assert.deepEqual(result.publisher, ["Pub A", "Pub B"]);
 });

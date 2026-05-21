@@ -35,6 +35,7 @@ export type Book = {
   reads: { finishedAt: string }[];
   status: "reading" | "finished" | "wishlist";
   addedAt: string;
+  metadata?: Record<string, unknown>;
 };
 
 export type MarginEntry = {
@@ -124,6 +125,7 @@ function rowToBook(r: any): Book {
     reads: (r.reads as { finishedAt: string }[]) ?? [],
     status: r.status as "reading" | "finished" | "wishlist",
     addedAt: r.addedAt instanceof Date ? r.addedAt.toISOString() : r.addedAt,
+    metadata: r.metadata ?? {},
   };
 }
 
@@ -248,6 +250,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
           status: b.status ?? "reading",
           addedAt: b.addedAt,
           reads,
+          metadata: b.metadata ?? {},
         },
       });
       setState((s) => ({ ...s, books: [...s.books, rowToBook(row)] }));
