@@ -108,6 +108,7 @@ export const addBook = createServerFn({ method: "POST" })
       status: z.enum(["reading", "finished", "wishlist"]).optional(),
       addedAt: z.string().optional(),
       reads: z.array(z.object({ finishedAt: z.string() })).optional(),
+      metadata: z.record(z.string(), z.unknown()).optional(),
     }),
   )
   .handler(async ({ data }) => {
@@ -131,6 +132,7 @@ export const addBook = createServerFn({ method: "POST" })
         status: data.status ?? "reading",
         reads,
         addedAt,
+        metadata: data.metadata ?? {},
       })
       .returning();
     return book;
@@ -151,6 +153,7 @@ export const updateBook = createServerFn({ method: "POST" })
         currentMinute: z.number().optional(),
         status: z.enum(["reading", "finished", "wishlist"]).optional(),
         reads: z.array(z.object({ finishedAt: z.string() })).optional(),
+        metadata: z.record(z.string(), z.unknown()).optional(),
       }),
     }),
   )

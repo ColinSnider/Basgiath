@@ -75,6 +75,8 @@ export function BookSearch({
       author: manualAuthor.trim() || "Unknown",
       coverUrl: manualCover.trim() || undefined,
       totalPages: manualFormat === "book" && manualPages ? Number(manualPages) : undefined,
+      source: "openlibrary",
+      sourceUrl: "https://openlibrary.org/",
       format: manualFormat,
       durationMinutes: durationMins ? Math.round(durationMins) : undefined,
       status: manualStatus,
