@@ -250,7 +250,7 @@ export function BookSearch({
             </ul>
             {!q && (
               <p className="text-xs text-muted-foreground/80 text-center mt-8 px-6">
-                Search powered by Open Library. Results filtered to English titles.
+                Search powered by Open Library.
               </p>
             )}
           </>
