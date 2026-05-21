@@ -59,3 +59,20 @@ test("parseImportJson returns normalized preferences defaults when omitted", () 
   );
   assert.deepEqual(parsed.preferences, DEFAULT_PREFERENCES);
 });
+
+
+test("parseImportJson accepts legacy payloads without settings object", () => {
+  const parsed = parseImportJson(JSON.stringify({ books: [], margins: [], goals: [], darkMode: true, compactMode: true, accentColor: "sage", fontScale: "lg" }));
+  assert.equal(parsed.settings.darkMode, true);
+  assert.equal(parsed.settings.compactMode, true);
+  assert.equal(parsed.settings.accentColor, "sage");
+  assert.equal(parsed.settings.fontScale, "lg");
+});
+
+test("parseImportJson accepts userSettings object fallback", () => {
+  const parsed = parseImportJson(JSON.stringify({ books: [], margins: [], goals: [], userSettings: { darkMode: true, compactMode: false, accentColor: "ocean", fontScale: "sm" } }));
+  assert.equal(parsed.settings.darkMode, true);
+  assert.equal(parsed.settings.compactMode, false);
+  assert.equal(parsed.settings.accentColor, "ocean");
+  assert.equal(parsed.settings.fontScale, "sm");
+});

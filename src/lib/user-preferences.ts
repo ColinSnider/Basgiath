@@ -303,19 +303,33 @@ export function parseImportJson(raw: string): ExportData {
   if (!Array.isArray(parsed.books)) throw new Error("Import failed: books must be an array.");
   if (!Array.isArray(parsed.margins)) throw new Error("Import failed: margins must be an array.");
   if (!Array.isArray(parsed.goals)) throw new Error("Import failed: goals must be an array.");
-  if (!isObject(parsed.settings)) throw new Error("Import failed: settings must be an object.");
 
-  const settingsRaw = parsed.settings;
-  const fontScale = settingsRaw.fontScale;
-  if (fontScale !== "sm" && fontScale !== "md" && fontScale !== "lg") {
-    throw new Error("Import failed: settings.fontScale must be one of sm, md, or lg.");
-  }
-  if (typeof settingsRaw.darkMode !== "boolean")
-    throw new Error("Import failed: settings.darkMode must be true or false.");
-  if (typeof settingsRaw.compactMode !== "boolean")
-    throw new Error("Import failed: settings.compactMode must be true or false.");
-  if (typeof settingsRaw.accentColor !== "string")
-    throw new Error("Import failed: settings.accentColor must be a string.");
+  const settingsCandidate = isObject(parsed.settings)
+    ? parsed.settings
+    : isObject(parsed.userSettings)
+      ? parsed.userSettings
+      : parsed;
+
+  const fontScaleRaw = settingsCandidate.fontScale;
+  const fontScale: FontScale =
+    fontScaleRaw === "sm" || fontScaleRaw === "md" || fontScaleRaw === "lg"
+      ? fontScaleRaw
+      : "md";
+
+  const darkMode =
+    typeof settingsCandidate.darkMode === "boolean"
+      ? settingsCandidate.darkMode
+      : false;
+
+  const compactMode =
+    typeof settingsCandidate.compactMode === "boolean"
+      ? settingsCandidate.compactMode
+      : false;
+
+  const accentColor =
+    typeof settingsCandidate.accentColor === "string" && settingsCandidate.accentColor.trim().length > 0
+      ? settingsCandidate.accentColor
+      : "default";
 
   return {
     version: 1,
@@ -324,9 +338,9 @@ export function parseImportJson(raw: string): ExportData {
     margins: parsed.margins,
     goals: parsed.goals,
     settings: {
-      darkMode: settingsRaw.darkMode,
-      compactMode: settingsRaw.compactMode,
-      accentColor: settingsRaw.accentColor,
+      darkMode,
+      compactMode,
+      accentColor,
       fontScale,
     },
     preferences: normalizeUserPreferences(parsed.preferences),
