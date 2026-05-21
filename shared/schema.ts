@@ -30,6 +30,7 @@ export const books = pgTable("books", {
   status: text("status").notNull().default("reading"),
   addedAt: timestamp("added_at").defaultNow().notNull(),
   reads: jsonb("reads").$type<{ finishedAt: string }[]>().notNull().default([]),
+  metadata: jsonb("metadata").$type<Record<string, unknown>>().notNull().default({}),
 });
 
 export const margins = pgTable("margins", {

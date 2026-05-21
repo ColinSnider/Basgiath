@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { searchBooks, type SearchResult } from "@/lib/open-library";
+import { applyEditionToResult, fetchWorkEditions, getBestEditionForWork, searchBooks, type EditionResult, type SearchResult } from "@/lib/open-library";
 import { Loader2, Search, X, PenLine, Headphones, BookOpen, CalendarDays } from "lucide-react";
 import { BookCover } from "./BookCover";
 
@@ -43,6 +43,8 @@ export function BookSearch({
   const [pickStarted, setPickStarted] = useState(() => new Date().toISOString().split("T")[0]);
   const [pickFinished, setPickFinished] = useState(() => new Date().toISOString().split("T")[0]);
   const [pickFormat, setPickFormat] = useState<"book" | "audiobook">("book");
+  const [editions, setEditions] = useState<EditionResult[]>([]);
+  const [editionLoading, setEditionLoading] = useState(false);
 
   useEffect(() => {
     if (tab !== "search" || !q.trim()) { setResults([]); return; }
@@ -56,6 +58,29 @@ export function BookSearch({
     return () => clearTimeout(t);
   }, [q, tab]);
 
+
+  useEffect(() => {
+    if (!picked?.key?.startsWith("/works/")) { setEditions([]); return; }
+    let cancelled = false;
+    (async () => {
+      setEditionLoading(true);
+      try {
+        const [list, best] = await Promise.all([fetchWorkEditions(picked.key), getBestEditionForWork(picked.key)]);
+        if (!cancelled) {
+          setEditions(list);
+          if (best) setPicked((prev) => (prev ? applyEditionToResult(prev, best) : prev));
+        }
+      } finally {
+        if (!cancelled) setEditionLoading(false);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [picked?.key]);
+
+  function applyEdition(e: EditionResult) {
+    if (!picked) return;
+    setPicked(applyEditionToResult(picked, e));
+  }
   function confirmPick() {
     if (!picked) return;
     const finishedAt = pickStatus === "finished" ? new Date(pickFinished + "T12:00:00").toISOString() : undefined;
@@ -75,6 +100,8 @@ export function BookSearch({
       author: manualAuthor.trim() || "Unknown",
       coverUrl: manualCover.trim() || undefined,
       totalPages: manualFormat === "book" && manualPages ? Number(manualPages) : undefined,
+      source: "openlibrary",
+      sourceUrl: "https://openlibrary.org/",
       format: manualFormat,
       durationMinutes: durationMins ? Math.round(durationMins) : undefined,
       status: manualStatus,
@@ -104,7 +131,31 @@ export function BookSearch({
               <p className="font-display text-lg leading-tight">{picked.title}</p>
               <p className="text-sm text-muted-foreground">{picked.author}</p>
               {picked.totalPages && <p className="text-xs text-muted-foreground/80 mt-1">{picked.totalPages} pages</p>}
+              {picked.languageCodes?.length ? <p className="text-xs text-muted-foreground/80 mt-1">Lang: {picked.languageCodes.join(", ").toUpperCase()}</p> : null}
             </div>
+          </div>
+
+
+          <div>
+            <label className="text-xs text-muted-foreground mb-1.5 block">Edition/version</label>
+            {editionLoading ? (
+              <p className="text-xs text-muted-foreground">Loading editions…</p>
+            ) : editions.length === 0 ? (
+              <p className="text-xs text-muted-foreground">No alternate editions found.</p>
+            ) : (
+              <div className="max-h-32 overflow-y-auto space-y-1">
+                {editions.map((e) => (
+                  <button
+                    key={e.key}
+                    type="button"
+                    onClick={() => applyEdition(e)}
+                    className="w-full text-left text-xs rounded border border-border px-2 py-1.5 hover:bg-muted"
+                  >
+                    {e.title} {e.publishYear ? `(${e.publishYear})` : ""} {e.languageCodes?.length ? `· ${e.languageCodes.join(", ").toUpperCase()}` : ""}
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
 
           {/* Format */}
