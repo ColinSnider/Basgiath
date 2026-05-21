@@ -168,6 +168,17 @@ function Library() {
               reads: r.finishedAt ? [{ finishedAt: r.finishedAt }] : [],
               addedAt: r.addedAt,
               extraReads: r.extraReads,
+              metadata: {
+                source: r.source,
+                sourceKey: r.key,
+                sourceUrl: r.sourceUrl,
+                languageCodes: r.languageCodes,
+                firstPublishYear: r.firstPublishYear,
+                publishYear: r.publishYear,
+                editionCount: r.editionCount,
+                isbn: r.isbn,
+                publisher: r.publisher,
+              },
             });
             setSearching(false);
           }}
