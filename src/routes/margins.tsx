@@ -103,6 +103,7 @@ function Margins() {
               const b = lookup[m.bookId];
               return (
                 <li key={m.id} className="bg-card border border-border rounded-lg p-3.5 relative">
+                  <Link to="/margin/$id" params={{ id: m.id }} className="absolute inset-0" aria-label="Open margin detail" />
                   <div className="flex items-center gap-1.5 text-[11px] uppercase tracking-wider text-gold font-semibold">
                     {m.type === "quote" ? <Quote className="h-3 w-3" /> : <StickyNote className="h-3 w-3" />}
                     <span>{m.type}</span>

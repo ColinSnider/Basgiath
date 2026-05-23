@@ -232,7 +232,7 @@ function AppShell() {
 
   return (
     <div className="min-h-screen bg-background">
-      <div className="max-w-md mx-auto pb-24">
+      <div className="max-w-5xl mx-auto pb-24 md:pb-10">
         <Outlet />
       </div>
       {!hideNav && <BottomNav />}

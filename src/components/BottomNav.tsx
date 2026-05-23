@@ -12,8 +12,8 @@ const tabs: Tab[] = [
 export function BottomNav() {
   const { pathname } = useLocation();
   return (
-    <nav className="fixed bottom-0 inset-x-0 z-40 border-t border-border bg-card/95 backdrop-blur supports-[backdrop-filter]:bg-card/80 pb-[env(safe-area-inset-bottom)]">
-      <ul className="grid grid-cols-4 max-w-md mx-auto">
+    <nav className="fixed md:static bottom-0 inset-x-0 z-40 border-t border-border bg-card/95 backdrop-blur supports-[backdrop-filter]:bg-card/80 pb-[env(safe-area-inset-bottom)]">
+      <ul className="grid grid-cols-4 max-w-5xl mx-auto">
         {tabs.map(({ to, label, Icon, exact }) => {
           const active = exact ? pathname === to : pathname.startsWith(to);
           return (
