@@ -11,6 +11,7 @@ import {
 } from "@tanstack/react-router";
 import { useEffect } from "react";
 import { BottomNav } from "@/components/BottomNav";
+import { DesktopSidebar } from "@/components/DesktopSidebar";
 import { AuthProvider, useAuth } from "@/lib/auth-context";
 import { StoreProvider, useStore } from "@/lib/basgiath-store";
 import { shouldRequireLoginRedirect } from "@/lib/session-auth.js";
@@ -164,7 +165,8 @@ function AppShell() {
     const customTheme = prefs.activeCustomThemeId
       ? prefs.customThemes.find((t) => t.id === prefs.activeCustomThemeId)
       : null;
-    const fallbackTheme = PRESET_THEMES.find((t) => t.id === settings.accentColor) ?? PRESET_THEMES[0];
+    const fallbackTheme =
+      PRESET_THEMES.find((t) => t.id === settings.accentColor) ?? PRESET_THEMES[0];
     const theme = customTheme
       ? {
           light: [customTheme.lightPrimary, customTheme.lightForeground] as [string, string],
@@ -231,9 +233,12 @@ function AppShell() {
   }
 
   return (
-    <div className="min-h-screen bg-background">
-      <div className="max-w-md mx-auto pb-24">
-        <Outlet />
+    <div className="min-h-screen bg-background md:grid md:grid-cols-[16rem_minmax(0,1fr)]">
+      {!hideNav && <DesktopSidebar />}
+      <div className="min-w-0 pb-24 md:pb-0">
+        <div className="mx-auto w-full max-w-[1440px]">
+          <Outlet />
+        </div>
       </div>
       {!hideNav && <BottomNav />}
     </div>
