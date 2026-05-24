@@ -3,7 +3,7 @@ import { AppHeader } from "@/components/AppHeader";
 import { BookCover } from "@/components/BookCover";
 import { useStore, readsInYear, totalReads } from "@/lib/basgiath-store";
 import { useAuth } from "@/lib/auth-context";
-import { BookOpen, Plus, Target, Quote, StickyNote, Sparkles, Stars, Trophy, Flame, WandSparkles } from "lucide-react";
+import { BookOpen, Plus, Target, Quote, StickyNote, Sparkles, Stars, Trophy, Flame, Orbit, WandSparkles } from "lucide-react";
 import { useMemo, useState } from "react";
 import { BookSearch } from "@/components/BookSearch";
 
@@ -39,7 +39,8 @@ function Dashboard() {
       <main className="px-5 pb-8 max-w-7xl mx-auto space-y-4">
         <section className="relative overflow-hidden rounded-2xl border border-primary/25 bg-gradient-to-br from-primary via-primary/85 to-gold/90 text-primary-foreground p-6 shadow-xl">
           <Sparkles className="absolute right-5 top-5 h-8 w-8 text-white/60" />
-          <Stars className="absolute -left-3 -bottom-3 h-20 w-20 text-white/10" />
+          <Stars className="absolute right-20 bottom-2 h-12 w-12 text-white/20" />
+          <Orbit className="absolute left-10 top-5 h-5 w-5 text-white/30" />
           <p className="text-[11px] uppercase tracking-[0.18em] text-primary-foreground/75">{year} Reading</p>
           <div className="mt-2 flex flex-wrap items-end gap-3">
             <p className="font-display text-6xl leading-none">{finishedThisYear}</p>
