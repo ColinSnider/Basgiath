@@ -165,7 +165,7 @@ function Settings() {
   }
 
   return (
-    <div>
+    <div className="min-h-screen bg-background">
       <div className="px-3 pt-[max(env(safe-area-inset-top),0.75rem)] pb-2">
         <Link
           to="/"
@@ -175,14 +175,18 @@ function Settings() {
         </Link>
       </div>
 
-      <header className="px-5 pt-2 pb-6">
-        <h1 className="font-display text-3xl text-primary">Settings</h1>
+      <header className="px-5 pt-2 pb-6 md:px-8">
+        <div className="mx-auto w-full max-w-[1400px] rounded-3xl border border-gold/35 bg-gradient-to-r from-primary to-primary/90 px-6 py-7 text-primary-foreground shadow-[0_14px_45px_-28px_rgba(72,24,30,0.8)]">
+          <p className="text-xs uppercase tracking-[0.2em] text-primary-foreground/75">Preferences</p>
+          <h1 className="font-display text-4xl">Settings</h1>
+          <p className="mt-1 text-sm text-primary-foreground/80">Make Basgiath yours with polished themes, profile controls, and backup tools.</p>
+        </div>
       </header>
 
       <div className="px-5 pb-8 md:px-8 xl:px-10">
-        <div className="grid gap-5 2xl:grid-cols-[minmax(0,1.1fr)_minmax(0,1fr)]">
+        <div className="mx-auto grid w-full max-w-[1400px] gap-6 2xl:grid-cols-[minmax(0,1.1fr)_minmax(0,1fr)]">
           {/* Account */}
-          <section className="bg-card border border-border rounded-lg p-4 space-y-4 2xl:col-span-2">
+          <section className="bg-card border border-gold/30 rounded-2xl p-5 space-y-4 shadow-[0_14px_40px_-32px_rgba(120,86,38,0.7)] 2xl:col-span-2">
             <div className="flex items-center gap-2 text-sm font-medium">
               <KeyRound className="h-4 w-4 text-muted-foreground" /> Account
             </div>
@@ -252,7 +256,7 @@ function Settings() {
           </section>
 
           {/* Password */}
-          <section className="bg-card border border-border rounded-lg p-5 space-y-3">
+          <section className="bg-card border border-gold/30 rounded-2xl p-5 space-y-3 shadow-[0_14px_40px_-32px_rgba(120,86,38,0.7)]">
             <div className="flex items-center gap-2 text-sm font-medium">
               <KeyRound className="h-4 w-4 text-muted-foreground" /> Change password
             </div>
@@ -287,7 +291,7 @@ function Settings() {
           </section>
 
           {/* Appearance */}
-          <section className="bg-card border border-border rounded-lg p-5 space-y-4 relative overflow-hidden">
+          <section className="bg-card border border-gold/30 rounded-2xl p-5 space-y-4 relative overflow-hidden shadow-[0_14px_40px_-32px_rgba(120,86,38,0.7)]">
             <Sparkles className="h-20 w-20 absolute -right-4 -top-5 text-primary/15" />
             <div className="flex items-center gap-2 text-sm font-medium">
               <Palette className="h-4 w-4 text-muted-foreground" /> Appearance
@@ -353,7 +357,7 @@ function Settings() {
           </section>
 
           {/* Reading */}
-          <section className="bg-card border border-border rounded-lg p-5 space-y-4">
+          <section className="bg-card border border-gold/30 rounded-2xl p-5 space-y-4 shadow-[0_14px_40px_-32px_rgba(120,86,38,0.7)]">
             <div className="flex items-center gap-2 text-sm font-medium">
               <Type className="h-4 w-4 text-muted-foreground" /> Reading preferences
             </div>
@@ -451,7 +455,7 @@ function Settings() {
           </section>
 
           {/* Data */}
-          <section className="bg-card border border-border rounded-lg p-4 space-y-3 2xl:col-span-2">
+          <section className="bg-card border border-gold/30 rounded-2xl p-5 space-y-3 2xl:col-span-2 shadow-[0_14px_40px_-32px_rgba(120,86,38,0.7)]">
             <div className="flex items-center gap-2 text-sm font-medium">
               <Layout className="h-4 w-4 text-muted-foreground" /> Data
             </div>
