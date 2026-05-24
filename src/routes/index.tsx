@@ -351,7 +351,6 @@ function Landing() {
             <div className="rounded-lg border border-gold/30 bg-card/80 p-2 text-center">Margins</div>
           </div>
         </div>
-
         <div className="mx-auto w-full max-w-[620px] lg:justify-self-center rounded-[1.5rem] border border-gold/40 bg-card/95 p-8 text-center shadow-[0_20px_50px_-32px_rgba(81,43,20,0.65)] backdrop-blur-sm">
           <BookOpen className="mx-auto h-10 w-10 text-primary" />
           <h2 className="font-display text-5xl mt-4">Basgiath</h2>

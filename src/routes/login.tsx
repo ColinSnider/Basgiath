@@ -95,7 +95,6 @@ function LoginPage() {
             <div className="rounded-xl border border-gold/30 bg-card/80 p-3"><p className="text-xs font-medium">Margin notes</p></div>
           </div>
         </div>
-
         <div className="mx-auto w-full max-w-[620px] lg:justify-self-center bg-card/95 border border-gold/40 rounded-[1.5rem] p-6 md:p-9 shadow-[0_20px_50px_-32px_rgba(81,43,20,0.65)] backdrop-blur-sm space-y-5">
           <div>
             <h1 className="text-xl font-semibold text-foreground">
