@@ -36,7 +36,7 @@ function Dashboard() {
   return (
     <>
       <AppHeader title="Basgiath" subtitle={`Welcome back, ${user?.displayName ?? "Reader"}.`} />
-      <main className="px-5 pb-8 max-w-7xl mx-auto space-y-4">
+      <main className="px-5 pb-8 md:pb-10 max-w-7xl mx-auto space-y-4 xl:space-y-5">
         <section className="relative overflow-hidden rounded-2xl border border-primary/25 bg-gradient-to-br from-primary via-primary/85 to-gold/90 text-primary-foreground p-6 shadow-xl">
           <Orbit className="absolute left-4 top-4 h-5 w-5 text-white/25" />
           <Sparkles className="absolute right-5 top-5 h-8 w-8 text-white/60" />
@@ -53,7 +53,7 @@ function Dashboard() {
           </div>
         </section>
 
-        <section className="grid md:grid-cols-3 gap-3">
+        <section className="grid sm:grid-cols-2 xl:grid-cols-3 gap-3">
           <Link to="/library" className="relative overflow-hidden border border-border bg-card rounded-xl p-4 shadow-sm hover:shadow-md transition-all hover:-translate-y-0.5">
             <Trophy className="absolute -right-2 -top-2 h-14 w-14 text-gold/15" />
             <p className="text-xs text-muted-foreground">Reading Sessions</p><p className="font-display text-4xl mt-1">{streakish}</p>
@@ -68,8 +68,9 @@ function Dashboard() {
           </button>
         </section>
 
-        <section className="grid lg:grid-cols-[1.5fr_1fr] gap-4">
-          <div className="rounded-xl border border-border bg-card p-4">
+        <div className="xl:grid xl:grid-cols-[minmax(0,1.65fr)_minmax(320px,1fr)] xl:gap-4 xl:items-start space-y-4 xl:space-y-0">
+          <section className="grid xl:grid-cols-[minmax(0,1.65fr)_minmax(320px,1fr)] gap-4 items-start">
+          <div className="rounded-xl border border-border bg-card p-4 xl:p-5">
             <div className="flex flex-wrap items-center justify-between mb-3 gap-2">
               <h2 className="font-display text-2xl">Reading</h2>
               <div className="inline-flex bg-muted/70 rounded-lg p-1 border border-border">
@@ -85,16 +86,17 @@ function Dashboard() {
             )}
           </div>
 
-          <div className="rounded-xl border border-border bg-card p-4">
+          <div className="rounded-xl border border-border bg-card p-4 xl:p-5">
             <h2 className="font-display text-xl mb-3 inline-flex gap-1 items-center"><Target className="h-4 w-4 text-primary"/>Goals + Momentum</h2>
             {goals.length===0 ? <p className="text-sm text-muted-foreground">No goals set.</p> : <ul className="space-y-2">{goals.map((g)=><li key={g.id}><Link to="/goals" className="block border border-border rounded-lg p-2.5 hover:bg-muted/40"><p className="text-sm capitalize">{g.timeframe}ly {g.metric}</p><p className="text-xs text-muted-foreground">Target: {g.target}</p></Link></li>)}</ul>}
           </div>
         </section>
 
-        <section className="rounded-xl border border-border bg-card p-4">
+        <section className="rounded-xl border border-border bg-card p-4 xl:p-5">
           <h2 className="font-display text-xl mb-3">Recent margins</h2>
           {recentMargins.length===0 ? <p className="text-sm text-muted-foreground">No margins yet.</p> : <ul className="grid lg:grid-cols-2 gap-2">{recentMargins.map((m)=><li key={m.id}><Link to="/margins" className="block border border-border rounded-lg p-2.5 hover:bg-muted/40"><p className="text-sm line-clamp-2">{m.text}</p><p className="text-[11px] text-muted-foreground mt-1 inline-flex items-center gap-1">{m.type==="quote" ? <Quote className="h-3 w-3"/> : <StickyNote className="h-3 w-3"/>}{m.type}</p></Link></li>)}</ul>}
         </section>
+        </div>
       </main>
 
       {searching && <BookSearch onClose={() => setSearching(false)} onPick={(r) => { addBook({ title: r.title, author: r.author, coverUrl: r.coverUrl, totalPages: r.totalPages, currentPage: 0, format: r.format ?? "book", durationMinutes: r.durationMinutes, status: r.status ?? "reading", reads: r.finishedAt ? [{ finishedAt: r.finishedAt }] : [], addedAt: r.addedAt, extraReads: r.extraReads }); setSearching(false); }} />}
