@@ -51,6 +51,14 @@ export const PRESET_THEMES: PresetTheme[] = [
     },
   },
   {
+    id: "scarlet",
+    label: "Scarlet",
+    hex: "#b91c1c",
+    light: ["oklch(0.48 0.18 25)", "oklch(0.98 0.01 70)"],
+    dark: ["oklch(0.62 0.2 25)", "oklch(0.98 0.01 70)"],
+    darkSurfaces: { bg: "oklch(0.16 0.022 25)", card: "oklch(0.2 0.028 25)", border: "oklch(0.3 0.03 25)", muted: "oklch(0.24 0.032 25)" },
+  },
+  {
     id: "sage",
     label: "Sage",
     hex: "#3a5c4a",
@@ -62,6 +70,14 @@ export const PRESET_THEMES: PresetTheme[] = [
       border: "oklch(0.28 0.026 155)",
       muted: "oklch(0.24 0.030 155)",
     },
+  },
+  {
+    id: "forest",
+    label: "Forest",
+    hex: "#166534",
+    light: ["oklch(0.4 0.11 152)", "oklch(0.97 0.01 145)"],
+    dark: ["oklch(0.56 0.13 152)", "oklch(0.98 0.01 145)"],
+    darkSurfaces: { bg: "oklch(0.14 0.016 152)", card: "oklch(0.18 0.02 152)", border: "oklch(0.27 0.025 152)", muted: "oklch(0.23 0.028 152)" },
   },
   {
     id: "ocean",
@@ -77,9 +93,17 @@ export const PRESET_THEMES: PresetTheme[] = [
     },
   },
   {
-    id: "sunset",
-    label: "Sunset",
-    hex: "#8b3a1a",
+    id: "sky",
+    label: "Sky",
+    hex: "#0ea5e9",
+    light: ["oklch(0.63 0.14 240)", "oklch(0.15 0.02 250)"],
+    dark: ["oklch(0.72 0.14 240)", "oklch(0.16 0.02 250)"],
+    darkSurfaces: { bg: "oklch(0.15 0.016 240)", card: "oklch(0.2 0.02 240)", border: "oklch(0.28 0.024 240)", muted: "oklch(0.24 0.028 240)" },
+  },
+  {
+    id: "violet",
+    label: "Violet",
+    hex: "#4c1d95",
     light: ["oklch(0.42 0.12 40)", "oklch(0.97 0.012 60)"],
     dark: ["oklch(0.58 0.14 40)", "oklch(0.98 0.01 60)"],
     darkSurfaces: {
@@ -90,42 +114,16 @@ export const PRESET_THEMES: PresetTheme[] = [
     },
   },
   {
-    id: "slate",
-    label: "Slate",
-    hex: "#374151",
-    light: ["oklch(0.35 0.025 255)", "oklch(0.97 0.005 255)"],
-    dark: ["oklch(0.52 0.03 255)", "oklch(0.98 0.005 255)"],
-    darkSurfaces: {
-      bg: "oklch(0.15 0.012 255)",
-      card: "oklch(0.19 0.015 255)",
-      border: "oklch(0.28 0.018 255)",
-      muted: "oklch(0.24 0.020 255)",
-    },
-  },
-  {
-    id: "violet",
-    label: "Violet",
-    hex: "#4c1d95",
-    light: ["oklch(0.33 0.16 295)", "oklch(0.97 0.01 295)"],
-    dark: ["oklch(0.52 0.18 295)", "oklch(0.98 0.01 295)"],
+    id: "orchid",
+    label: "Orchid",
+    hex: "#a855f7",
+    light: ["oklch(0.58 0.18 310)", "oklch(0.15 0.02 300)"],
+    dark: ["oklch(0.7 0.2 310)", "oklch(0.16 0.02 300)"],
     darkSurfaces: {
       bg: "oklch(0.15 0.022 295)",
       card: "oklch(0.19 0.028 295)",
       border: "oklch(0.28 0.032 295)",
       muted: "oklch(0.24 0.036 295)",
-    },
-  },
-  {
-    id: "pine",
-    label: "Pine",
-    hex: "#14532d",
-    light: ["oklch(0.34 0.09 155)", "oklch(0.97 0.01 150)"],
-    dark: ["oklch(0.5 0.12 155)", "oklch(0.98 0.01 150)"],
-    darkSurfaces: {
-      bg: "oklch(0.14 0.016 155)",
-      card: "oklch(0.18 0.02 155)",
-      border: "oklch(0.27 0.024 155)",
-      muted: "oklch(0.23 0.028 155)",
     },
   },
   {
@@ -140,6 +138,14 @@ export const PRESET_THEMES: PresetTheme[] = [
       border: "oklch(0.30 0.026 70)",
       muted: "oklch(0.24 0.03 70)",
     },
+  },
+  {
+    id: "rose-gold",
+    label: "Rose Gold",
+    hex: "#b76e79",
+    light: ["oklch(0.58 0.08 20)", "oklch(0.14 0.02 30)"],
+    dark: ["oklch(0.66 0.09 20)", "oklch(0.15 0.02 30)"],
+    darkSurfaces: { bg: "oklch(0.16 0.015 20)", card: "oklch(0.2 0.02 20)", border: "oklch(0.3 0.024 20)", muted: "oklch(0.24 0.026 20)" },
   },
 ];
 
