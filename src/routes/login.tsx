@@ -85,7 +85,7 @@ function LoginPage() {
           </div>
         </section>
 
-        <div className="w-full max-w-md xl:max-w-xl xl:justify-self-center bg-card/95 border border-gold/40 rounded-[1.5rem] p-6 md:p-9 shadow-[0_20px_50px_-32px_rgba(81,43,20,0.65)] backdrop-blur-sm space-y-5">
+        <div className="mx-auto w-full max-w-md xl:max-w-xl xl:justify-self-center bg-card/95 border border-gold/40 rounded-[1.5rem] p-6 md:p-9 shadow-[0_20px_50px_-32px_rgba(81,43,20,0.65)] backdrop-blur-sm space-y-5">
           <div>
             <h1 className="text-xl font-semibold text-foreground">
               {mode === "login" ? "Sign In" : "Create Account"}
