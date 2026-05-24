@@ -1,7 +1,7 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useStore, totalReads, lastReadDate } from "@/lib/basgiath-store";
 import { BookCover } from "@/components/BookCover";
-import { ChevronLeft, Check, Trash2, RotateCcw, CalendarDays, X, Headphones, Save } from "lucide-react";
+import { ChevronLeft, Check, Trash2, RotateCcw, CalendarDays, X, Headphones, Save, Pencil, Sparkles } from "lucide-react";
 import { useState, useEffect } from "react";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
@@ -23,6 +23,7 @@ function BookDetail() {
   const [coverUrl, setCoverUrl] = useState("");
   const [tags, setTags] = useState("");
   const [status, setStatus] = useState<"reading"|"finished"|"wishlist">("reading");
+  const [editingDetails, setEditingDetails] = useState(false);
 
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [finishDate, setFinishDate] = useState<Date | undefined>(new Date());
@@ -60,6 +61,7 @@ function BookDetail() {
   function saveDetails() {
     const nextTags = tags.split(",").map((t) => t.trim()).filter(Boolean);
     updateBook(book.id, { title: title.trim() || book.title, author: author.trim() || book.author, coverUrl: coverUrl.trim() || null, status, metadata: { ...(book.metadata ?? {}), tags: nextTags } });
+    setEditingDetails(false);
   }
 
   function confirmFinish() {
@@ -90,16 +92,40 @@ function BookDetail() {
       </div>
     </div>
 
-    <section className="mt-6 bg-card border border-border rounded-md p-4 space-y-3">
-      <h2 className="font-display text-lg">Edit book details</h2>
-      <div className="grid md:grid-cols-2 gap-3">
-        <input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Title" className="bg-muted rounded-md px-3 py-2 text-sm" />
-        <input value={author} onChange={(e) => setAuthor(e.target.value)} placeholder="Author" className="bg-muted rounded-md px-3 py-2 text-sm" />
-        <input value={coverUrl} onChange={(e) => setCoverUrl(e.target.value)} placeholder="Cover image URL" className="bg-muted rounded-md px-3 py-2 text-sm md:col-span-2" />
-        <input value={tags} onChange={(e) => setTags(e.target.value)} placeholder="Tags (Genre, Fantasy, etc.)" className="bg-muted rounded-md px-3 py-2 text-sm" />
-        <select value={status} onChange={(e)=>setStatus(e.target.value as any)} className="bg-muted rounded-md px-3 py-2 text-sm"><option value="reading">Current Reads</option><option value="finished">Past Reads</option><option value="wishlist">TBR</option></select>
+    <section className="mt-6 bg-card border border-border rounded-md p-4 space-y-3 relative overflow-hidden">
+      <Sparkles className="absolute -right-2 -top-2 h-10 w-10 text-primary/20" />
+      <div className="flex items-center justify-between gap-2">
+        <h2 className="font-display text-lg">Book details</h2>
+        {!editingDetails ? (
+          <button onClick={() => setEditingDetails(true)} className="inline-flex items-center gap-1 border border-border rounded-md px-3 py-1.5 text-xs hover:bg-muted/40">
+            <Pencil className="h-3.5 w-3.5" /> Edit
+          </button>
+        ) : (
+          <button onClick={() => setEditingDetails(false)} className="inline-flex items-center gap-1 border border-border rounded-md px-3 py-1.5 text-xs hover:bg-muted/40">
+            Cancel
+          </button>
+        )}
       </div>
-      <button onClick={saveDetails} className="inline-flex items-center gap-1 bg-primary text-primary-foreground px-4 py-2 rounded-md text-sm"><Save className="h-4 w-4" /> Save details</button>
+      {!editingDetails ? (
+        <div className="grid md:grid-cols-2 gap-2 text-sm">
+          <p><span className="text-muted-foreground">Title:</span> {book.title}</p>
+          <p><span className="text-muted-foreground">Author:</span> {book.author}</p>
+          <p className="md:col-span-2"><span className="text-muted-foreground">Cover:</span> {book.coverUrl ?? "Default cover"}</p>
+          <p><span className="text-muted-foreground">Status:</span> {book.status === "wishlist" ? "TBR" : book.status}</p>
+          <p><span className="text-muted-foreground">Tags:</span> {(book.metadata as any)?.tags?.join?.(", ") || "None"}</p>
+        </div>
+      ) : (
+        <>
+          <div className="grid md:grid-cols-2 gap-3">
+            <input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Title" className="bg-muted rounded-md px-3 py-2 text-sm" />
+            <input value={author} onChange={(e) => setAuthor(e.target.value)} placeholder="Author" className="bg-muted rounded-md px-3 py-2 text-sm" />
+            <input value={coverUrl} onChange={(e) => setCoverUrl(e.target.value)} placeholder="Cover image URL" className="bg-muted rounded-md px-3 py-2 text-sm md:col-span-2" />
+            <input value={tags} onChange={(e) => setTags(e.target.value)} placeholder="Tags (Genre, Fantasy, etc.)" className="bg-muted rounded-md px-3 py-2 text-sm" />
+            <select value={status} onChange={(e)=>setStatus(e.target.value as any)} className="bg-muted rounded-md px-3 py-2 text-sm"><option value="reading">Current Reads</option><option value="finished">Past Reads</option><option value="wishlist">TBR</option></select>
+          </div>
+          <button onClick={saveDetails} className="inline-flex items-center gap-1 bg-primary text-primary-foreground px-4 py-2 rounded-md text-sm"><Save className="h-4 w-4" /> Save details</button>
+        </>
+      )}
     </section>
 
     <section className="mt-6 bg-card border border-border rounded-md p-4 space-y-3">
