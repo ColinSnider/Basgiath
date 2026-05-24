@@ -3,7 +3,7 @@ import { AppHeader } from "@/components/AppHeader";
 import { BookCover } from "@/components/BookCover";
 import { useStore, readsInYear, totalReads } from "@/lib/basgiath-store";
 import { useAuth } from "@/lib/auth-context";
-import { BookOpen, Plus, Target, Quote, StickyNote, Sparkles, Stars, Trophy } from "lucide-react";
+import { BookOpen, Plus, Target, Quote, StickyNote, Sparkles, Stars, Trophy, Flame, Orbit, WandSparkles } from "lucide-react";
 import { useMemo, useState } from "react";
 import { BookSearch } from "@/components/BookSearch";
 
@@ -40,6 +40,7 @@ function Dashboard() {
         <section className="relative overflow-hidden rounded-2xl border border-primary/25 bg-gradient-to-br from-primary via-primary/85 to-gold/90 text-primary-foreground p-6 shadow-xl">
           <Sparkles className="absolute right-5 top-5 h-8 w-8 text-white/60" />
           <Stars className="absolute -left-3 -bottom-3 h-20 w-20 text-white/10" />
+          <Orbit className="absolute left-10 top-5 h-5 w-5 text-white/30" />
           <p className="text-[11px] uppercase tracking-[0.18em] text-primary-foreground/75">{year} Reading Aura</p>
           <div className="mt-2 flex flex-wrap items-end gap-3">
             <p className="font-display text-6xl leading-none">{finishedThisYear}</p>
@@ -53,14 +54,16 @@ function Dashboard() {
         </section>
 
         <section className="grid md:grid-cols-3 gap-3">
-          <Link to="/library" className="relative overflow-hidden border border-border bg-card rounded-xl p-4 shadow-sm hover:shadow-md transition-all">
+          <Link to="/library" className="relative overflow-hidden border border-border bg-card rounded-xl p-4 shadow-sm hover:shadow-md transition-all hover:-translate-y-0.5">
             <Trophy className="absolute -right-2 -top-2 h-14 w-14 text-gold/15" />
             <p className="text-xs text-muted-foreground">Reading Sessions</p><p className="font-display text-4xl mt-1">{streakish}</p>
           </Link>
-          <Link to="/goals" className="border border-border bg-card rounded-xl p-4 shadow-sm hover:shadow-md transition-all">
+          <Link to="/goals" className="relative overflow-hidden border border-border bg-card rounded-xl p-4 shadow-sm hover:shadow-md transition-all hover:-translate-y-0.5">
+            <Flame className="absolute -right-2 -bottom-1 h-12 w-12 text-primary/15" />
             <p className="text-xs text-muted-foreground">Active Goals</p><p className="font-display text-4xl mt-1">{goals.length}</p>
           </Link>
-          <button onClick={() => setSearching(true)} className="text-left border border-primary/30 bg-gradient-to-br from-gold/35 to-primary/15 rounded-xl p-4 shadow-sm hover:shadow-md transition-all">
+          <button onClick={() => setSearching(true)} className="relative text-left border border-primary/30 bg-gradient-to-br from-gold/35 to-primary/15 rounded-xl p-4 shadow-sm hover:shadow-md transition-all hover:-translate-y-0.5">
+            <WandSparkles className="absolute right-3 top-3 h-4 w-4 text-primary/70" />
             <p className="text-xs text-muted-foreground">Discover</p><p className="font-display text-2xl mt-1 inline-flex items-center gap-1">Add a Book <Plus className="h-4 w-4" /></p>
           </button>
         </section>
