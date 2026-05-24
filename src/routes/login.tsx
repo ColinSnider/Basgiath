@@ -58,137 +58,159 @@ function LoginPage() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-background px-4">
-      <div className="w-full max-w-sm bg-card border border-border rounded-xl p-6 shadow-sm space-y-5">
-        <div>
-          <h1 className="text-xl font-semibold text-foreground">
-            {mode === "login" ? "Sign In" : "Create Account"}
-          </h1>
-          <p className="text-sm text-muted-foreground mt-1">
-            {mode === "login"
-              ? "Welcome back. Sign in to continue."
-              : "Create a new account to get started."}
+    <div className="min-h-screen bg-background px-5 py-10 md:px-10 xl:px-14">
+      <div className="mx-auto grid max-w-6xl gap-6 xl:grid-cols-[1.1fr_1fr] xl:items-stretch">
+        <section className="hidden xl:flex rounded-3xl border border-primary/20 bg-gradient-to-br from-primary via-primary/85 to-gold/85 text-primary-foreground p-10 shadow-xl flex-col justify-between">
+          <div>
+            <p className="text-xs uppercase tracking-[0.18em] text-primary-foreground/80">
+              Basgiath
+            </p>
+            <h2 className="font-display text-5xl mt-4">Read with momentum.</h2>
+            <p className="mt-4 text-primary-foreground/85 max-w-md">
+              Keep your reading stack, goals, and annotations in one focused workspace.
+            </p>
+          </div>
+          <div className="grid grid-cols-3 gap-2 text-xs">
+            <div className="rounded-lg border border-white/20 bg-black/15 p-2">
+              Track current reads
+            </div>
+            <div className="rounded-lg border border-white/20 bg-black/15 p-2">Set smart goals</div>
+            <div className="rounded-lg border border-white/20 bg-black/15 p-2">Capture margins</div>
+          </div>
+        </section>
+
+        <div className="w-full max-w-md xl:max-w-none xl:w-auto bg-card border border-border rounded-2xl p-6 md:p-8 shadow-sm space-y-5">
+          <div>
+            <h1 className="text-xl font-semibold text-foreground">
+              {mode === "login" ? "Sign In" : "Create Account"}
+            </h1>
+            <p className="text-sm text-muted-foreground mt-1">
+              {mode === "login"
+                ? "Welcome back. Sign in to continue."
+                : "Create a new account to get started."}
+            </p>
+          </div>
+
+          <form onSubmit={handleSubmit} className="space-y-3">
+            <div className="space-y-1">
+              <label className="text-sm font-medium text-foreground">Username</label>
+              <input
+                value={username}
+                onChange={(e) => setUsername(e.target.value)}
+                placeholder="e.g. avid_reader"
+                autoComplete="username"
+                required
+                className="w-full bg-muted rounded-md px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-primary/40"
+              />
+            </div>
+
+            <div className="space-y-1">
+              <label className="text-sm font-medium text-foreground">Password</label>
+              <input
+                type="password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                placeholder="••••••••"
+                autoComplete={mode === "login" ? "current-password" : "new-password"}
+                required
+                className="w-full bg-muted rounded-md px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-primary/40"
+              />
+            </div>
+
+            {mode === "register" && (
+              <>
+                <div className="space-y-1">
+                  <label className="text-sm font-medium text-foreground">
+                    Display Name{" "}
+                    <span className="text-muted-foreground font-normal">(optional)</span>
+                  </label>
+                  <input
+                    value={displayName}
+                    onChange={(e) => setDisplayName(e.target.value)}
+                    placeholder="How should we call you?"
+                    className="w-full bg-muted rounded-md px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-primary/40"
+                  />
+                </div>
+
+                <div className="space-y-1">
+                  <label className="text-sm font-medium text-foreground">
+                    Email <span className="text-muted-foreground font-normal">(optional)</span>
+                  </label>
+                  <input
+                    type="email"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    placeholder="you@example.com"
+                    autoComplete="email"
+                    className="w-full bg-muted rounded-md px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-primary/40"
+                  />
+                </div>
+              </>
+            )}
+
+            {error && <p className="text-sm text-destructive">{error}</p>}
+
+            <button
+              type="submit"
+              disabled={loading}
+              className="w-full bg-primary text-primary-foreground rounded-md py-2.5 text-sm font-medium hover:bg-primary/90 disabled:opacity-50 flex items-center justify-center gap-2"
+            >
+              {loading && <Loader2 className="h-4 w-4 animate-spin" />}
+              {mode === "login" ? "Sign In" : "Create Account"}
+            </button>
+
+            {mode === "login" && (
+              <>
+                <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                  <span className="h-px flex-1 bg-border" />
+                  <span>Just browsing?</span>
+                  <span className="h-px flex-1 bg-border" />
+                </div>
+                <button
+                  type="button"
+                  onClick={handleContinueAsGuest}
+                  disabled={loading}
+                  className="w-full border border-border rounded-md py-2.5 text-sm font-medium text-foreground hover:bg-muted/50 disabled:opacity-50"
+                >
+                  Continue as Guest
+                </button>
+                <p className="text-xs text-muted-foreground">{GUEST_BROWSE_MESSAGE}</p>
+              </>
+            )}
+          </form>
+
+          <p className="text-sm text-center text-muted-foreground">
+            {mode === "login" ? (
+              <>
+                Don't have an account?{" "}
+                <button
+                  type="button"
+                  onClick={() => {
+                    setMode("register");
+                    setError(null);
+                  }}
+                  className="text-primary hover:underline font-medium"
+                >
+                  Create one
+                </button>
+              </>
+            ) : (
+              <>
+                Already have an account?{" "}
+                <button
+                  type="button"
+                  onClick={() => {
+                    setMode("login");
+                    setError(null);
+                  }}
+                  className="text-primary hover:underline font-medium"
+                >
+                  Sign in
+                </button>
+              </>
+            )}
           </p>
         </div>
-
-        <form onSubmit={handleSubmit} className="space-y-3">
-          <div className="space-y-1">
-            <label className="text-sm font-medium text-foreground">Username</label>
-            <input
-              value={username}
-              onChange={(e) => setUsername(e.target.value)}
-              placeholder="e.g. avid_reader"
-              autoComplete="username"
-              required
-              className="w-full bg-muted rounded-md px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-primary/40"
-            />
-          </div>
-
-          <div className="space-y-1">
-            <label className="text-sm font-medium text-foreground">Password</label>
-            <input
-              type="password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              placeholder="••••••••"
-              autoComplete={mode === "login" ? "current-password" : "new-password"}
-              required
-              className="w-full bg-muted rounded-md px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-primary/40"
-            />
-          </div>
-
-          {mode === "register" && (
-            <>
-              <div className="space-y-1">
-                <label className="text-sm font-medium text-foreground">
-                  Display Name <span className="text-muted-foreground font-normal">(optional)</span>
-                </label>
-                <input
-                  value={displayName}
-                  onChange={(e) => setDisplayName(e.target.value)}
-                  placeholder="How should we call you?"
-                  className="w-full bg-muted rounded-md px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-primary/40"
-                />
-              </div>
-
-              <div className="space-y-1">
-                <label className="text-sm font-medium text-foreground">
-                  Email <span className="text-muted-foreground font-normal">(optional)</span>
-                </label>
-                <input
-                  type="email"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  placeholder="you@example.com"
-                  autoComplete="email"
-                  className="w-full bg-muted rounded-md px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-primary/40"
-                />
-              </div>
-            </>
-          )}
-
-          {error && <p className="text-sm text-destructive">{error}</p>}
-
-          <button
-            type="submit"
-            disabled={loading}
-            className="w-full bg-primary text-primary-foreground rounded-md py-2.5 text-sm font-medium hover:bg-primary/90 disabled:opacity-50 flex items-center justify-center gap-2"
-          >
-            {loading && <Loader2 className="h-4 w-4 animate-spin" />}
-            {mode === "login" ? "Sign In" : "Create Account"}
-          </button>
-
-          {mode === "login" && (
-            <>
-              <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                <span className="h-px flex-1 bg-border" />
-                <span>Just browsing?</span>
-                <span className="h-px flex-1 bg-border" />
-              </div>
-              <button
-                type="button"
-                onClick={handleContinueAsGuest}
-                disabled={loading}
-                className="w-full border border-border rounded-md py-2.5 text-sm font-medium text-foreground hover:bg-muted/50 disabled:opacity-50"
-              >
-                Continue as Guest
-              </button>
-              <p className="text-xs text-muted-foreground">{GUEST_BROWSE_MESSAGE}</p>
-            </>
-          )}
-        </form>
-
-        <p className="text-sm text-center text-muted-foreground">
-          {mode === "login" ? (
-            <>
-              Don't have an account?{" "}
-              <button
-                type="button"
-                onClick={() => {
-                  setMode("register");
-                  setError(null);
-                }}
-                className="text-primary hover:underline font-medium"
-              >
-                Create one
-              </button>
-            </>
-          ) : (
-            <>
-              Already have an account?{" "}
-              <button
-                type="button"
-                onClick={() => {
-                  setMode("login");
-                  setError(null);
-                }}
-                className="text-primary hover:underline font-medium"
-              >
-                Sign in
-              </button>
-            </>
-          )}
-        </p>
       </div>
     </div>
   );

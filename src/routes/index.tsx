@@ -53,7 +53,7 @@ function Dashboard() {
     <>
       <AppHeader title="Basgiath" subtitle={`Welcome back, ${user?.displayName ?? "Reader"}.`} />
       <main className="px-5 pb-8 md:px-8 md:pb-10 xl:px-10">
-        <div className="grid gap-4 xl:grid-cols-[minmax(0,1.7fr)_minmax(340px,1fr)] 2xl:gap-5">
+        <div className="grid gap-4 xl:grid-cols-[minmax(0,2.15fr)_340px] 2xl:gap-5">
           <div className="space-y-4 2xl:space-y-5">
             <section className="relative overflow-hidden rounded-2xl border border-primary/25 bg-gradient-to-br from-primary via-primary/85 to-gold/90 text-primary-foreground p-6 shadow-xl">
               <Orbit className="absolute left-4 top-4 h-5 w-5 text-white/25" />
@@ -81,7 +81,7 @@ function Dashboard() {
               </div>
             </section>
 
-            <section className="grid sm:grid-cols-2 xl:grid-cols-3 gap-3">
+            <section className="grid sm:grid-cols-2 2xl:grid-cols-3 gap-3">
               <Link
                 to="/library"
                 className="relative overflow-hidden border border-border bg-card rounded-xl p-4 shadow-sm hover:shadow-md transition-all hover:-translate-y-0.5"
@@ -110,7 +110,7 @@ function Dashboard() {
               </button>
             </section>
 
-            <section className="grid xl:grid-cols-[minmax(0,1.35fr)_minmax(280px,1fr)] gap-4 items-start">
+            <section className="grid xl:grid-cols-[minmax(0,1.9fr)_minmax(220px,1fr)] gap-4 items-start">
               <div className="rounded-xl border border-border bg-card p-4 xl:p-5">
                 <div className="flex flex-wrap items-center justify-between mb-3 gap-2">
                   <h2 className="font-display text-2xl">Reading</h2>
@@ -139,18 +139,30 @@ function Dashboard() {
                   reading.length === 0 ? (
                     <p className="text-sm text-muted-foreground">Nothing on your bookmark yet.</p>
                   ) : (
-                    <div className="grid sm:grid-cols-2 xl:grid-cols-3 gap-3">
+                    <div className="grid sm:grid-cols-2 2xl:grid-cols-3 gap-3">
                       {reading.slice(0, 9).map((b) => (
                         <Link
                           key={b.id}
                           to="/book/$id"
                           params={{ id: b.id }}
-                          className="border border-border rounded-lg p-3 flex items-center gap-3 hover:bg-muted/40"
+                          className="border border-border rounded-lg p-3.5 flex items-center gap-3.5 hover:bg-muted/40 min-w-0"
                         >
                           <BookCover book={b} size="sm" />
-                          <div>
-                            <p className="text-sm font-semibold line-clamp-1">{b.title}</p>
-                            <p className="text-xs text-muted-foreground">{b.author}</p>
+                          <div className="min-w-0 flex-1">
+                            <p className="text-sm font-semibold line-clamp-2 leading-tight">
+                              {b.title}
+                            </p>
+                            <p className="text-xs text-muted-foreground line-clamp-1 mt-0.5">
+                              {b.author}
+                            </p>
+                            <div className="mt-2 flex flex-wrap gap-1.5">
+                              <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-muted text-muted-foreground">
+                                p. {b.currentPage || 0}
+                              </span>
+                              <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-primary/10 text-primary">
+                                {totalReads(b)} reads
+                              </span>
+                            </div>
                           </div>
                         </Link>
                       ))}
@@ -159,19 +171,31 @@ function Dashboard() {
                 ) : recentlyFinished.length === 0 ? (
                   <p className="text-sm text-muted-foreground">No recent finished reads yet.</p>
                 ) : (
-                  <div className="grid sm:grid-cols-2 xl:grid-cols-3 gap-3">
+                  <div className="grid sm:grid-cols-2 2xl:grid-cols-3 gap-3">
                     {recentlyFinished.map(({ book, at }) => (
                       <Link
                         key={`${book.id}-${at}`}
                         to="/book/$id"
                         params={{ id: book.id }}
-                        className="border border-border rounded-lg p-3 hover:bg-muted/40"
+                        className="border border-border rounded-lg p-3.5 hover:bg-muted/40 min-w-0"
                       >
                         <div className="flex items-center gap-3">
                           <BookCover book={book} size="sm" />
-                          <div>
-                            <p className="text-sm font-semibold line-clamp-1">{book.title}</p>
-                            <p className="text-xs text-muted-foreground">{book.author}</p>
+                          <div className="min-w-0 flex-1">
+                            <p className="text-sm font-semibold line-clamp-2 leading-tight">
+                              {book.title}
+                            </p>
+                            <p className="text-xs text-muted-foreground line-clamp-1 mt-0.5">
+                              {book.author}
+                            </p>
+                            <div className="mt-2 flex flex-wrap gap-1.5">
+                              <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-muted text-muted-foreground">
+                                p. {book.currentPage || 0}
+                              </span>
+                              <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-primary/10 text-primary">
+                                {totalReads(book)} reads
+                              </span>
+                            </div>
                             <p className="text-[10px] text-muted-foreground/80 mt-1">
                               Finished {new Date(at).toLocaleDateString()}
                             </p>

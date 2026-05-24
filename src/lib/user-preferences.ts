@@ -56,7 +56,12 @@ export const PRESET_THEMES: PresetTheme[] = [
     hex: "#b91c1c",
     light: ["oklch(0.48 0.18 25)", "oklch(0.98 0.01 70)"],
     dark: ["oklch(0.62 0.2 25)", "oklch(0.98 0.01 70)"],
-    darkSurfaces: { bg: "oklch(0.16 0.022 25)", card: "oklch(0.2 0.028 25)", border: "oklch(0.3 0.03 25)", muted: "oklch(0.24 0.032 25)" },
+    darkSurfaces: {
+      bg: "oklch(0.16 0.022 25)",
+      card: "oklch(0.2 0.028 25)",
+      border: "oklch(0.3 0.03 25)",
+      muted: "oklch(0.24 0.032 25)",
+    },
   },
   {
     id: "sage",
@@ -77,7 +82,12 @@ export const PRESET_THEMES: PresetTheme[] = [
     hex: "#166534",
     light: ["oklch(0.4 0.11 152)", "oklch(0.97 0.01 145)"],
     dark: ["oklch(0.56 0.13 152)", "oklch(0.98 0.01 145)"],
-    darkSurfaces: { bg: "oklch(0.14 0.016 152)", card: "oklch(0.18 0.02 152)", border: "oklch(0.27 0.025 152)", muted: "oklch(0.23 0.028 152)" },
+    darkSurfaces: {
+      bg: "oklch(0.14 0.016 152)",
+      card: "oklch(0.18 0.02 152)",
+      border: "oklch(0.27 0.025 152)",
+      muted: "oklch(0.23 0.028 152)",
+    },
   },
   {
     id: "ocean",
@@ -98,19 +108,24 @@ export const PRESET_THEMES: PresetTheme[] = [
     hex: "#0ea5e9",
     light: ["oklch(0.63 0.14 240)", "oklch(0.15 0.02 250)"],
     dark: ["oklch(0.72 0.14 240)", "oklch(0.16 0.02 250)"],
-    darkSurfaces: { bg: "oklch(0.15 0.016 240)", card: "oklch(0.2 0.02 240)", border: "oklch(0.28 0.024 240)", muted: "oklch(0.24 0.028 240)" },
+    darkSurfaces: {
+      bg: "oklch(0.15 0.016 240)",
+      card: "oklch(0.2 0.02 240)",
+      border: "oklch(0.28 0.024 240)",
+      muted: "oklch(0.24 0.028 240)",
+    },
   },
   {
     id: "violet",
     label: "Violet",
     hex: "#4c1d95",
-    light: ["oklch(0.42 0.12 40)", "oklch(0.97 0.012 60)"],
-    dark: ["oklch(0.58 0.14 40)", "oklch(0.98 0.01 60)"],
+    light: ["oklch(0.42 0.16 305)", "oklch(0.98 0.01 300)"],
+    dark: ["oklch(0.62 0.18 305)", "oklch(0.98 0.01 300)"],
     darkSurfaces: {
-      bg: "oklch(0.15 0.018 40)",
-      card: "oklch(0.19 0.022 40)",
-      border: "oklch(0.28 0.026 40)",
-      muted: "oklch(0.24 0.030 40)",
+      bg: "oklch(0.15 0.02 300)",
+      card: "oklch(0.19 0.025 300)",
+      border: "oklch(0.28 0.03 300)",
+      muted: "oklch(0.24 0.032 300)",
     },
   },
   {
@@ -145,7 +160,12 @@ export const PRESET_THEMES: PresetTheme[] = [
     hex: "#b76e79",
     light: ["oklch(0.58 0.08 20)", "oklch(0.14 0.02 30)"],
     dark: ["oklch(0.66 0.09 20)", "oklch(0.15 0.02 30)"],
-    darkSurfaces: { bg: "oklch(0.16 0.015 20)", card: "oklch(0.2 0.02 20)", border: "oklch(0.3 0.024 20)", muted: "oklch(0.24 0.026 20)" },
+    darkSurfaces: {
+      bg: "oklch(0.16 0.015 20)",
+      card: "oklch(0.2 0.02 20)",
+      border: "oklch(0.3 0.024 20)",
+      muted: "oklch(0.24 0.026 20)",
+    },
   },
 ];
 
@@ -210,7 +230,12 @@ function normalizeCustomTheme(theme: unknown, idx: number): CustomTheme {
   const name = normalizeOptionalString(theme.name);
   const id = normalizeOptionalString(theme.id) ?? `custom-${idx + 1}`;
   if (!name) throw new Error(`customThemes[${idx}].name is required.`);
-  for (const field of ["lightPrimary", "lightForeground", "darkPrimary", "darkForeground"] as const) {
+  for (const field of [
+    "lightPrimary",
+    "lightForeground",
+    "darkPrimary",
+    "darkForeground",
+  ] as const) {
     if (!isHex(theme[field])) {
       throw new Error(`customThemes[${idx}].${field} must be a valid hex color like #123abc.`);
     }
@@ -246,7 +271,8 @@ export function normalizeDashboardTiles(input: unknown): DashboardTile[] {
     if (seen.has(widgetId)) continue;
     normalized.push({
       widgetId,
-      width: DEFAULT_PREFERENCES.dashboardTiles.find((t) => t.widgetId === widgetId)?.width ?? "half",
+      width:
+        DEFAULT_PREFERENCES.dashboardTiles.find((t) => t.widgetId === widgetId)?.width ?? "half",
     });
   }
   return normalized;
@@ -255,7 +281,9 @@ export function normalizeDashboardTiles(input: unknown): DashboardTile[] {
 export function normalizeUserPreferences(input: unknown): UserPreferences {
   if (!isObject(input)) return DEFAULT_PREFERENCES;
 
-  const bodyFont = FONT_CHOICES.some((f) => f.id === input.bodyFont) ? (input.bodyFont as FontChoice) : DEFAULT_PREFERENCES.bodyFont;
+  const bodyFont = FONT_CHOICES.some((f) => f.id === input.bodyFont)
+    ? (input.bodyFont as FontChoice)
+    : DEFAULT_PREFERENCES.bodyFont;
   const displayFont = DISPLAY_FONT_CHOICES.some((f) => f.id === input.displayFont)
     ? (input.displayFont as DisplayFontChoice)
     : DEFAULT_PREFERENCES.displayFont;
@@ -318,22 +346,17 @@ export function parseImportJson(raw: string): ExportData {
 
   const fontScaleRaw = settingsCandidate.fontScale;
   const fontScale: FontScale =
-    fontScaleRaw === "sm" || fontScaleRaw === "md" || fontScaleRaw === "lg"
-      ? fontScaleRaw
-      : "md";
+    fontScaleRaw === "sm" || fontScaleRaw === "md" || fontScaleRaw === "lg" ? fontScaleRaw : "md";
 
   const darkMode =
-    typeof settingsCandidate.darkMode === "boolean"
-      ? settingsCandidate.darkMode
-      : false;
+    typeof settingsCandidate.darkMode === "boolean" ? settingsCandidate.darkMode : false;
 
   const compactMode =
-    typeof settingsCandidate.compactMode === "boolean"
-      ? settingsCandidate.compactMode
-      : false;
+    typeof settingsCandidate.compactMode === "boolean" ? settingsCandidate.compactMode : false;
 
   const accentColor =
-    typeof settingsCandidate.accentColor === "string" && settingsCandidate.accentColor.trim().length > 0
+    typeof settingsCandidate.accentColor === "string" &&
+    settingsCandidate.accentColor.trim().length > 0
       ? settingsCandidate.accentColor
       : "default";
 

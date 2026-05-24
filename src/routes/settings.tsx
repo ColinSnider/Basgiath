@@ -179,10 +179,10 @@ function Settings() {
         <h1 className="font-display text-3xl text-primary">Settings</h1>
       </header>
 
-      <div className="px-5 pb-8 max-w-6xl">
-        <div className="grid gap-5 xl:grid-cols-2">
+      <div className="px-5 pb-8 md:px-8 xl:px-10">
+        <div className="grid gap-5 2xl:grid-cols-[minmax(0,1.1fr)_minmax(0,1fr)]">
           {/* Account */}
-          <section className="bg-card border border-border rounded-lg p-4 space-y-4 xl:col-span-2">
+          <section className="bg-card border border-border rounded-lg p-4 space-y-4 2xl:col-span-2">
             <div className="flex items-center gap-2 text-sm font-medium">
               <KeyRound className="h-4 w-4 text-muted-foreground" /> Account
             </div>
@@ -252,7 +252,7 @@ function Settings() {
           </section>
 
           {/* Password */}
-          <section className="bg-card border border-border rounded-lg p-4 space-y-3">
+          <section className="bg-card border border-border rounded-lg p-5 space-y-3">
             <div className="flex items-center gap-2 text-sm font-medium">
               <KeyRound className="h-4 w-4 text-muted-foreground" /> Change password
             </div>
@@ -287,7 +287,7 @@ function Settings() {
           </section>
 
           {/* Appearance */}
-          <section className="bg-card border border-border rounded-lg p-4 space-y-4 relative overflow-hidden">
+          <section className="bg-card border border-border rounded-lg p-5 space-y-4 relative overflow-hidden">
             <Sparkles className="h-20 w-20 absolute -right-4 -top-5 text-primary/15" />
             <div className="flex items-center gap-2 text-sm font-medium">
               <Palette className="h-4 w-4 text-muted-foreground" /> Appearance
@@ -353,7 +353,7 @@ function Settings() {
           </section>
 
           {/* Reading */}
-          <section className="bg-card border border-border rounded-lg p-4 space-y-4">
+          <section className="bg-card border border-border rounded-lg p-5 space-y-4">
             <div className="flex items-center gap-2 text-sm font-medium">
               <Type className="h-4 w-4 text-muted-foreground" /> Reading preferences
             </div>
@@ -451,7 +451,7 @@ function Settings() {
           </section>
 
           {/* Data */}
-          <section className="bg-card border border-border rounded-lg p-4 space-y-3 xl:col-span-2">
+          <section className="bg-card border border-border rounded-lg p-4 space-y-3 2xl:col-span-2">
             <div className="flex items-center gap-2 text-sm font-medium">
               <Layout className="h-4 w-4 text-muted-foreground" /> Data
             </div>
@@ -487,7 +487,7 @@ function Settings() {
 
           <button
             onClick={doLogout}
-            className="w-full border border-border rounded-lg py-2.5 text-sm text-muted-foreground hover:text-foreground hover:border-foreground/30 xl:col-span-2"
+            className="w-full border border-border rounded-lg py-2.5 text-sm text-muted-foreground hover:text-foreground hover:border-foreground/30 2xl:col-span-2"
           >
             {user?.isGuest ? "Exit guest mode" : "Sign out"}
           </button>
