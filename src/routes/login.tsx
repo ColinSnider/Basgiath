@@ -1,7 +1,7 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useAuth } from "@/lib/auth-context";
 import { useState } from "react";
-import { Loader2 } from "lucide-react";
+import { BookOpen, Compass, Loader2, Sparkles, Target } from "lucide-react";
 import { GUEST_BROWSE_MESSAGE } from "@/lib/session-auth.js";
 
 export const Route = createFileRoute("/login")({
@@ -59,27 +59,33 @@ function LoginPage() {
 
   return (
     <div className="min-h-screen bg-background px-5 py-10 md:px-10 xl:px-14">
-      <div className="mx-auto grid max-w-6xl gap-6 xl:grid-cols-[1.1fr_1fr] xl:items-stretch">
-        <section className="hidden xl:flex rounded-3xl border border-primary/20 bg-gradient-to-br from-primary via-primary/85 to-gold/85 text-primary-foreground p-10 shadow-xl flex-col justify-between">
+      <div className="mx-auto grid w-full max-w-7xl items-center gap-8 xl:grid-cols-[1.15fr_0.9fr]">
+        <section className="hidden xl:flex min-h-[44rem] rounded-[2rem] border border-gold/40 bg-gradient-to-br from-primary via-primary/90 to-gold/75 text-primary-foreground p-12 shadow-[0_24px_80px_-30px_rgba(86,25,34,0.7)] flex-col justify-between relative overflow-hidden">
+          <Sparkles className="absolute -right-8 top-8 h-28 w-28 text-gold/30" />
           <div>
-            <p className="text-xs uppercase tracking-[0.18em] text-primary-foreground/80">
-              Basgiath
-            </p>
-            <h2 className="font-display text-5xl mt-4">Read with momentum.</h2>
-            <p className="mt-4 text-primary-foreground/85 max-w-md">
-              Keep your reading stack, goals, and annotations in one focused workspace.
+            <p className="text-xs uppercase tracking-[0.24em] text-primary-foreground/75">Basgiath</p>
+            <h2 className="font-display text-6xl mt-4 leading-tight">Read with momentum.</h2>
+            <p className="mt-5 text-lg text-primary-foreground/85 max-w-lg">
+              Your elegant reading command center for books, margins, goals, and audiobook progress.
             </p>
           </div>
-          <div className="grid grid-cols-3 gap-2 text-xs">
-            <div className="rounded-lg border border-white/20 bg-black/15 p-2">
-              Track current reads
+          <div className="grid grid-cols-3 gap-3 text-xs">
+            <div className="rounded-xl border border-gold/45 bg-black/15 p-3 space-y-2">
+              <BookOpen className="h-4 w-4 text-gold" />
+              <p className="font-medium leading-snug">Track books and audiobooks in one timeline.</p>
             </div>
-            <div className="rounded-lg border border-white/20 bg-black/15 p-2">Set smart goals</div>
-            <div className="rounded-lg border border-white/20 bg-black/15 p-2">Capture margins</div>
+            <div className="rounded-xl border border-gold/45 bg-black/15 p-3 space-y-2">
+              <Target className="h-4 w-4 text-gold" />
+              <p className="font-medium leading-snug">Turn yearly goals into daily momentum.</p>
+            </div>
+            <div className="rounded-xl border border-gold/45 bg-black/15 p-3 space-y-2">
+              <Compass className="h-4 w-4 text-gold" />
+              <p className="font-medium leading-snug">Capture insights with margin notes and highlights.</p>
+            </div>
           </div>
         </section>
 
-        <div className="w-full max-w-md xl:max-w-none xl:w-auto bg-card border border-border rounded-2xl p-6 md:p-8 shadow-sm space-y-5">
+        <div className="w-full max-w-md xl:max-w-xl xl:justify-self-center bg-card/95 border border-gold/40 rounded-[1.5rem] p-6 md:p-9 shadow-[0_20px_50px_-32px_rgba(81,43,20,0.65)] backdrop-blur-sm space-y-5">
           <div>
             <h1 className="text-xl font-semibold text-foreground">
               {mode === "login" ? "Sign In" : "Create Account"}
