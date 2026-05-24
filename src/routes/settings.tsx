@@ -165,7 +165,7 @@ function Settings() {
   }
 
   return (
-    <div>
+    <div className="min-h-screen bg-background">
       <div className="px-3 pt-[max(env(safe-area-inset-top),0.75rem)] pb-2">
         <Link
           to="/"
@@ -175,14 +175,24 @@ function Settings() {
         </Link>
       </div>
 
-      <header className="px-5 pt-2 pb-6">
-        <h1 className="font-display text-3xl text-primary">Settings</h1>
-      </header>
+      <div className="px-5 pt-2 pb-8 md:px-8 xl:px-10">
+        <div className="mx-auto grid w-full max-w-[1400px] items-start gap-8 lg:grid-cols-[minmax(430px,0.9fr)_minmax(700px,1.1fr)]">
+          <aside className="space-y-4">
+            <div className="rounded-[2rem] border border-gold/40 bg-gradient-to-br from-primary via-primary/90 to-gold/75 p-8 text-primary-foreground shadow-[0_24px_80px_-30px_rgba(86,25,34,0.7)]">
+              <p className="text-xs uppercase tracking-[0.2em] text-primary-foreground/75">Preferences</p>
+              <h1 className="font-display text-5xl mt-3">Settings</h1>
+              <p className="mt-3 text-primary-foreground/85">Tune your profile, themes, reading behavior, and backups.</p>
+              <div className="grid grid-cols-3 gap-2 text-xs mt-6">
+                <div className="rounded-lg border border-gold/40 bg-black/15 p-2">Account controls</div>
+                <div className="rounded-lg border border-gold/40 bg-black/15 p-2">Theme polish</div>
+                <div className="rounded-lg border border-gold/40 bg-black/15 p-2">Backup + restore</div>
+              </div>
+            </div>
+          </aside>
 
-      <div className="px-5 pb-8 md:px-8 xl:px-10">
-        <div className="grid gap-5 2xl:grid-cols-[minmax(0,1.1fr)_minmax(0,1fr)]">
+          <div className="grid gap-6 2xl:grid-cols-[minmax(0,1.1fr)_minmax(0,1fr)]">
           {/* Account */}
-          <section className="bg-card border border-border rounded-lg p-4 space-y-4 2xl:col-span-2">
+          <section className="bg-card border border-gold/30 rounded-2xl p-5 space-y-4 shadow-[0_14px_40px_-32px_rgba(120,86,38,0.7)] 2xl:col-span-2">
             <div className="flex items-center gap-2 text-sm font-medium">
               <KeyRound className="h-4 w-4 text-muted-foreground" /> Account
             </div>
@@ -252,7 +262,7 @@ function Settings() {
           </section>
 
           {/* Password */}
-          <section className="bg-card border border-border rounded-lg p-5 space-y-3">
+          <section className="bg-card border border-gold/30 rounded-2xl p-5 space-y-3 shadow-[0_14px_40px_-32px_rgba(120,86,38,0.7)]">
             <div className="flex items-center gap-2 text-sm font-medium">
               <KeyRound className="h-4 w-4 text-muted-foreground" /> Change password
             </div>
@@ -287,7 +297,7 @@ function Settings() {
           </section>
 
           {/* Appearance */}
-          <section className="bg-card border border-border rounded-lg p-5 space-y-4 relative overflow-hidden">
+          <section className="bg-card border border-gold/30 rounded-2xl p-5 space-y-4 relative overflow-hidden shadow-[0_14px_40px_-32px_rgba(120,86,38,0.7)]">
             <Sparkles className="h-20 w-20 absolute -right-4 -top-5 text-primary/15" />
             <div className="flex items-center gap-2 text-sm font-medium">
               <Palette className="h-4 w-4 text-muted-foreground" /> Appearance
@@ -353,7 +363,7 @@ function Settings() {
           </section>
 
           {/* Reading */}
-          <section className="bg-card border border-border rounded-lg p-5 space-y-4">
+          <section className="bg-card border border-gold/30 rounded-2xl p-5 space-y-4 shadow-[0_14px_40px_-32px_rgba(120,86,38,0.7)]">
             <div className="flex items-center gap-2 text-sm font-medium">
               <Type className="h-4 w-4 text-muted-foreground" /> Reading preferences
             </div>
@@ -451,7 +461,7 @@ function Settings() {
           </section>
 
           {/* Data */}
-          <section className="bg-card border border-border rounded-lg p-4 space-y-3 2xl:col-span-2">
+          <section className="bg-card border border-gold/30 rounded-2xl p-5 space-y-3 2xl:col-span-2 shadow-[0_14px_40px_-32px_rgba(120,86,38,0.7)]">
             <div className="flex items-center gap-2 text-sm font-medium">
               <Layout className="h-4 w-4 text-muted-foreground" /> Data
             </div>
@@ -491,6 +501,7 @@ function Settings() {
           >
             {user?.isGuest ? "Exit guest mode" : "Sign out"}
           </button>
+          </div>
         </div>
       </div>
 

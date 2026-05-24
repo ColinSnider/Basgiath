@@ -322,17 +322,49 @@ function Dashboard() {
 
 function Landing() {
   return (
-    <div className="min-h-screen flex items-center justify-center p-6">
-      <div className="max-w-xl text-center">
-        <BookOpen className="h-8 w-8 text-primary mx-auto" />
-        <h1 className="font-display text-5xl mt-3">Basgiath</h1>
-        <p className="text-muted-foreground mt-3">Track books, audiobooks, margins, and goals.</p>
-        <Link
-          to="/login"
-          className="inline-block mt-6 bg-primary text-primary-foreground px-5 py-3 rounded-md"
-        >
-          Sign in
-        </Link>
+    <div className="min-h-screen bg-background px-5 py-10 md:px-8 xl:px-14">
+      <div className="mx-auto grid w-full max-w-[1400px] items-center gap-10 lg:grid-cols-[minmax(520px,0.95fr)_minmax(520px,1.05fr)]">
+        <section className="hidden lg:flex min-h-[42rem] rounded-[2rem] border border-gold/40 bg-gradient-to-br from-primary via-primary/90 to-gold/75 text-primary-foreground p-12 shadow-[0_24px_80px_-30px_rgba(86,25,34,0.7)] flex-col justify-between relative overflow-hidden">
+          <Sparkles className="absolute -right-8 top-8 h-28 w-28 text-gold/30" />
+          <div>
+            <p className="text-xs uppercase tracking-[0.24em] text-primary-foreground/75">Welcome</p>
+            <h1 className="font-display text-6xl mt-4 leading-tight">Basgiath</h1>
+            <p className="mt-5 text-lg text-primary-foreground/85 max-w-lg">
+              A refined reading hub for tracking books, audiobooks, goals, and margin notes.
+            </p>
+          </div>
+          <div className="grid grid-cols-3 gap-3 text-xs">
+            <div className="rounded-xl border border-gold/45 bg-black/15 p-3">Personal library timeline</div>
+            <div className="rounded-xl border border-gold/45 bg-black/15 p-3">Golden goal streaks</div>
+            <div className="rounded-xl border border-gold/45 bg-black/15 p-3">Margin notes that stay searchable</div>
+          </div>
+        </section>
+
+        <div className="grid grid-cols-1 gap-3 lg:hidden">
+          <div className="rounded-xl border border-gold/40 bg-gradient-to-r from-primary to-primary/85 p-4 text-primary-foreground">
+            <p className="font-medium">Your reading HQ</p>
+            <p className="text-primary-foreground/80 text-xs mt-1">Books, audiobooks, goals, and notes in one place.</p>
+          </div>
+          <div className="grid grid-cols-3 gap-2 text-xs">
+            <div className="rounded-lg border border-gold/30 bg-card/80 p-2 text-center">Library</div>
+            <div className="rounded-lg border border-gold/30 bg-card/80 p-2 text-center">Goals</div>
+            <div className="rounded-lg border border-gold/30 bg-card/80 p-2 text-center">Margins</div>
+          </div>
+        </div>
+
+        <div className="mx-auto w-full max-w-[620px] lg:justify-self-center rounded-[1.5rem] border border-gold/40 bg-card/95 p-8 text-center shadow-[0_20px_50px_-32px_rgba(81,43,20,0.65)] backdrop-blur-sm">
+          <BookOpen className="mx-auto h-10 w-10 text-primary" />
+          <h2 className="font-display text-5xl mt-4">Basgiath</h2>
+          <p className="text-muted-foreground mt-3 text-base">
+            Track books, audiobooks, margins, and goals with a focused desktop experience.
+          </p>
+          <Link
+            to="/login"
+            className="inline-block mt-7 rounded-md bg-primary px-6 py-3 text-primary-foreground"
+          >
+            Sign in
+          </Link>
+        </div>
       </div>
     </div>
   );
