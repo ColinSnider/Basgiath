@@ -1,8 +1,19 @@
 import { Book } from "@/lib/basgiath-store";
-import { BookOpen } from "lucide-react";
+import { BookOpen, Headphones } from "lucide-react";
 
-export function BookCover({ book, size = "md" }: { book: Pick<Book, "title" | "coverUrl">; size?: "sm" | "md" | "lg" }) {
-  const dims = size === "sm" ? "h-14 w-10" : size === "lg" ? "h-40 w-28" : "h-20 w-14";
+export function BookCover({ book, size = "md" }: { book: Pick<Book, "title" | "coverUrl" | "format">; size?: "sm" | "md" | "lg" }) {
+  const isAudio = book.format === "audiobook";
+  const dims = isAudio
+    ? size === "sm"
+      ? "h-12 w-12"
+      : size === "lg"
+        ? "h-40 w-40"
+        : "h-20 w-20"
+    : size === "sm"
+      ? "h-14 w-10"
+      : size === "lg"
+        ? "h-40 w-28"
+        : "h-20 w-14";
   if (book.coverUrl) {
     return (
       <img
@@ -17,7 +28,7 @@ export function BookCover({ book, size = "md" }: { book: Pick<Book, "title" | "c
     <div
       className={`${dims} rounded-sm flex items-center justify-center bg-gradient-to-br from-primary to-primary/70 text-primary-foreground shadow-md ring-1 ring-gold/40`}
     >
-      <BookOpen className="h-1/3 w-1/3 opacity-80" />
+      {isAudio ? <Headphones className="h-1/3 w-1/3 opacity-85" /> : <BookOpen className="h-1/3 w-1/3 opacity-80" />}
     </div>
   );
 }

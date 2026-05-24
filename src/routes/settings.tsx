@@ -16,19 +16,15 @@ import {
   Mail,
   Download,
   Upload,
-  MoveUp,
-  MoveDown,
-  Pencil,
   Plus,
+  Sparkles,
+  Gem,
 } from "lucide-react";
 import { useState } from "react";
 import {
   PRESET_THEMES,
   FONT_CHOICES,
   DISPLAY_FONT_CHOICES,
-  WIDGET_ORDER,
-  normalizeDashboardTiles,
-  type DashboardWidgetId,
 } from "@/lib/user-preferences";
 
 export const Route = createFileRoute("/settings")({
@@ -68,14 +64,6 @@ function Settings() {
   const [pwMsg, setPwMsg] = useState<{ ok: boolean; text: string } | null>(null);
   const [dataMsg, setDataMsg] = useState<{ ok: boolean; text: string } | null>(null);
   const [importing, setImporting] = useState(false);
-  const [customThemeDraft, setCustomThemeDraft] = useState({
-    name: "",
-    lightPrimary: "#5a1a25",
-    lightForeground: "#f8f5ec",
-    darkPrimary: "#a63a4e",
-    darkForeground: "#fff7eb",
-  });
-  const [layoutEditorOpen, setLayoutEditorOpen] = useState(false);
 
   async function saveName(e: React.FormEvent) {
     e.preventDefault();
@@ -177,66 +165,6 @@ function Settings() {
     } finally {
       setImporting(false);
     }
-  }
-
-  function createCustomTheme() {
-    if (!customThemeDraft.name.trim()) {
-      setDataMsg({ ok: false, text: "Custom theme name is required." });
-      return;
-    }
-    const id = `custom-${crypto.randomUUID()}`;
-    const nextThemes = [
-      ...preferences.customThemes,
-      {
-        id,
-        name: customThemeDraft.name.trim(),
-        lightPrimary: customThemeDraft.lightPrimary,
-        lightForeground: customThemeDraft.lightForeground,
-        darkPrimary: customThemeDraft.darkPrimary,
-        darkForeground: customThemeDraft.darkForeground,
-      },
-    ];
-    updatePreferences({ customThemes: nextThemes, activeCustomThemeId: id });
-    setDataMsg({ ok: true, text: "Custom theme saved." });
-  }
-
-  function removeCustomTheme(id: string) {
-    const nextThemes = preferences.customThemes.filter((theme) => theme.id !== id);
-    updatePreferences({
-      customThemes: nextThemes,
-      activeCustomThemeId: preferences.activeCustomThemeId === id ? null : preferences.activeCustomThemeId,
-    });
-  }
-
-  function moveTile(widgetId: DashboardWidgetId, direction: -1 | 1) {
-    const current = [...preferences.dashboardTiles];
-    const idx = current.findIndex((tile) => tile.widgetId === widgetId);
-    const targetIdx = idx + direction;
-    if (idx < 0 || targetIdx < 0 || targetIdx >= current.length) return;
-    const [tile] = current.splice(idx, 1);
-    current.splice(targetIdx, 0, tile);
-    updatePreferences({ dashboardTiles: normalizeDashboardTiles(current) });
-  }
-
-  function toggleTileWidth(widgetId: DashboardWidgetId) {
-    updatePreferences({
-      dashboardTiles: preferences.dashboardTiles.map((tile) =>
-        tile.widgetId === widgetId
-          ? { ...tile, width: tile.width === "full" ? "half" : "full" }
-          : tile,
-      ),
-    });
-  }
-
-  function toggleTile(widgetId: DashboardWidgetId) {
-    const hasTile = preferences.dashboardTiles.some((tile) => tile.widgetId === widgetId);
-    if (hasTile) {
-      const next = preferences.dashboardTiles.filter((tile) => tile.widgetId !== widgetId);
-      updatePreferences({ dashboardTiles: normalizeDashboardTiles(next) });
-      return;
-    }
-    const next = [...preferences.dashboardTiles, { widgetId, width: "half" as const }];
-    updatePreferences({ dashboardTiles: normalizeDashboardTiles(next) });
   }
 
   return (
@@ -361,7 +289,8 @@ function Settings() {
         </section>
 
         {/* Appearance */}
-        <section className="bg-card border border-border rounded-lg p-4 space-y-4">
+        <section className="bg-card border border-border rounded-lg p-4 space-y-4 relative overflow-hidden">
+          <Sparkles className="h-20 w-20 absolute -right-4 -top-5 text-primary/15" />
           <div className="flex items-center gap-2 text-sm font-medium">
             <Palette className="h-4 w-4 text-muted-foreground" /> Appearance
           </div>
@@ -385,95 +314,42 @@ function Settings() {
           </div>
 
           <div>
-            <p className="text-sm mb-2.5">Accent colour</p>
-            <div className="flex gap-3 flex-wrap">
+            <p className="text-sm mb-2.5">Signature themes</p>
+            <div className="grid sm:grid-cols-2 gap-2">
               {PRESET_THEMES.map((c) => (
                 <button
                   key={c.id}
                   onClick={() => {
                     updateSettings({ accentColor: c.id });
-                    updatePreferences({ activeCustomThemeId: null });
+                    updatePreferences({ activeCustomThemeId: null, customThemes: [] });
                   }}
                   title={c.label}
                   style={{ backgroundColor: c.hex }}
-                  className={`h-9 w-9 rounded-full transition-all ${
-                    settings.accentColor === c.id && !preferences.activeCustomThemeId
-                      ? "ring-2 ring-offset-2 ring-foreground/60 scale-110"
-                      : "opacity-60 hover:opacity-90 hover:scale-105"
+                  className={`group relative border rounded-md px-3 py-2 text-left transition-all ${
+                    settings.accentColor === c.id
+                      ? "border-primary shadow-md bg-primary/10"
+                      : "border-border hover:border-primary/50 hover:bg-muted/40"
                   }`}
-                />
+                >
+                  <span className="flex items-center justify-between text-xs">
+                    <span className="font-medium">{c.label}</span>
+                    {(c.id === "default" || c.id === "ocean" || c.id === "violet" || c.id === "scarlet") && (
+                      <Gem className="h-3.5 w-3.5 text-gold" />
+                    )}
+                  </span>
+                  <span
+                    style={{ backgroundColor: c.hex }}
+                    className="mt-2 h-2.5 w-full rounded-full block border border-black/10"
+                  />
+                </button>
               ))}
             </div>
             <p className="text-[11px] text-muted-foreground mt-2">
               Current:{" "}
               <span className="font-medium capitalize">
-                {preferences.activeCustomThemeId
-                  ? preferences.customThemes.find((t) => t.id === preferences.activeCustomThemeId)?.name ??
-                    "Custom theme"
-                  : PRESET_THEMES.find((c) => c.id === settings.accentColor)?.label ?? "Crimson"}
+                {PRESET_THEMES.find((c) => c.id === settings.accentColor)?.label ?? "Crimson"}
               </span>
             </p>
-          </div>
-
-          <div className="space-y-2">
-            <p className="text-sm">Custom themes</p>
-            {preferences.customThemes.length > 0 && (
-              <div className="space-y-2">
-                {preferences.customThemes.map((theme) => (
-                  <div
-                    key={theme.id}
-                    className="flex items-center justify-between rounded-md border border-border px-2.5 py-2"
-                  >
-                    <button
-                      onClick={() => updatePreferences({ activeCustomThemeId: theme.id })}
-                      className={`text-xs ${preferences.activeCustomThemeId === theme.id ? "font-semibold text-foreground" : "text-muted-foreground"}`}
-                    >
-                      {theme.name}
-                    </button>
-                    <button
-                      onClick={() => removeCustomTheme(theme.id)}
-                      className="text-xs text-destructive hover:underline"
-                    >
-                      Remove
-                    </button>
-                  </div>
-                ))}
-              </div>
-            )}
-            <div className="grid grid-cols-2 gap-2">
-              <input
-                value={customThemeDraft.name}
-                onChange={(e) => setCustomThemeDraft((s) => ({ ...s, name: e.target.value }))}
-                className="col-span-2 bg-muted rounded-md px-3 py-2 text-xs outline-none"
-                placeholder="Theme name"
-              />
-              {(
-                [
-                  ["lightPrimary", "Light primary"],
-                  ["lightForeground", "Light text"],
-                  ["darkPrimary", "Dark primary"],
-                  ["darkForeground", "Dark text"],
-                ] as const
-              ).map(([key, label]) => (
-                <label key={key} className="text-[11px] text-muted-foreground">
-                  {label}
-                  <input
-                    type="color"
-                    value={customThemeDraft[key]}
-                    onChange={(e) =>
-                      setCustomThemeDraft((s) => ({ ...s, [key]: e.target.value }))
-                    }
-                    className="mt-1 h-8 w-full rounded border border-border bg-card p-1"
-                  />
-                </label>
-              ))}
-            </div>
-            <button
-              onClick={createCustomTheme}
-              className="inline-flex items-center gap-1 rounded-md border border-border px-3 py-1.5 text-xs hover:bg-muted/50"
-            >
-              <Plus className="h-3.5 w-3.5" /> Save custom theme
-            </button>
           </div>
         </section>
 
@@ -599,65 +475,6 @@ function Settings() {
             <p className={`text-xs ${dataMsg.ok ? "text-green-600" : "text-destructive"}`}>
               {dataMsg.text}
             </p>
-          )}
-          <button
-            onClick={() => setLayoutEditorOpen((v) => !v)}
-            className="w-full inline-flex items-center justify-center gap-1.5 border border-border rounded-lg py-2 text-sm hover:bg-muted/40"
-          >
-            <Pencil className="h-4 w-4" /> {layoutEditorOpen ? "Close widget layout" : "Edit widget layout"}
-          </button>
-          {layoutEditorOpen && (
-            <div className="space-y-2 rounded-md border border-border p-2.5">
-              {preferences.dashboardTiles.map((tile, idx) => (
-                <div key={tile.widgetId} className="flex items-center justify-between gap-2 text-xs">
-                  <button
-                    onClick={() => toggleTile(tile.widgetId)}
-                    className="text-left hover:underline capitalize"
-                  >
-                    {tile.widgetId}
-                  </button>
-                  <div className="flex items-center gap-1">
-                    <button
-                      onClick={() => moveTile(tile.widgetId, -1)}
-                      disabled={idx === 0}
-                      className="rounded border border-border p-1 disabled:opacity-40"
-                    >
-                      <MoveUp className="h-3.5 w-3.5" />
-                    </button>
-                    <button
-                      onClick={() => moveTile(tile.widgetId, 1)}
-                      disabled={idx === preferences.dashboardTiles.length - 1}
-                      className="rounded border border-border p-1 disabled:opacity-40"
-                    >
-                      <MoveDown className="h-3.5 w-3.5" />
-                    </button>
-                    <button
-                      onClick={() => toggleTileWidth(tile.widgetId)}
-                      className="rounded border border-border px-2 py-1"
-                    >
-                      {tile.width === "full" ? "Full" : "Half"}
-                    </button>
-                  </div>
-                </div>
-              ))}
-              <div className="pt-1 text-[11px] text-muted-foreground">
-                Add or remove widgets:
-                <div className="mt-1 flex flex-wrap gap-1">
-                  {WIDGET_ORDER.map((widgetId) => {
-                    const active = preferences.dashboardTiles.some((tile) => tile.widgetId === widgetId);
-                    return (
-                      <button
-                        key={widgetId}
-                        onClick={() => toggleTile(widgetId)}
-                        className={`rounded-full border px-2 py-0.5 capitalize ${active ? "border-primary text-primary" : "border-border text-muted-foreground"}`}
-                      >
-                        {widgetId}
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
-            </div>
           )}
           <button
             onClick={doClear}
