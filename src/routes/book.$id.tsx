@@ -71,18 +71,22 @@ function BookDetail() {
 
   const progressPct = isAudio ? (book.durationMinutes ? Math.min(100, Math.round(((book.currentMinute ?? 0) / book.durationMinutes) * 100)) : 0) : (book.totalPages ? Math.min(100, Math.round(((book.currentPage ?? 0) / book.totalPages) * 100)) : 0);
 
-  return <div className="max-w-5xl mx-auto px-3 md:px-6 lg:px-10">
+  return <div className="max-w-5xl mx-auto px-3 md:px-6 lg:px-10 pb-6">
     {showDatePicker && <div className="fixed inset-0 z-50 bg-background/80 backdrop-blur-sm flex items-center justify-center"><div className="w-full max-w-md bg-card border border-border rounded-md p-5 shadow-xl space-y-4"><div className="flex items-center justify-between"><h2 className="font-display text-lg">When did you finish?</h2><button onClick={() => setShowDatePicker(false)}><X className="h-5 w-5" /></button></div><Calendar mode="single" selected={finishDate} onSelect={setFinishDate} disabled={(d) => d > new Date()} /><div className="flex gap-2"><button onClick={() => setShowDatePicker(false)} className="flex-1 text-sm py-2.5 rounded-md border border-border">Cancel</button><button onClick={confirmFinish} className="flex-1 bg-primary text-primary-foreground rounded-md py-2.5 text-sm font-medium flex items-center justify-center gap-1"><Check className="h-4 w-4" /> Confirm</button></div></div></div>}
 
     <div className="py-3 flex items-center justify-between"><button onClick={() => navigate({ to: "/library" })} className="inline-flex items-center text-sm text-muted-foreground hover:text-foreground"><ChevronLeft className="h-5 w-5" /> Back</button><button onClick={() => { if (confirm("Remove this book and all its margins?")) { removeBook(book.id); navigate({ to: "/library" }); } }} className="text-muted-foreground/70 hover:text-destructive p-1"><Trash2 className="h-4 w-4" /></button></div>
 
-    <div className="grid md:grid-cols-[220px_1fr] gap-6 items-start">
-      <BookCover book={book} size="lg" />
-      <div>
-        <h1 className="font-display text-3xl leading-tight">{book.title}</h1>
-        <p className="text-sm text-muted-foreground mt-1">{book.author}</p>
-        {isAudio && <span className="inline-flex items-center gap-1 mt-2 text-[11px] bg-primary/10 text-primary rounded px-2 py-0.5"><Headphones className="h-3 w-3" /> Audiobook</span>}
-        <p className="text-[11px] text-muted-foreground/80 mt-2">{reads === 0 ? "Not yet finished" : `Read ${reads} time${reads > 1 ? "s" : ""}${last ? ` · last ${new Date(last).toLocaleDateString()}` : ""}`}</p>
+    <div className="relative overflow-hidden rounded-xl border border-primary/20 bg-gradient-to-br from-card via-card to-primary/10 p-5 md:p-6">
+      <div className="grid md:grid-cols-[240px_1fr] gap-6 items-start">
+        <div className="flex justify-center md:justify-start">
+          <BookCover book={book} size="lg" />
+        </div>
+        <div className="text-center md:text-left">
+          <h1 className="font-display text-3xl leading-tight">{book.title}</h1>
+          <p className="text-sm text-muted-foreground mt-1">{book.author}</p>
+          {isAudio && <span className="inline-flex items-center gap-1 mt-2 text-[11px] bg-primary/10 text-primary rounded px-2 py-0.5"><Headphones className="h-3 w-3" /> Audiobook</span>}
+          <p className="text-[11px] text-muted-foreground/80 mt-2">{reads === 0 ? "Not yet finished" : `Read ${reads} time${reads > 1 ? "s" : ""}${last ? ` · last ${new Date(last).toLocaleDateString()}` : ""}`}</p>
+        </div>
       </div>
     </div>
 

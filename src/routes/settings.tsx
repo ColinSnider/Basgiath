@@ -18,7 +18,6 @@ import {
   Upload,
   Plus,
   Sparkles,
-  WandSparkles,
   Gem,
 } from "lucide-react";
 import { useState } from "react";
@@ -65,13 +64,6 @@ function Settings() {
   const [pwMsg, setPwMsg] = useState<{ ok: boolean; text: string } | null>(null);
   const [dataMsg, setDataMsg] = useState<{ ok: boolean; text: string } | null>(null);
   const [importing, setImporting] = useState(false);
-  const [customThemeDraft, setCustomThemeDraft] = useState({
-    name: "",
-    lightPrimary: "#5a1a25",
-    lightForeground: "#f8f5ec",
-    darkPrimary: "#a63a4e",
-    darkForeground: "#fff7eb",
-  });
 
   async function saveName(e: React.FormEvent) {
     e.preventDefault();
@@ -173,35 +165,6 @@ function Settings() {
     } finally {
       setImporting(false);
     }
-  }
-
-  function createCustomTheme() {
-    if (!customThemeDraft.name.trim()) {
-      setDataMsg({ ok: false, text: "Custom theme name is required." });
-      return;
-    }
-    const id = `custom-${crypto.randomUUID()}`;
-    const nextThemes = [
-      ...preferences.customThemes,
-      {
-        id,
-        name: customThemeDraft.name.trim(),
-        lightPrimary: customThemeDraft.lightPrimary,
-        lightForeground: customThemeDraft.lightForeground,
-        darkPrimary: customThemeDraft.darkPrimary,
-        darkForeground: customThemeDraft.darkForeground,
-      },
-    ];
-    updatePreferences({ customThemes: nextThemes, activeCustomThemeId: id });
-    setDataMsg({ ok: true, text: "Custom theme saved." });
-  }
-
-  function removeCustomTheme(id: string) {
-    const nextThemes = preferences.customThemes.filter((theme) => theme.id !== id);
-    updatePreferences({
-      customThemes: nextThemes,
-      activeCustomThemeId: preferences.activeCustomThemeId === id ? null : preferences.activeCustomThemeId,
-    });
   }
 
   return (
@@ -358,19 +321,19 @@ function Settings() {
                   key={c.id}
                   onClick={() => {
                     updateSettings({ accentColor: c.id });
-                    updatePreferences({ activeCustomThemeId: null });
+                    updatePreferences({ activeCustomThemeId: null, customThemes: [] });
                   }}
                   title={c.label}
                   style={{ backgroundColor: c.hex }}
                   className={`group relative border rounded-md px-3 py-2 text-left transition-all ${
-                    settings.accentColor === c.id && !preferences.activeCustomThemeId
+                    settings.accentColor === c.id
                       ? "border-primary shadow-md bg-primary/10"
                       : "border-border hover:border-primary/50 hover:bg-muted/40"
                   }`}
                 >
                   <span className="flex items-center justify-between text-xs">
                     <span className="font-medium">{c.label}</span>
-                    {(c.id === "default" || c.id === "ocean" || c.id === "violet") && (
+                    {(c.id === "default" || c.id === "ocean" || c.id === "violet" || c.id === "scarlet") && (
                       <Gem className="h-3.5 w-3.5 text-gold" />
                     )}
                   </span>
@@ -384,73 +347,9 @@ function Settings() {
             <p className="text-[11px] text-muted-foreground mt-2">
               Current:{" "}
               <span className="font-medium capitalize">
-                {preferences.activeCustomThemeId
-                  ? preferences.customThemes.find((t) => t.id === preferences.activeCustomThemeId)?.name ??
-                    "Custom theme"
-                  : PRESET_THEMES.find((c) => c.id === settings.accentColor)?.label ?? "Crimson"}
+                {PRESET_THEMES.find((c) => c.id === settings.accentColor)?.label ?? "Crimson"}
               </span>
             </p>
-          </div>
-
-          <div className="space-y-2">
-            <p className="text-sm inline-flex items-center gap-1"><WandSparkles className="h-3.5 w-3.5 text-primary" />Custom themes</p>
-            {preferences.customThemes.length > 0 && (
-              <div className="space-y-2">
-                {preferences.customThemes.map((theme) => (
-                  <div
-                    key={theme.id}
-                    className="flex items-center justify-between rounded-md border border-border px-2.5 py-2"
-                  >
-                    <button
-                      onClick={() => updatePreferences({ activeCustomThemeId: theme.id })}
-                      className={`text-xs ${preferences.activeCustomThemeId === theme.id ? "font-semibold text-foreground" : "text-muted-foreground"}`}
-                    >
-                      {theme.name}
-                    </button>
-                    <button
-                      onClick={() => removeCustomTheme(theme.id)}
-                      className="text-xs text-destructive hover:underline"
-                    >
-                      Remove
-                    </button>
-                  </div>
-                ))}
-              </div>
-            )}
-            <div className="grid grid-cols-2 gap-2">
-              <input
-                value={customThemeDraft.name}
-                onChange={(e) => setCustomThemeDraft((s) => ({ ...s, name: e.target.value }))}
-                className="col-span-2 bg-muted rounded-md px-3 py-2 text-xs outline-none"
-                placeholder="Theme name"
-              />
-              {(
-                [
-                  ["lightPrimary", "Light primary"],
-                  ["lightForeground", "Light text"],
-                  ["darkPrimary", "Dark primary"],
-                  ["darkForeground", "Dark text"],
-                ] as const
-              ).map(([key, label]) => (
-                <label key={key} className="text-[11px] text-muted-foreground">
-                  {label}
-                  <input
-                    type="color"
-                    value={customThemeDraft[key]}
-                    onChange={(e) =>
-                      setCustomThemeDraft((s) => ({ ...s, [key]: e.target.value }))
-                    }
-                    className="mt-1 h-8 w-full rounded border border-border bg-card p-1"
-                  />
-                </label>
-              ))}
-            </div>
-            <button
-              onClick={createCustomTheme}
-              className="inline-flex items-center gap-1 rounded-md border border-border px-3 py-1.5 text-xs hover:bg-muted/50"
-            >
-              <Plus className="h-3.5 w-3.5" /> Save custom theme
-            </button>
           </div>
         </section>
 
