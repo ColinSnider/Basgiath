@@ -53,7 +53,7 @@ function Dashboard() {
     <>
       <AppHeader title="Basgiath" subtitle={`Welcome back, ${user?.displayName ?? "Reader"}.`} />
       <main className="px-5 pb-8 md:px-8 md:pb-10 xl:px-10">
-        <div className="grid gap-4 xl:grid-cols-[minmax(0,1.9fr)_360px] 2xl:gap-5">
+        <div className="grid gap-4 xl:grid-cols-[minmax(0,1.7fr)_minmax(340px,1fr)] 2xl:gap-5">
           <div className="space-y-4 2xl:space-y-5">
             <section className="relative overflow-hidden rounded-2xl border border-primary/25 bg-gradient-to-br from-primary via-primary/85 to-gold/90 text-primary-foreground p-6 shadow-xl">
               <Orbit className="absolute left-4 top-4 h-5 w-5 text-white/25" />
@@ -110,7 +110,7 @@ function Dashboard() {
               </button>
             </section>
 
-            <section className="grid xl:grid-cols-[minmax(0,1.5fr)_minmax(260px,1fr)] gap-4 items-start">
+            <section className="grid xl:grid-cols-[minmax(0,1.35fr)_minmax(280px,1fr)] gap-4 items-start">
               <div className="rounded-xl border border-border bg-card p-4 xl:p-5">
                 <div className="flex flex-wrap items-center justify-between mb-3 gap-2">
                   <h2 className="font-display text-2xl">Reading</h2>
