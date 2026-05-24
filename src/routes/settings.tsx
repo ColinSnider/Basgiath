@@ -175,16 +175,22 @@ function Settings() {
         </Link>
       </div>
 
-      <header className="px-5 pt-2 pb-6 md:px-8">
-        <div className="mx-auto w-full max-w-[1400px] rounded-3xl border border-gold/35 bg-gradient-to-r from-primary to-primary/90 px-6 py-7 text-primary-foreground shadow-[0_14px_45px_-28px_rgba(72,24,30,0.8)]">
-          <p className="text-xs uppercase tracking-[0.2em] text-primary-foreground/75">Preferences</p>
-          <h1 className="font-display text-4xl">Settings</h1>
-          <p className="mt-1 text-sm text-primary-foreground/80">Make Basgiath yours with polished themes, profile controls, and backup tools.</p>
-        </div>
-      </header>
+      <div className="px-5 pt-2 pb-8 md:px-8 xl:px-10">
+        <div className="mx-auto grid w-full max-w-[1400px] items-start gap-8 lg:grid-cols-[minmax(430px,0.9fr)_minmax(700px,1.1fr)]">
+          <aside className="space-y-4">
+            <div className="rounded-[2rem] border border-gold/40 bg-gradient-to-br from-primary via-primary/90 to-gold/75 p-8 text-primary-foreground shadow-[0_24px_80px_-30px_rgba(86,25,34,0.7)]">
+              <p className="text-xs uppercase tracking-[0.2em] text-primary-foreground/75">Preferences</p>
+              <h1 className="font-display text-5xl mt-3">Settings</h1>
+              <p className="mt-3 text-primary-foreground/85">Tune your profile, themes, reading behavior, and backups.</p>
+              <div className="grid grid-cols-3 gap-2 text-xs mt-6">
+                <div className="rounded-lg border border-gold/40 bg-black/15 p-2">Account controls</div>
+                <div className="rounded-lg border border-gold/40 bg-black/15 p-2">Theme polish</div>
+                <div className="rounded-lg border border-gold/40 bg-black/15 p-2">Backup + restore</div>
+              </div>
+            </div>
+          </aside>
 
-      <div className="px-5 pb-8 md:px-8 xl:px-10">
-        <div className="mx-auto grid w-full max-w-[1400px] gap-6 2xl:grid-cols-[minmax(0,1.1fr)_minmax(0,1fr)]">
+          <div className="grid gap-6 2xl:grid-cols-[minmax(0,1.1fr)_minmax(0,1fr)]">
           {/* Account */}
           <section className="bg-card border border-gold/30 rounded-2xl p-5 space-y-4 shadow-[0_14px_40px_-32px_rgba(120,86,38,0.7)] 2xl:col-span-2">
             <div className="flex items-center gap-2 text-sm font-medium">
@@ -495,6 +501,7 @@ function Settings() {
           >
             {user?.isGuest ? "Exit guest mode" : "Sign out"}
           </button>
+          </div>
         </div>
       </div>
 

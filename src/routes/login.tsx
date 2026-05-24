@@ -85,6 +85,16 @@ function LoginPage() {
           </div>
         </section>
 
+        <div className="grid grid-cols-1 gap-3 text-sm lg:hidden">
+          <div className="rounded-xl border border-gold/40 bg-gradient-to-r from-primary to-primary/85 p-4 text-primary-foreground">
+            <p className="font-medium">Track books + audiobooks</p>
+            <p className="text-primary-foreground/80 text-xs mt-1">Keep every read in one elegant timeline.</p>
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div className="rounded-xl border border-gold/30 bg-card/80 p-3"><p className="text-xs font-medium">Goal streaks</p></div>
+            <div className="rounded-xl border border-gold/30 bg-card/80 p-3"><p className="text-xs font-medium">Margin notes</p></div>
+          </div>
+        </div>
         <div className="mx-auto w-full max-w-[620px] lg:justify-self-center bg-card/95 border border-gold/40 rounded-[1.5rem] p-6 md:p-9 shadow-[0_20px_50px_-32px_rgba(81,43,20,0.65)] backdrop-blur-sm space-y-5">
           <div>
             <h1 className="text-xl font-semibold text-foreground">

@@ -340,6 +340,17 @@ function Landing() {
           </div>
         </section>
 
+        <div className="grid grid-cols-1 gap-3 lg:hidden">
+          <div className="rounded-xl border border-gold/40 bg-gradient-to-r from-primary to-primary/85 p-4 text-primary-foreground">
+            <p className="font-medium">Your reading HQ</p>
+            <p className="text-primary-foreground/80 text-xs mt-1">Books, audiobooks, goals, and notes in one place.</p>
+          </div>
+          <div className="grid grid-cols-3 gap-2 text-xs">
+            <div className="rounded-lg border border-gold/30 bg-card/80 p-2 text-center">Library</div>
+            <div className="rounded-lg border border-gold/30 bg-card/80 p-2 text-center">Goals</div>
+            <div className="rounded-lg border border-gold/30 bg-card/80 p-2 text-center">Margins</div>
+          </div>
+        </div>
         <div className="mx-auto w-full max-w-[620px] lg:justify-self-center rounded-[1.5rem] border border-gold/40 bg-card/95 p-8 text-center shadow-[0_20px_50px_-32px_rgba(81,43,20,0.65)] backdrop-blur-sm">
           <BookOpen className="mx-auto h-10 w-10 text-primary" />
           <h2 className="font-display text-5xl mt-4">Basgiath</h2>
