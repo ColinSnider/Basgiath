@@ -59,8 +59,8 @@ function LoginPage() {
 
   return (
     <div className="min-h-screen bg-background px-5 py-10 md:px-10 xl:px-14">
-      <div className="mx-auto grid w-full max-w-7xl items-center gap-8 xl:grid-cols-[1.15fr_0.9fr]">
-        <section className="hidden xl:flex min-h-[44rem] rounded-[2rem] border border-gold/40 bg-gradient-to-br from-primary via-primary/90 to-gold/75 text-primary-foreground p-12 shadow-[0_24px_80px_-30px_rgba(86,25,34,0.7)] flex-col justify-between relative overflow-hidden">
+      <div className="mx-auto grid w-full max-w-[1400px] items-center gap-10 lg:grid-cols-[minmax(520px,0.95fr)_minmax(520px,1.05fr)]">
+        <section className="hidden lg:flex min-h-[44rem] rounded-[2rem] border border-gold/40 bg-gradient-to-br from-primary via-primary/90 to-gold/75 text-primary-foreground p-12 shadow-[0_24px_80px_-30px_rgba(86,25,34,0.7)] flex-col justify-between relative overflow-hidden">
           <Sparkles className="absolute -right-8 top-8 h-28 w-28 text-gold/30" />
           <div>
             <p className="text-xs uppercase tracking-[0.24em] text-primary-foreground/75">Basgiath</p>
@@ -85,7 +85,7 @@ function LoginPage() {
           </div>
         </section>
 
-        <div className="mx-auto w-full max-w-md xl:max-w-xl xl:justify-self-center bg-card/95 border border-gold/40 rounded-[1.5rem] p-6 md:p-9 shadow-[0_20px_50px_-32px_rgba(81,43,20,0.65)] backdrop-blur-sm space-y-5">
+        <div className="mx-auto w-full max-w-[620px] lg:justify-self-center bg-card/95 border border-gold/40 rounded-[1.5rem] p-6 md:p-9 shadow-[0_20px_50px_-32px_rgba(81,43,20,0.65)] backdrop-blur-sm space-y-5">
           <div>
             <h1 className="text-xl font-semibold text-foreground">
               {mode === "login" ? "Sign In" : "Create Account"}

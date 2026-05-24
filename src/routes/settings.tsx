@@ -176,7 +176,7 @@ function Settings() {
       </div>
 
       <header className="px-5 pt-2 pb-6 md:px-8">
-        <div className="mx-auto max-w-6xl rounded-3xl border border-gold/35 bg-gradient-to-r from-primary to-primary/90 px-6 py-7 text-primary-foreground shadow-[0_14px_45px_-28px_rgba(72,24,30,0.8)]">
+        <div className="mx-auto w-full max-w-[1400px] rounded-3xl border border-gold/35 bg-gradient-to-r from-primary to-primary/90 px-6 py-7 text-primary-foreground shadow-[0_14px_45px_-28px_rgba(72,24,30,0.8)]">
           <p className="text-xs uppercase tracking-[0.2em] text-primary-foreground/75">Preferences</p>
           <h1 className="font-display text-4xl">Settings</h1>
           <p className="mt-1 text-sm text-primary-foreground/80">Make Basgiath yours with polished themes, profile controls, and backup tools.</p>
@@ -184,7 +184,7 @@ function Settings() {
       </header>
 
       <div className="px-5 pb-8 md:px-8 xl:px-10">
-        <div className="mx-auto grid max-w-6xl gap-5 2xl:grid-cols-[minmax(0,1.1fr)_minmax(0,1fr)]">
+        <div className="mx-auto grid w-full max-w-[1400px] gap-6 2xl:grid-cols-[minmax(0,1.1fr)_minmax(0,1fr)]">
           {/* Account */}
           <section className="bg-card border border-gold/30 rounded-2xl p-5 space-y-4 shadow-[0_14px_40px_-32px_rgba(120,86,38,0.7)] 2xl:col-span-2">
             <div className="flex items-center gap-2 text-sm font-medium">

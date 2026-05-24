@@ -323,8 +323,8 @@ function Dashboard() {
 function Landing() {
   return (
     <div className="min-h-screen bg-background px-5 py-10 md:px-8 xl:px-14">
-      <div className="mx-auto grid w-full max-w-7xl items-center gap-8 xl:grid-cols-[1.15fr_0.9fr]">
-        <section className="hidden xl:flex min-h-[42rem] rounded-[2rem] border border-gold/40 bg-gradient-to-br from-primary via-primary/90 to-gold/75 text-primary-foreground p-12 shadow-[0_24px_80px_-30px_rgba(86,25,34,0.7)] flex-col justify-between relative overflow-hidden">
+      <div className="mx-auto grid w-full max-w-[1400px] items-center gap-10 lg:grid-cols-[minmax(520px,0.95fr)_minmax(520px,1.05fr)]">
+        <section className="hidden lg:flex min-h-[42rem] rounded-[2rem] border border-gold/40 bg-gradient-to-br from-primary via-primary/90 to-gold/75 text-primary-foreground p-12 shadow-[0_24px_80px_-30px_rgba(86,25,34,0.7)] flex-col justify-between relative overflow-hidden">
           <Sparkles className="absolute -right-8 top-8 h-28 w-28 text-gold/30" />
           <div>
             <p className="text-xs uppercase tracking-[0.24em] text-primary-foreground/75">Welcome</p>
@@ -340,7 +340,7 @@ function Landing() {
           </div>
         </section>
 
-        <div className="mx-auto w-full max-w-md xl:max-w-xl xl:justify-self-center rounded-[1.5rem] border border-gold/40 bg-card/95 p-8 text-center shadow-[0_20px_50px_-32px_rgba(81,43,20,0.65)] backdrop-blur-sm">
+        <div className="mx-auto w-full max-w-[620px] lg:justify-self-center rounded-[1.5rem] border border-gold/40 bg-card/95 p-8 text-center shadow-[0_20px_50px_-32px_rgba(81,43,20,0.65)] backdrop-blur-sm">
           <BookOpen className="mx-auto h-10 w-10 text-primary" />
           <h2 className="font-display text-5xl mt-4">Basgiath</h2>
           <p className="text-muted-foreground mt-3 text-base">
