@@ -3,7 +3,7 @@ import { AppHeader } from "@/components/AppHeader";
 import { BookCover } from "@/components/BookCover";
 import { useStore, readsInYear, totalReads } from "@/lib/basgiath-store";
 import { useAuth } from "@/lib/auth-context";
-import { BookOpen, Plus, Target, Quote, StickyNote, Sparkles, Stars, Trophy, Flame, WandSparkles, Orbit } from "lucide-react";
+import { BookOpen, Plus, Target, Quote, StickyNote, Sparkles, Stars, Trophy, Flame, Orbit, WandSparkles } from "lucide-react";
 import { useMemo, useState } from "react";
 import { BookSearch } from "@/components/BookSearch";
 
