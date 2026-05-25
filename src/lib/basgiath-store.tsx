@@ -33,7 +33,7 @@ export type Book = {
   durationMinutes?: number | null;
   currentMinute?: number | null;
   reads: { finishedAt: string }[];
-  status: "reading" | "finished" | "wishlist";
+  status: "reading" | "finished" | "wishlist" | "dnf";
   addedAt: string;
   metadata?: Record<string, unknown>;
 };
@@ -123,7 +123,7 @@ function rowToBook(r: any): Book {
     durationMinutes: r.durationMinutes,
     currentMinute: r.currentMinute,
     reads: (r.reads as { finishedAt: string }[]) ?? [],
-    status: r.status as "reading" | "finished" | "wishlist",
+    status: r.status as "reading" | "finished" | "wishlist" | "dnf",
     addedAt: r.addedAt instanceof Date ? r.addedAt.toISOString() : r.addedAt,
     metadata: r.metadata ?? {},
   };
@@ -276,6 +276,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
             currentMinute: patch.currentMinute,
             status: patch.status,
             reads: patch.reads,
+            metadata: patch.metadata,
           },
         },
       });
