@@ -52,6 +52,8 @@ function Goals() {
 
   const achievements = useMemo(() => {
     const allReads = books.flatMap((book) => book.reads.map((read, i) => ({ book, read, i })));
+    const finishedBooks = books.filter((book) => book.reads.length > 0);
+    const now = Date.now();
 
     const fastest = allReads
       .map(({ book, i }) => ({ book, days: readDurationDays(book, i) }))
@@ -60,6 +62,12 @@ function Goals() {
 
     const pagesByDay = new Map<string, number>();
     const booksByWeek = new Map<string, number>();
+    const booksByDay = new Map<string, number>();
+    const pagesByWeek = new Map<string, number>();
+    const formats = { books: 0 };
+    const readStreakDays = new Set<string>();
+    let totalPages = 0;
+    let totalMinutes = 0;
 
     for (const { book, read } of allReads) {
       const dt = new Date(read.finishedAt);
@@ -70,10 +78,42 @@ function Goals() {
       const pages = book.format === "audiobook" ? 0 : book.totalPages ?? 0;
       pagesByDay.set(dayKey, (pagesByDay.get(dayKey) ?? 0) + pages);
       booksByWeek.set(weekKey, (booksByWeek.get(weekKey) ?? 0) + 1);
+      booksByDay.set(dayKey, (booksByDay.get(dayKey) ?? 0) + 1);
+      pagesByWeek.set(weekKey, (pagesByWeek.get(weekKey) ?? 0) + pages);
+      readStreakDays.add(dayKey);
+      totalPages += pages;
+      if (book.format === "audiobook") totalMinutes += book.durationMinutes ?? 0;
+      if (book.format !== "audiobook") formats.books += 1;
     }
 
     const topPagesDay = [...pagesByDay.entries()].sort((a, b) => b[1] - a[1])[0];
     const topBooksWeek = [...booksByWeek.entries()].sort((a, b) => b[1] - a[1])[0];
+    const topBooksDay = [...booksByDay.entries()].sort((a, b) => b[1] - a[1])[0];
+    const topPagesWeek = [...pagesByWeek.entries()].sort((a, b) => b[1] - a[1])[0];
+    const longestBook = finishedBooks.filter((b) => b.totalPages).sort((a, b) => (b.totalPages ?? 0) - (a.totalPages ?? 0))[0];
+    const shortestBook = finishedBooks.filter((b) => b.totalPages).sort((a, b) => (a.totalPages ?? 0) - (b.totalPages ?? 0))[0];
+    const rereadChampion = books
+      .filter((b) => b.reads.length > 1)
+      .sort((a, b) => b.reads.length - a.reads.length)[0];
+    const oldestFinish = allReads.sort((a, b) => new Date(a.read.finishedAt).getTime() - new Date(b.read.finishedAt).getTime())[0];
+    const recentFinish = allReads.sort((a, b) => new Date(b.read.finishedAt).getTime() - new Date(a.read.finishedAt).getTime())[0];
+    const uniqueAuthors = new Set(finishedBooks.map((b) => b.author.trim().toLowerCase()).filter(Boolean)).size;
+    const avgPagesPerBook = formats.books ? Math.round(totalPages / formats.books) : 0;
+    const longestStreak = (() => {
+      const dates = [...readStreakDays].sort();
+      if (!dates.length) return 0;
+      let best = 1;
+      let run = 1;
+      for (let i = 1; i < dates.length; i += 1) {
+        const prev = new Date(dates[i - 1]).getTime();
+        const curr = new Date(dates[i]).getTime();
+        if (curr - prev === 24 * 60 * 60 * 1000) run += 1;
+        else run = 1;
+        best = Math.max(best, run);
+      }
+      return best;
+    })();
+    const finishedLast30 = allReads.filter(({ read }) => now - new Date(read.finishedAt).getTime() <= 30 * 24 * 60 * 60 * 1000).length;
 
     return [
       {
@@ -88,6 +128,18 @@ function Goals() {
         label: "Most books in one week",
         value: topBooksWeek ? `${topBooksWeek[1]} books · week of ${topBooksWeek[0]}` : "No completed books yet",
       },
+      { label: "Most books in one day", value: topBooksDay ? `${topBooksDay[1]} books · ${topBooksDay[0]}` : "No completed books yet" },
+      { label: "Most pages in one week", value: topPagesWeek ? `${topPagesWeek[1]} pages · week of ${topPagesWeek[0]}` : "No page-based reads yet" },
+      { label: "Longest book finished", value: longestBook ? `${longestBook.title} · ${longestBook.totalPages} pages` : "No page-based reads yet" },
+      { label: "Shortest book finished", value: shortestBook ? `${shortestBook.title} · ${shortestBook.totalPages} pages` : "No page-based reads yet" },
+      { label: "Most re-read book", value: rereadChampion ? `${rereadChampion.title} · ${rereadChampion.reads.length} finishes` : "No re-reads logged yet" },
+      { label: "Longest reading streak", value: longestStreak ? `${longestStreak} day${longestStreak === 1 ? "" : "s"}` : "No reading streak yet" },
+      { label: "Books finished in 30 days", value: `${finishedLast30} in the last 30 days` },
+      { label: "Average pages per book", value: avgPagesPerBook ? `${avgPagesPerBook} pages` : "No page-based reads yet" },
+      { label: "First completion logged", value: oldestFinish ? `${oldestFinish.book.title} · ${oldestFinish.read.finishedAt.slice(0, 10)}` : "No completions yet" },
+      { label: "Latest completion logged", value: recentFinish ? `${recentFinish.book.title} · ${recentFinish.read.finishedAt.slice(0, 10)}` : "No completions yet" },
+      { label: "Unique authors finished", value: `${uniqueAuthors} author${uniqueAuthors === 1 ? "" : "s"}` },
+      { label: "Listening hours completed", value: `${Math.round((totalMinutes / 60) * 10) / 10} hours` },
     ];
   }, [books]);
 

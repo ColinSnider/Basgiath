@@ -11,6 +11,12 @@ export const Route = createFileRoute("/library")({
 
 function BookSpine({ book }: { book: Book }) {
   const [spineColor, setSpineColor] = useState("hsl(29 58% 38%)");
+  const authorInitials = book.author
+    .split(" ")
+    .filter(Boolean)
+    .slice(0, 3)
+    .map((part) => part[0]?.toUpperCase() ?? "")
+    .join("");
 
   useEffect(() => {
     if (!book.coverUrl || typeof window === "undefined") return;
@@ -26,17 +32,36 @@ function BookSpine({ book }: { book: Book }) {
         canvas.height = 16;
         ctx.drawImage(img, 0, 0, 16, 16);
         const data = ctx.getImageData(0, 0, 16, 16).data;
-        let r = 0;
-        let g = 0;
-        let b = 0;
-        let count = 0;
+        let totalLuma = 0;
+        const buckets = new Map<string, { count: number; r: number; g: number; b: number; sat: number }>();
         for (let i = 0; i < data.length; i += 4) {
-          r += data[i];
-          g += data[i + 1];
-          b += data[i + 2];
-          count += 1;
+          const r = data[i];
+          const g = data[i + 1];
+          const b = data[i + 2];
+          const max = Math.max(r, g, b);
+          const min = Math.min(r, g, b);
+          const sat = max === 0 ? 0 : (max - min) / max;
+          const key = `${Math.round(r / 32)}-${Math.round(g / 32)}-${Math.round(b / 32)}`;
+          const prev = buckets.get(key) ?? { count: 0, r: 0, g: 0, b: 0, sat: 0 };
+          buckets.set(key, { count: prev.count + 1, r: prev.r + r, g: prev.g + g, b: prev.b + b, sat: prev.sat + sat });
+          totalLuma += 0.2126 * r + 0.7152 * g + 0.0722 * b;
         }
-        setSpineColor(`rgb(${Math.round(r / count)}, ${Math.round(g / count)}, ${Math.round(b / count)})`);
+        const avgLuma = totalLuma / (data.length / 4);
+        const ranked = [...buckets.values()].sort((a, b) => {
+          const aSat = a.sat / a.count;
+          const bSat = b.sat / b.count;
+          return bSat * b.count - aSat * a.count;
+        });
+        const pick = ranked.find((bucket) => bucket.count >= 2) ?? ranked[0];
+        if (!pick) return;
+        const baseR = Math.round(pick.r / pick.count);
+        const baseG = Math.round(pick.g / pick.count);
+        const baseB = Math.round(pick.b / pick.count);
+        const brighten = avgLuma < 65 ? 1.35 : avgLuma < 95 ? 1.2 : 1;
+        const r = Math.min(255, Math.round(baseR * brighten));
+        const g = Math.min(255, Math.round(baseG * brighten));
+        const b = Math.min(255, Math.round(baseB * brighten));
+        setSpineColor(`rgb(${r}, ${g}, ${b})`);
       } catch {
         // Graceful fallback when cover hosts block canvas reads.
       }
@@ -54,8 +79,8 @@ function BookSpine({ book }: { book: Book }) {
       <div className="absolute inset-y-0 right-2 w-px bg-black/25" />
       <div className="absolute top-2 left-2 right-2 h-1 rounded-full bg-white/35" />
       <div className="absolute inset-0 px-3 py-2 flex flex-col justify-between">
-        <p className="text-[10px] font-semibold uppercase tracking-[0.15em] text-white/75 truncate">{book.author}</p>
-        <p className="text-sm font-semibold text-white [writing-mode:vertical-rl] [text-orientation:mixed] leading-none h-full truncate">
+        <p className="text-[10px] font-semibold uppercase tracking-[0.15em] text-white/75">{authorInitials}</p>
+        <p className="text-sm font-semibold text-white [writing-mode:vertical-rl] [text-orientation:mixed] leading-tight h-full whitespace-normal break-words">
           {book.title}
         </p>
         <p className="text-[10px] text-white/80">{book.totalPages ? `${book.totalPages}p` : ""}</p>
