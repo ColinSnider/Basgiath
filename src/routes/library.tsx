@@ -91,14 +91,19 @@ function BookSpine({ book }: { book: Book }) {
 
 function Library() {
   const { books, addBook } = useStore();
-  const [tab, setTab] = useState<"reading" | "finished" | "tbr">("reading");
+  const [tab, setTab] = useState<"reading" | "finished" | "tbr" | "dnf">("reading");
   const [viewMode, setViewMode] = useState<"list" | "bookshelf">("list");
   const [searching, setSearching] = useState(false);
 
   const readingBooks = books.filter((b) => b.status === "reading");
   const tbrBooks = books.filter((b) => b.status === "wishlist");
+  const dnfBooks = books.filter((b) => b.status === "dnf");
   const pastReadsByYear = Array.from(
-    new Set(books.flatMap((b) => b.reads.map((r) => new Date(r.finishedAt).getFullYear()))),
+    new Set(
+      books
+        .filter((b) => b.status !== "dnf")
+        .flatMap((b) => b.reads.map((r) => new Date(r.finishedAt).getFullYear())),
+    ),
   ).sort((a, b) => b - a);
 
   const allBooks = [...books].sort((a, b) => {
@@ -110,7 +115,8 @@ function Library() {
     return b.addedAt.localeCompare(a.addedAt);
   });
 
-  const activeBooks = tab === "reading" ? readingBooks : tab === "tbr" ? tbrBooks : allBooks;
+  const activeBooks =
+    tab === "reading" ? readingBooks : tab === "tbr" ? tbrBooks : tab === "dnf" ? dnfBooks : allBooks;
 
   return (
     <>
@@ -118,7 +124,7 @@ function Library() {
 
       <div className="px-5 space-y-3">
         <div className="flex gap-1 p-1 bg-muted rounded-lg">
-          {(["reading", "finished", "tbr"] as const).map((t) => (
+          {(["reading", "finished", "tbr", "dnf"] as const).map((t) => (
             <button
               key={t}
               onClick={() => setTab(t)}
@@ -126,7 +132,7 @@ function Library() {
                 tab === t ? "bg-card text-foreground shadow-sm" : "text-muted-foreground"
               }`}
             >
-              {t === "reading" ? "Current Reads" : t === "finished" ? "Past Reads" : "TBR"}
+              {t === "reading" ? "Current Reads" : t === "finished" ? "Past Reads" : t === "tbr" ? "TBR" : "DNF"}
             </button>
           ))}
         </div>
@@ -181,6 +187,26 @@ function Library() {
         <section className="px-5 mt-5">
           <ul className="space-y-3">
             {tbrBooks.map((b) => (
+              <li key={b.id}>
+                <Link
+                  to="/book/$id"
+                  params={{ id: b.id }}
+                  className="flex gap-3 items-center bg-card rounded-lg p-3 border border-border"
+                >
+                  <BookCover book={b} />
+                  <div>
+                    <p className="font-medium text-sm">{b.title}</p>
+                    <p className="text-xs text-muted-foreground">{b.author}</p>
+                  </div>
+                </Link>
+              </li>
+            ))}
+          </ul>
+        </section>
+      ) : tab === "dnf" ? (
+        <section className="px-5 mt-5">
+          <ul className="space-y-3">
+            {dnfBooks.map((b) => (
               <li key={b.id}>
                 <Link
                   to="/book/$id"
