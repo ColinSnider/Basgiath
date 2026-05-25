@@ -1,8 +1,9 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { AppHeader } from "@/components/AppHeader";
 import { BookCover } from "@/components/BookCover";
-import { useStore, readsInYear, lastReadDate, type Book } from "@/lib/basgiath-store";
+import { useStore, readsInYear, lastReadDate, totalReads, type Book } from "@/lib/basgiath-store";
 import { useEffect, useState } from "react";
+import { Star } from "lucide-react";
 import { BookSearch } from "@/components/BookSearch";
 
 export const Route = createFileRoute("/library")({
@@ -118,6 +119,37 @@ function Library() {
   const activeBooks =
     tab === "reading" ? readingBooks : tab === "tbr" ? tbrBooks : tab === "dnf" ? dnfBooks : allBooks;
 
+  function formatDate(value?: string) {
+    if (!value) return "—";
+    return new Date(value).toLocaleDateString();
+  }
+
+  function bookBubbles(b: Book) {
+    const rating = Number((b.metadata as any)?.rating ?? 0);
+    const tags = Array.isArray((b.metadata as any)?.tags) ? ((b.metadata as any).tags as string[]) : [];
+    const finishAt = b.reads.length > 0 ? b.reads[b.reads.length - 1]?.finishedAt : undefined;
+
+    return (
+      <div className="mt-2 flex flex-wrap gap-1.5">
+        <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-muted text-muted-foreground">Started {formatDate(b.addedAt)}</span>
+        {b.status === "reading" ? (
+          <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-primary/10 text-primary">p. {b.currentPage || 0}</span>
+        ) : (
+          <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-primary/10 text-primary">Finished {formatDate(finishAt)}</span>
+        )}
+        <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-gold/15 text-gold-foreground inline-flex items-center gap-1">
+          <Star className="h-3 w-3" /> {rating || 0}/5
+        </span>
+        <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-muted text-muted-foreground">{totalReads(b)} reads</span>
+        {tags.slice(0, 3).map((tag) => (
+          <span key={tag} className="text-[10px] px-1.5 py-0.5 rounded-full bg-card border border-border">
+            #{tag}
+          </span>
+        ))}
+      </div>
+    );
+  }
+
   return (
     <>
       <AppHeader title="Library" subtitle="Your reading history." />
@@ -177,6 +209,7 @@ function Library() {
                   <div>
                     <p className="font-medium text-sm">{b.title}</p>
                     <p className="text-xs text-muted-foreground">{b.author}</p>
+                    {bookBubbles(b)}
                   </div>
                 </Link>
               </li>
@@ -197,6 +230,7 @@ function Library() {
                   <div>
                     <p className="font-medium text-sm">{b.title}</p>
                     <p className="text-xs text-muted-foreground">{b.author}</p>
+                    {bookBubbles(b)}
                   </div>
                 </Link>
               </li>
@@ -217,6 +251,7 @@ function Library() {
                   <div>
                     <p className="font-medium text-sm">{b.title}</p>
                     <p className="text-xs text-muted-foreground">{b.author}</p>
+                    {bookBubbles(b)}
                   </div>
                 </Link>
               </li>
@@ -242,6 +277,7 @@ function Library() {
                         <div className="flex-1">
                           <p className="font-medium text-sm">{b.title}</p>
                           <p className="text-xs text-muted-foreground">{b.author}</p>
+                          {bookBubbles(b)}
                         </div>
                       </Link>
                     </li>
