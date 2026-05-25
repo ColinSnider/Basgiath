@@ -1,7 +1,7 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useStore, totalReads, lastReadDate } from "@/lib/basgiath-store";
 import { BookCover } from "@/components/BookCover";
-import { ChevronLeft, Check, Trash2, RotateCcw, CalendarDays, X, Headphones, Save, Pencil, Sparkles } from "lucide-react";
+import { ChevronLeft, Check, Trash2, RotateCcw, CalendarDays, X, Headphones, Save, Pencil, Sparkles, Star } from "lucide-react";
 import { useState, useEffect } from "react";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
@@ -11,7 +11,7 @@ export const Route = createFileRoute("/book/$id")({ component: BookDetail });
 function BookDetail() {
   const { id } = Route.useParams();
   const navigate = useNavigate();
-  const { books, margins, updateBook, removeBook, finishRead } = useStore();
+  const { books, margins, updateBook, removeBook, finishRead, addMargin } = useStore();
   const book = books.find((b) => b.id === id);
 
   const [page, setPage] = useState("");
@@ -22,7 +22,11 @@ function BookDetail() {
   const [author, setAuthor] = useState("");
   const [coverUrl, setCoverUrl] = useState("");
   const [tags, setTags] = useState("");
-  const [status, setStatus] = useState<"reading"|"finished"|"wishlist">("reading");
+  const [status, setStatus] = useState<"reading"|"finished"|"wishlist"|"dnf">("reading");
+  const [rating, setRating] = useState(0);
+  const [newTag, setNewTag] = useState("");
+  const [marginText, setMarginText] = useState("");
+  const [marginPage, setMarginPage] = useState("");
   const [editingDetails, setEditingDetails] = useState(false);
 
   const [showDatePicker, setShowDatePicker] = useState(false);
@@ -36,6 +40,7 @@ function BookDetail() {
       setStatus(book.status);
       const existingTags = Array.isArray((book.metadata as any)?.tags) ? ((book.metadata as any).tags as string[]) : [];
       setTags(existingTags.join(", "));
+      setRating(Number((book.metadata as any)?.rating ?? 0));
       if (book.format === "audiobook") {
         setMinutes(String(book.currentMinute ?? 0));
         setTotalMins(String(book.durationMinutes ?? ""));
@@ -60,7 +65,7 @@ function BookDetail() {
 
   function saveDetails() {
     const nextTags = tags.split(",").map((t) => t.trim()).filter(Boolean);
-    updateBook(book.id, { title: title.trim() || book.title, author: author.trim() || book.author, coverUrl: coverUrl.trim() || null, status, metadata: { ...(book.metadata ?? {}), tags: nextTags } });
+    updateBook(book.id, { title: title.trim() || book.title, author: author.trim() || book.author, coverUrl: coverUrl.trim() || null, status, metadata: { ...(book.metadata ?? {}), tags: nextTags, rating } });
     setEditingDetails(false);
   }
 
@@ -71,6 +76,23 @@ function BookDetail() {
     setShowDatePicker(false);
   }
 
+  const displayTags = Array.isArray((book.metadata as any)?.tags) ? ((book.metadata as any).tags as string[]) : [];
+
+  function addTag() {
+    const t = newTag.trim();
+    if (!t) return;
+    const tagSet = new Set([...displayTags, t]);
+    updateBook(book.id, { metadata: { ...(book.metadata ?? {}), tags: Array.from(tagSet), rating } });
+    setNewTag("");
+  }
+
+  function addMarginFromBook() {
+    if (!marginText.trim()) return;
+    addMargin({ bookId: book.id, type: "note", text: marginText.trim(), page: marginPage ? Number(marginPage) : undefined });
+    setMarginText("");
+    setMarginPage("");
+  }
+
   const progressPct = isAudio ? (book.durationMinutes ? Math.min(100, Math.round(((book.currentMinute ?? 0) / book.durationMinutes) * 100)) : 0) : (book.totalPages ? Math.min(100, Math.round(((book.currentPage ?? 0) / book.totalPages) * 100)) : 0);
 
   return <div className="max-w-5xl mx-auto px-3 md:px-6 lg:px-10 pb-6">
@@ -79,16 +101,22 @@ function BookDetail() {
     <div className="py-3 flex items-center justify-between"><button onClick={() => navigate({ to: "/library" })} className="inline-flex items-center text-sm text-muted-foreground hover:text-foreground"><ChevronLeft className="h-5 w-5" /> Back</button><button onClick={() => { if (confirm("Remove this book and all its margins?")) { removeBook(book.id); navigate({ to: "/library" }); } }} className="text-muted-foreground/70 hover:text-destructive p-1"><Trash2 className="h-4 w-4" /></button></div>
 
     <div className="relative overflow-hidden rounded-xl border border-primary/20 bg-gradient-to-br from-card via-card to-primary/10 p-5 md:p-6">
+      {book.coverUrl && <img src={book.coverUrl} alt="" aria-hidden className="absolute inset-0 h-full w-full object-cover opacity-20 blur-2xl scale-110" />}
+      <div className="absolute inset-0 bg-background/50" />
+      <div className="relative">
       <div className="grid md:grid-cols-[240px_1fr] gap-6 items-start">
         <div className="flex justify-center md:justify-start">
           <BookCover book={book} size="lg" />
         </div>
         <div className="text-center md:text-left">
-          <h1 className="font-display text-3xl leading-tight">{book.title}</h1>
+          <h1 className="font-display font-bold text-3xl leading-tight">{book.title}</h1>
           <p className="text-sm text-muted-foreground mt-1">{book.author}</p>
           {isAudio && <span className="inline-flex items-center gap-1 mt-2 text-[11px] bg-primary/10 text-primary rounded px-2 py-0.5"><Headphones className="h-3 w-3" /> Audiobook</span>}
+          <div className="mt-2 flex flex-wrap gap-1 justify-center md:justify-start">{displayTags.map((tag) => <span key={tag} className="text-xs px-2 py-0.5 rounded-full bg-card/70 border border-border">#{tag}</span>)}</div>
+          <div className="mt-2 flex items-center gap-1 justify-center md:justify-start">{[1,2,3,4,5].map((n)=><Star key={n} className={`h-4 w-4 ${n <= rating ? "fill-gold text-gold" : "text-muted-foreground/40"}`} />)}</div>
           <p className="text-[11px] text-muted-foreground/80 mt-2">{reads === 0 ? "Not yet finished" : `Read ${reads} time${reads > 1 ? "s" : ""}${last ? ` · last ${new Date(last).toLocaleDateString()}` : ""}`}</p>
         </div>
+      </div>
       </div>
     </div>
 
@@ -110,8 +138,7 @@ function BookDetail() {
         <div className="grid md:grid-cols-2 gap-2 text-sm">
           <p><span className="text-muted-foreground">Title:</span> {book.title}</p>
           <p><span className="text-muted-foreground">Author:</span> {book.author}</p>
-          <p className="md:col-span-2"><span className="text-muted-foreground">Cover:</span> {book.coverUrl ?? "Default cover"}</p>
-          <p><span className="text-muted-foreground">Status:</span> {book.status === "wishlist" ? "TBR" : book.status}</p>
+          <p><span className="text-muted-foreground">Status:</span> {book.status === "wishlist" ? "TBR" : book.status.toUpperCase()}</p>
           <p><span className="text-muted-foreground">Tags:</span> {(book.metadata as any)?.tags?.join?.(", ") || "None"}</p>
         </div>
       ) : (
@@ -121,7 +148,7 @@ function BookDetail() {
             <input value={author} onChange={(e) => setAuthor(e.target.value)} placeholder="Author" className="bg-muted rounded-md px-3 py-2 text-sm" />
             <input value={coverUrl} onChange={(e) => setCoverUrl(e.target.value)} placeholder="Cover image URL" className="bg-muted rounded-md px-3 py-2 text-sm md:col-span-2" />
             <input value={tags} onChange={(e) => setTags(e.target.value)} placeholder="Tags (Genre, Fantasy, etc.)" className="bg-muted rounded-md px-3 py-2 text-sm" />
-            <select value={status} onChange={(e)=>setStatus(e.target.value as any)} className="bg-muted rounded-md px-3 py-2 text-sm"><option value="reading">Current Reads</option><option value="finished">Past Reads</option><option value="wishlist">TBR</option></select>
+            <select value={status} onChange={(e)=>setStatus(e.target.value as any)} className="bg-muted rounded-md px-3 py-2 text-sm"><option value="reading">Current Reads</option><option value="finished">Past Reads</option><option value="wishlist">TBR</option><option value="dnf">DNF</option></select>
           </div>
           <button onClick={saveDetails} className="inline-flex items-center gap-1 bg-primary text-primary-foreground px-4 py-2 rounded-md text-sm"><Save className="h-4 w-4" /> Save details</button>
         </>
@@ -136,6 +163,24 @@ function BookDetail() {
       {book.status === "finished" && <button onClick={() => updateBook(book.id, { status: "reading", currentPage: 0 })} className="inline-flex items-center justify-center gap-1 border border-border rounded-md py-2 px-3 text-sm"><RotateCcw className="h-4 w-4" /> Re-read</button>}
     </section>
 
-    <section className="mt-6 mb-6"><h2 className="font-display text-lg mb-2">Margins</h2>{myMargins.length===0?<p className="text-sm text-muted-foreground">No notes yet for this book.</p>:<ul className="space-y-2">{myMargins.map((m)=><li key={m.id} className="bg-card border border-border rounded-md p-3"><Link to="/margins" className="block"><p className={`text-sm ${m.type === "quote" ? "font-display italic" : ""}`}>{m.text}</p>{m.page && <p className="text-[11px] text-muted-foreground mt-1">p. {m.page}</p>}</Link></li>)}</ul>}</section>
+    <section className="mt-6 bg-card border border-border rounded-md p-4 space-y-3">
+      <h2 className="font-display text-lg">Margins</h2>
+      <div className="grid md:grid-cols-[1fr_120px_auto] gap-2">
+        <input value={marginText} onChange={(e)=>setMarginText(e.target.value)} placeholder="Add a margin/note from this book" className="bg-muted rounded-md px-3 py-2 text-sm" />
+        <input value={marginPage} onChange={(e)=>setMarginPage(e.target.value.replace(/\D/g, ""))} placeholder="Page" className="bg-muted rounded-md px-3 py-2 text-sm" />
+        <button onClick={addMarginFromBook} className="bg-primary text-primary-foreground rounded-md px-3 py-2 text-sm">Add Margin</button>
+      </div>
+      {myMargins.length===0?<p className="text-sm text-muted-foreground">No notes yet for this book.</p>:<ul className="space-y-2">{myMargins.map((m)=><li key={m.id} className="bg-muted/40 border border-border rounded-md p-3"><Link to="/margins" className="block"><p className={`text-sm ${m.type === "quote" ? "font-display italic" : ""}`}>{m.text}</p>{m.page && <p className="text-[11px] text-muted-foreground mt-1">p. {m.page}</p>}</Link></li>)}</ul>}
+    </section>
+
+    <section className="mt-6 mb-6 bg-card border border-border rounded-md p-4 space-y-3">
+      <h2 className="font-display text-lg">Book Reviews</h2>
+      <p className="text-xs text-muted-foreground">Your star rating here is displayed at the top of the book view and in margins context.</p>
+      <div className="flex items-center gap-1">{[1,2,3,4,5].map((n)=><button key={n} onClick={()=>{ setRating(n); updateBook(book.id, { metadata: { ...(book.metadata ?? {}), rating: n, tags: displayTags } }); }}><Star className={`h-5 w-5 ${n <= rating ? "fill-gold text-gold" : "text-muted-foreground/40"}`} /></button>)}</div>
+      <div className="flex gap-2">
+        <input value={newTag} onChange={(e)=>setNewTag(e.target.value)} placeholder="Add tag" className="bg-muted rounded-md px-3 py-2 text-sm" />
+        <button onClick={addTag} className="border border-border rounded-md px-3 py-2 text-sm">Add Tag</button>
+      </div>
+    </section>
   </div>;
 }
