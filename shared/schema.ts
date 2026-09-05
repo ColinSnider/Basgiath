@@ -1,4 +1,5 @@
 import { pgTable, text, integer, boolean, timestamp, serial, jsonb } from "drizzle-orm/pg-core";
+import type { JsonValue } from "./json.ts";
 import { relations } from "drizzle-orm";
 
 export const users = pgTable("users", {
@@ -12,13 +13,17 @@ export const users = pgTable("users", {
 
 export const sessions = pgTable("sessions", {
   id: text("id").primaryKey(),
-  userId: integer("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  userId: integer("user_id")
+    .notNull()
+    .references(() => users.id, { onDelete: "cascade" }),
   expiresAt: timestamp("expires_at").notNull(),
 });
 
 export const books = pgTable("books", {
   id: text("id").primaryKey(),
-  userId: integer("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  userId: integer("user_id")
+    .notNull()
+    .references(() => users.id, { onDelete: "cascade" }),
   title: text("title").notNull(),
   author: text("author").notNull(),
   coverUrl: text("cover_url"),
@@ -30,13 +35,17 @@ export const books = pgTable("books", {
   status: text("status").notNull().default("reading"),
   addedAt: timestamp("added_at").defaultNow().notNull(),
   reads: jsonb("reads").$type<{ finishedAt: string }[]>().notNull().default([]),
-  metadata: jsonb("metadata").$type<Record<string, unknown>>().notNull().default({}),
+  metadata: jsonb("metadata").$type<Record<string, JsonValue>>().notNull().default({}),
 });
 
 export const margins = pgTable("margins", {
   id: text("id").primaryKey(),
-  userId: integer("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
-  bookId: text("book_id").notNull().references(() => books.id, { onDelete: "cascade" }),
+  userId: integer("user_id")
+    .notNull()
+    .references(() => users.id, { onDelete: "cascade" }),
+  bookId: text("book_id")
+    .notNull()
+    .references(() => books.id, { onDelete: "cascade" }),
   type: text("type").notNull(),
   text: text("text").notNull(),
   page: integer("page"),
@@ -45,7 +54,9 @@ export const margins = pgTable("margins", {
 
 export const goals = pgTable("goals", {
   id: text("id").primaryKey(),
-  userId: integer("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  userId: integer("user_id")
+    .notNull()
+    .references(() => users.id, { onDelete: "cascade" }),
   metric: text("metric").notNull(),
   target: integer("target").notNull(),
   timeframe: text("timeframe").notNull(),
@@ -53,7 +64,9 @@ export const goals = pgTable("goals", {
 });
 
 export const userSettings = pgTable("user_settings", {
-  userId: integer("user_id").primaryKey().references(() => users.id, { onDelete: "cascade" }),
+  userId: integer("user_id")
+    .primaryKey()
+    .references(() => users.id, { onDelete: "cascade" }),
   darkMode: boolean("dark_mode").notNull().default(false),
   accentColor: text("accent_color").notNull().default("default"),
   compactMode: boolean("compact_mode").notNull().default(false),

@@ -12,7 +12,9 @@
     "lint": "eslint .",
     "format": "prettier --write .",
     "db:push": "drizzle-kit push",
-    "db:migrate": "drizzle-kit migrate"
+    "db:migrate": "drizzle-kit migrate",
+    "test": "node --experimental-strip-types --test src/lib/*.test.js src/lib/*.test.ts server/*.test.ts",
+    "typecheck": "tsc --noEmit"
   },
   "engines": {
     "node": ">=22.12.0"
@@ -72,9 +74,10 @@
     "zod": "^3.24.2"
   },
   "devDependencies": {
+    "@electric-sql/pglite": "^0.5.8",
+    "@eslint/js": "^9.32.0",
     "@tailwindcss/vite": "^4.2.1",
     "@tanstack/router-plugin": "^1.167.28",
-    "@eslint/js": "^9.32.0",
     "@types/node": "^22.16.5",
     "@types/pg": "^8.20.0",
     "@types/react": "^19.2.0",
@@ -92,5 +95,6 @@
     "typescript-eslint": "^8.56.1",
     "vite": "^7.3.1",
     "vite-tsconfig-paths": "^6.0.2"
-  }
+  },
+  "version": "1.1.0"
 }

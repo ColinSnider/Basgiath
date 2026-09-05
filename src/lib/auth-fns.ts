@@ -186,6 +186,7 @@ export const changePassword = createServerFn({ method: "POST" })
       .from(users)
       .where(eq(users.id, session.userId));
     if (!user) throw new Error("User not found");
+    if (!user.password) throw new Error("This account does not have a password set.");
     const valid = await bcryptjs.compare(data.currentPassword, user.password);
     if (!valid) throw new Error("Current password is incorrect");
     const hashed = await bcryptjs.hash(data.newPassword, authConfig.bcryptRounds);

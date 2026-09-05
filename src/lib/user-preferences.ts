@@ -201,7 +201,7 @@ export const DEFAULT_PREFERENCES: UserPreferences = {
 };
 
 function isObject(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null;
+  return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
 function isHex(value: unknown) {
@@ -241,6 +241,7 @@ function normalizeCustomTheme(theme: unknown, idx: number): CustomTheme {
     }
   }
   return {
+    ...theme,
     id,
     name,
     lightPrimary: normalizeHex(theme.lightPrimary as string),
@@ -262,6 +263,7 @@ export function normalizeDashboardTiles(input: unknown): DashboardTile[] {
     if (seen.has(widgetId as DashboardWidgetId)) continue;
     seen.add(widgetId as DashboardWidgetId);
     normalized.push({
+      ...tile,
       widgetId: widgetId as DashboardWidgetId,
       width: tile.width === "full" ? "full" : "half",
     });
@@ -299,6 +301,7 @@ export function normalizeUserPreferences(input: unknown): UserPreferences {
     .filter((v): v is CustomTheme => !!v);
   const activeCustomThemeId = normalizeOptionalString(input.activeCustomThemeId);
   return {
+    ...input,
     useCustomFont: input.useCustomFont === true,
     bodyFont,
     displayFont,
@@ -334,9 +337,39 @@ export function parseImportJson(raw: string): ExportData {
   }
 
   if (!isObject(parsed)) throw new Error("Import failed: root JSON value must be an object.");
+  if (parsed.version !== undefined && parsed.version !== 1) {
+    throw new Error("Import failed: unsupported export version. Use a version 1 Basgiath export.");
+  }
   if (!Array.isArray(parsed.books)) throw new Error("Import failed: books must be an array.");
   if (!Array.isArray(parsed.margins)) throw new Error("Import failed: margins must be an array.");
   if (!Array.isArray(parsed.goals)) throw new Error("Import failed: goals must be an array.");
+
+  const collections = { books: parsed.books, margins: parsed.margins, goals: parsed.goals };
+  const ids = new Map<string, Set<string>>();
+  for (const collection of ["books", "margins", "goals"] as const) {
+    const seen = new Set<string>();
+    for (const [index, row] of collections[collection].entries()) {
+      if (!isObject(row) || typeof row.id !== "string" || !row.id.trim()) {
+        throw new Error(`Import failed: ${collection}[${index}] must have a non-empty string id.`);
+      }
+      if (seen.has(row.id)) {
+        throw new Error(`Import failed: ${collection} contains duplicate id "${row.id}".`);
+      }
+      seen.add(row.id);
+    }
+    ids.set(collection, seen);
+  }
+  for (const [index, margin] of parsed.margins.entries()) {
+    if (
+      !isObject(margin) ||
+      typeof margin.bookId !== "string" ||
+      !ids.get("books")!.has(margin.bookId)
+    ) {
+      throw new Error(
+        `Import failed: margins[${index}].bookId must reference a book in this export.`,
+      );
+    }
+  }
 
   const settingsCandidate = isObject(parsed.settings)
     ? parsed.settings
@@ -362,7 +395,8 @@ export function parseImportJson(raw: string): ExportData {
 
   return {
     version: 1,
-    exportedAt: new Date().toISOString(),
+    exportedAt:
+      typeof parsed.exportedAt === "string" ? parsed.exportedAt : new Date().toISOString(),
     books: parsed.books,
     margins: parsed.margins,
     goals: parsed.goals,

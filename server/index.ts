@@ -1,6 +1,2 @@
-import { createStartHandler, defaultStreamHandler } from '@tanstack/react-start/server'
-import { getRouter } from '../src/router'
-
-export default createStartHandler({
-  createRouter: getRouter,
-})(defaultStreamHandler)
+// Keep the legacy entry aligned with the active server implementation.
+export { default } from "../src/server";

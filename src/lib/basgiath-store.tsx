@@ -21,6 +21,9 @@ import {
   type UserPreferences,
 } from "./user-preferences";
 import { mergeLoadedStoreState } from "./store-load-state";
+import { importDataSchema } from "./import-contract";
+import type { BookRow, MarginRow, GoalRow } from "../../shared/schema";
+import type { JsonValue } from "../../shared/json";
 
 export type Book = {
   id: string;
@@ -35,7 +38,7 @@ export type Book = {
   reads: { finishedAt: string }[];
   status: "reading" | "finished" | "wishlist" | "dnf";
   addedAt: string;
-  metadata?: Record<string, unknown>;
+  metadata?: Record<string, JsonValue>;
 };
 
 export type MarginEntry = {
@@ -69,12 +72,11 @@ type StoreState = {
   settings: Settings;
   preferences: UserPreferences;
   dataLoading: boolean;
+  dataError: string | null;
 };
 
 type StoreActions = {
-  addBook: (
-    b: Omit<Book, "id" | "reads" | "addedAt" | "status"> & Partial<Pick<Book, "status">>,
-  ) => Promise<void>;
+  addBook: (b: NewBook) => Promise<void>;
   updateBook: (id: string, patch: Partial<Book>) => Promise<void>;
   removeBook: (id: string) => Promise<void>;
   finishRead: (id: string, finishedAt?: string) => Promise<void>;
@@ -85,10 +87,13 @@ type StoreActions = {
   updateSettings: (patch: Partial<Settings>) => Promise<void>;
   updatePreferences: (patch: Partial<UserPreferences>) => void;
   importUserData: (rawJson: string) => Promise<void>;
-  exportUserData: () => string;
+  exportUserData: () => Promise<string>;
   clearAll: () => Promise<void>;
   reload: () => Promise<void>;
 };
+
+type NewBook = Omit<Book, "id" | "reads" | "addedAt" | "status"> &
+  Partial<Pick<Book, "reads" | "addedAt" | "status">> & { extraReads?: string[] };
 
 const StoreContext = createContext<(StoreState & StoreActions) | null>(null);
 
@@ -105,13 +110,14 @@ const DEFAULT_STATE: StoreState = {
   settings: DEFAULT_SETTINGS,
   preferences: DEFAULT_PREFERENCES,
   dataLoading: false,
+  dataError: null,
 };
 
 function storageKey(userId: number | undefined) {
   return userId ? `basgiath:preferences:v1:${userId}` : null;
 }
 
-function rowToBook(r: any): Book {
+function rowToBook(r: Omit<BookRow, "addedAt"> & { addedAt: Date | string }): Book {
   return {
     id: r.id,
     title: r.title,
@@ -129,7 +135,7 @@ function rowToBook(r: any): Book {
   };
 }
 
-function rowToMargin(r: any): MarginEntry {
+function rowToMargin(r: Omit<MarginRow, "createdAt"> & { createdAt: Date | string }): MarginEntry {
   return {
     id: r.id,
     bookId: r.bookId,
@@ -140,7 +146,7 @@ function rowToMargin(r: any): MarginEntry {
   };
 }
 
-function rowToGoal(r: any): Goal {
+function rowToGoal(r: Omit<GoalRow, "createdAt"> & { createdAt: Date | string }): Goal {
   return {
     id: r.id,
     metric: r.metric as "books" | "pages" | "minutes",
@@ -172,7 +178,9 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   }, [sessionId, user, promptAuth]);
 
   const getWritableSessionId = useCallback(() => {
-    return canMutate() ? sessionId : null;
+    if (!canMutate() || !sessionId)
+      throw new Error("Sign in to save changes to your reading data.");
+    return sessionId;
   }, [canMutate, sessionId]);
 
   const reload = useCallback(async () => {
@@ -180,12 +188,12 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       setState({ ...DEFAULT_STATE, dataLoading: false });
       return;
     }
-    setState((s) => ({ ...s, dataLoading: true }));
+    setState((s) => ({ ...s, dataLoading: true, dataError: null }));
     try {
       const res = await dataFns.loadData({ data: { sessionId } });
       setState((s) =>
         mergeLoadedStoreState({
-          previousState: s,
+          previousState: { ...s, dataError: null },
           loadedData: res,
           mapBook: rowToBook,
           mapMargin: rowToMargin,
@@ -193,12 +201,17 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         }),
       );
     } catch {
-      setState((s) => ({ ...s, dataLoading: false }));
+      setState((s) => ({
+        ...s,
+        dataLoading: false,
+        dataError: "Your reading data could not be refreshed. Please retry before making changes.",
+      }));
+      throw new Error("Reading data could not be refreshed. Please retry.");
     }
   }, [sessionId]);
 
   useEffect(() => {
-    reload();
+    void reload().catch(() => {});
   }, [reload]);
 
   useEffect(() => {
@@ -231,10 +244,10 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   }, [state.preferences, user?.id]);
 
   const addBook = useCallback(
-    async (b: Omit<Book, "id" | "addedAt"> & { addedAt?: string; extraReads?: string[] }) => {
+    async (b: NewBook) => {
       const writableSessionId = getWritableSessionId();
       if (!writableSessionId) return;
-      const reads: { finishedAt: string }[] = b.reads ?? [];
+      const reads: { finishedAt: string }[] = [...(b.reads ?? [])];
       if (b.extraReads) {
         for (const d of b.extraReads) reads.push({ finishedAt: d });
       }
@@ -303,29 +316,14 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     async (id: string, finishedAt?: string) => {
       const writableSessionId = getWritableSessionId();
       if (!writableSessionId) return;
-      setState((s) => {
-        const book = s.books.find((b) => b.id === id);
-        if (!book) return s;
-        const newReads = [...book.reads, { finishedAt: finishedAt ?? new Date().toISOString() }];
-        const updatedBook = {
-          ...book,
-          status: "finished" as const,
-          currentPage: book.totalPages ?? book.currentPage,
-          reads: newReads,
-        };
-        dataFns.updateBook({
-          data: {
-            sessionId: writableSessionId,
-            id,
-            patch: {
-              status: "finished",
-              currentPage: book.totalPages ?? book.currentPage ?? 0,
-              reads: newReads,
-            },
-          },
-        });
-        return { ...s, books: s.books.map((b) => (b.id === id ? updatedBook : b)) };
+      const row = await dataFns.finishRead({
+        data: {
+          sessionId: writableSessionId,
+          id,
+          finishedAt: finishedAt ?? new Date().toISOString(),
+        },
       });
+      setState((s) => ({ ...s, books: s.books.map((b) => (b.id === id ? rowToBook(row) : b)) }));
     },
     [getWritableSessionId],
   );
@@ -389,8 +387,8 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     async (patch: Partial<Settings>) => {
       const writableSessionId = getWritableSessionId();
       if (!writableSessionId) return;
-      setState((s) => ({ ...s, settings: { ...s.settings, ...patch } }));
       await dataFns.updateSettings({ data: { sessionId: writableSessionId, patch } });
+      setState((s) => ({ ...s, settings: { ...s.settings, ...patch } }));
     },
     [getWritableSessionId],
   );
@@ -402,40 +400,59 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     }));
   }, []);
 
-  const exportUserData = useCallback(() => {
+  const exportUserData = useCallback(async () => {
+    const writableSessionId = getWritableSessionId();
+    if (!writableSessionId) throw new Error("Sign in to export your saved reading data.");
+    const snapshot = await dataFns.exportUserData({ data: { sessionId: writableSessionId } });
     return JSON.stringify(
       {
         version: 1,
         exportedAt: new Date().toISOString(),
-        books: state.books,
-        margins: state.margins,
-        goals: state.goals,
-        settings: state.settings,
+        books: snapshot.books.map(rowToBook),
+        margins: snapshot.margins.map(rowToMargin),
+        goals: snapshot.goals.map(rowToGoal),
+        settings: snapshot.settings,
         preferences: state.preferences,
       },
       null,
       2,
     );
-  }, [state.books, state.margins, state.goals, state.settings, state.preferences]);
+  }, [getWritableSessionId, state.preferences]);
 
   const importUserData = useCallback(
     async (rawJson: string) => {
       const writableSessionId = getWritableSessionId();
-      if (!writableSessionId) return;
+      if (!writableSessionId) throw new Error("Sign in to import reading data.");
       const parsed = parseImportJson(rawJson);
+      const restoredData = importDataSchema.parse(parsed);
       await dataFns.importUserData({
         data: {
           sessionId: writableSessionId,
-          books: parsed.books,
-          margins: parsed.margins,
-          goals: parsed.goals,
-          settings: parsed.settings,
+          ...restoredData,
         },
       });
       setState((s) => ({ ...s, preferences: parsed.preferences }));
-      await reload();
+      let preferenceSaveFailed = false;
+      try {
+        const key = storageKey(user?.id);
+        if (key) window.localStorage.setItem(key, JSON.stringify(parsed.preferences));
+      } catch {
+        preferenceSaveFailed = true;
+      }
+      try {
+        await reload();
+      } catch {
+        throw new Error(
+          "Your import was saved, but the library could not be refreshed. Reload the page; do not import again.",
+        );
+      }
+      if (preferenceSaveFailed) {
+        throw new Error(
+          "Your reading data was restored, but this browser could not save appearance preferences. Keep the import file and allow browser storage before restoring preferences again.",
+        );
+      }
     },
-    [getWritableSessionId, reload],
+    [getWritableSessionId, reload, user?.id],
   );
 
   const clearAll = useCallback(async () => {

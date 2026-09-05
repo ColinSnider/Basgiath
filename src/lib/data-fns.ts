@@ -1,5 +1,7 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
+import { importDataSchema, jsonValueSchema } from "./import-contract";
+import { createUserDataService } from "../../server/user-data-service";
 import { db } from "../../server/db";
 import { books, margins, goals, userSettings, sessions } from "../../shared/schema";
 import { eq } from "drizzle-orm";
@@ -10,47 +12,7 @@ import {
   isGuestSessionValid,
 } from "./session-auth.js";
 
-const nullableText = z
-  .union([z.string(), z.null(), z.undefined()])
-  .transform((value) => {
-    if (value === null || value === undefined) return null;
-    const trimmed = value.trim();
-    if (!trimmed) return null;
-    if (trimmed.toLowerCase() === "none" || trimmed.toLowerCase() === "null") return null;
-    return trimmed;
-  });
-
-const importedBookSchema = z.object({
-  id: z.string().min(1),
-  title: z.string().min(1),
-  author: z.string().min(1),
-  coverUrl: nullableText.optional(),
-  format: z.enum(["book", "audiobook"]).default("book"),
-  totalPages: z.number().int().nonnegative().nullable().optional(),
-  currentPage: z.number().int().nonnegative().nullable().optional(),
-  durationMinutes: z.number().int().nonnegative().nullable().optional(),
-  currentMinute: z.number().int().nonnegative().nullable().optional(),
-  status: z.enum(["reading", "finished", "wishlist", "dnf"]),
-  addedAt: z.string().datetime(),
-  reads: z.array(z.object({ finishedAt: z.string().datetime() })).default([]),
-});
-
-const importedMarginSchema = z.object({
-  id: z.string().min(1),
-  bookId: z.string().min(1),
-  type: z.enum(["note", "quote"]),
-  text: z.string().min(1),
-  page: z.number().int().nonnegative().nullable().optional(),
-  createdAt: z.string().datetime(),
-});
-
-const importedGoalSchema = z.object({
-  id: z.string().min(1),
-  metric: z.enum(["books", "pages", "minutes"]),
-  target: z.number().int().nonnegative(),
-  timeframe: z.enum(["week", "month", "year"]),
-  createdAt: z.string().datetime(),
-});
+const userData = createUserDataService(db);
 
 async function validateSession(sessionId: string) {
   if (isGuestSessionId(sessionId)) throw new Error(FULL_AUTH_REQUIRED_MESSAGE);
@@ -108,7 +70,7 @@ export const addBook = createServerFn({ method: "POST" })
       status: z.enum(["reading", "finished", "wishlist", "dnf"]).optional(),
       addedAt: z.string().optional(),
       reads: z.array(z.object({ finishedAt: z.string() })).optional(),
-      metadata: z.record(z.string(), z.unknown()).optional(),
+      metadata: z.record(z.string(), jsonValueSchema).optional(),
     }),
   )
   .handler(async ({ data }) => {
@@ -148,26 +110,25 @@ export const updateBook = createServerFn({ method: "POST" })
         author: z.string().optional(),
         coverUrl: z.string().optional().nullable(),
         totalPages: z.number().optional().nullable(),
-        currentPage: z.number().optional(),
+        currentPage: z.number().nullable().optional(),
         durationMinutes: z.number().optional().nullable(),
-        currentMinute: z.number().optional(),
+        currentMinute: z.number().nullable().optional(),
         status: z.enum(["reading", "finished", "wishlist", "dnf"]).optional(),
         reads: z.array(z.object({ finishedAt: z.string() })).optional(),
-        metadata: z.record(z.string(), z.unknown()).optional(),
+        metadata: z.record(z.string(), jsonValueSchema).optional(),
       }),
     }),
   )
   .handler(async ({ data }) => {
-    await validateSession(data.sessionId);
-    const [book] = await db.update(books).set(data.patch).where(eq(books.id, data.id)).returning();
-    return book;
+    const userId = await validateSession(data.sessionId);
+    return userData.updateBook(userId, data.id, data.patch);
   });
 
 export const removeBook = createServerFn({ method: "POST" })
   .inputValidator(z.object({ sessionId: z.string(), id: z.string() }))
   .handler(async ({ data }) => {
-    await validateSession(data.sessionId);
-    await db.delete(books).where(eq(books.id, data.id));
+    const userId = await validateSession(data.sessionId);
+    await userData.removeBook(userId, data.id);
     return { ok: true };
   });
 
@@ -183,26 +144,14 @@ export const addMargin = createServerFn({ method: "POST" })
   )
   .handler(async ({ data }) => {
     const userId = await validateSession(data.sessionId);
-    const id = crypto.randomUUID();
-    const [margin] = await db
-      .insert(margins)
-      .values({
-        id,
-        userId,
-        bookId: data.bookId,
-        type: data.type,
-        text: data.text,
-        page: data.page,
-      })
-      .returning();
-    return margin;
+    return userData.addMargin(userId, data);
   });
 
 export const removeMargin = createServerFn({ method: "POST" })
   .inputValidator(z.object({ sessionId: z.string(), id: z.string() }))
   .handler(async ({ data }) => {
-    await validateSession(data.sessionId);
-    await db.delete(margins).where(eq(margins.id, data.id));
+    const userId = await validateSession(data.sessionId);
+    await userData.removeMargin(userId, data.id);
     return { ok: true };
   });
 
@@ -234,8 +183,8 @@ export const addGoal = createServerFn({ method: "POST" })
 export const removeGoal = createServerFn({ method: "POST" })
   .inputValidator(z.object({ sessionId: z.string(), id: z.string() }))
   .handler(async ({ data }) => {
-    await validateSession(data.sessionId);
-    await db.delete(goals).where(eq(goals.id, data.id));
+    const userId = await validateSession(data.sessionId);
+    await userData.removeGoal(userId, data.id);
     return { ok: true };
   });
 
@@ -253,7 +202,7 @@ export const updateSettings = createServerFn({ method: "POST" })
   )
   .handler(async ({ data }) => {
     const userId = await validateSession(data.sessionId);
-    await db.update(userSettings).set(data.patch).where(eq(userSettings.userId, userId));
+    await userData.updateSettings(userId, data.patch);
     return { ok: true };
   });
 
@@ -261,102 +210,34 @@ export const clearAllData = createServerFn({ method: "POST" })
   .inputValidator(z.object({ sessionId: z.string() }))
   .handler(async ({ data }) => {
     const userId = await validateSession(data.sessionId);
-    await Promise.all([
-      db.delete(books).where(eq(books.userId, userId)),
-      db.delete(margins).where(eq(margins.userId, userId)),
-      db.delete(goals).where(eq(goals.userId, userId)),
-    ]);
+    await userData.clearAllData(userId);
     return { ok: true };
   });
 
 export const importUserData = createServerFn({ method: "POST" })
+  .inputValidator(z.object({ sessionId: z.string() }).and(importDataSchema))
+  .handler(async ({ data }) => {
+    const userId = await validateSession(data.sessionId);
+    await userData.importUserData(userId, data);
+    return { ok: true };
+  });
+
+export const finishRead = createServerFn({ method: "POST" })
   .inputValidator(
     z.object({
       sessionId: z.string(),
-      books: z.array(importedBookSchema),
-      margins: z.array(importedMarginSchema),
-      goals: z.array(importedGoalSchema),
-      settings: z.object({
-        darkMode: z.boolean(),
-        accentColor: z.string(),
-        compactMode: z.boolean(),
-        fontScale: z.enum(["sm", "md", "lg"]),
-      }),
+      id: z.string(),
+      finishedAt: z.string().datetime().optional(),
     }),
   )
   .handler(async ({ data }) => {
     const userId = await validateSession(data.sessionId);
-    const bookIds = new Set(data.books.map((b) => b.id));
-    for (let i = 0; i < data.margins.length; i += 1) {
-      const margin = data.margins[i];
-      if (!bookIds.has(margin.bookId)) {
-        throw new Error(
-          `Import failed: margins[${i}] references missing bookId "${margin.bookId}".`,
-        );
-      }
-    }
+    return userData.finishRead(userId, data.id, data.finishedAt ?? new Date().toISOString());
+  });
 
-    await db.transaction(async (tx) => {
-      await tx.delete(margins).where(eq(margins.userId, userId));
-      await tx.delete(goals).where(eq(goals.userId, userId));
-      await tx.delete(books).where(eq(books.userId, userId));
-
-      if (data.books.length) {
-        await tx.insert(books).values(
-          data.books.map((book) => ({
-            id: book.id,
-            userId,
-            title: book.title,
-            author: book.author,
-            coverUrl: book.coverUrl ?? null,
-            format: book.format,
-            totalPages: book.totalPages ?? null,
-            currentPage: book.currentPage ?? 0,
-            durationMinutes: book.durationMinutes ?? null,
-            currentMinute: book.currentMinute ?? 0,
-            status: book.status,
-            reads: book.reads,
-            addedAt: new Date(book.addedAt),
-          })),
-        );
-      }
-
-      if (data.margins.length) {
-        await tx.insert(margins).values(
-          data.margins.map((margin) => ({
-            id: margin.id,
-            userId,
-            bookId: margin.bookId,
-            type: margin.type,
-            text: margin.text,
-            page: margin.page ?? null,
-            createdAt: new Date(margin.createdAt),
-          })),
-        );
-      }
-
-      if (data.goals.length) {
-        await tx.insert(goals).values(
-          data.goals.map((goal) => ({
-            id: goal.id,
-            userId,
-            metric: goal.metric,
-            target: goal.target,
-            timeframe: goal.timeframe,
-            createdAt: new Date(goal.createdAt),
-          })),
-        );
-      }
-
-      await tx
-        .update(userSettings)
-        .set({
-          darkMode: data.settings.darkMode,
-          accentColor: data.settings.accentColor,
-          compactMode: data.settings.compactMode,
-          fontScale: data.settings.fontScale,
-        })
-        .where(eq(userSettings.userId, userId));
-    });
-    return { ok: true };
+export const exportUserData = createServerFn({ method: "POST" })
+  .inputValidator(z.object({ sessionId: z.string() }))
+  .handler(async ({ data }) => {
+    const userId = await validateSession(data.sessionId);
+    return userData.exportUserData(userId);
   });

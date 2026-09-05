@@ -3,6 +3,7 @@ import { AppHeader } from "@/components/AppHeader";
 import { BookCover } from "@/components/BookCover";
 import { useStore, readsInYear, lastReadDate, totalReads, type Book } from "@/lib/basgiath-store";
 import { useEffect, useState } from "react";
+import { completedBooks, completionYears } from "@/lib/library-history";
 import { Star } from "lucide-react";
 import { BookSearch } from "@/components/BookSearch";
 
@@ -34,7 +35,10 @@ function BookSpine({ book }: { book: Book }) {
         ctx.drawImage(img, 0, 0, 16, 16);
         const data = ctx.getImageData(0, 0, 16, 16).data;
         let totalLuma = 0;
-        const buckets = new Map<string, { count: number; r: number; g: number; b: number; sat: number }>();
+        const buckets = new Map<
+          string,
+          { count: number; r: number; g: number; b: number; sat: number }
+        >();
         for (let i = 0; i < data.length; i += 4) {
           const r = data[i];
           const g = data[i + 1];
@@ -44,7 +48,13 @@ function BookSpine({ book }: { book: Book }) {
           const sat = max === 0 ? 0 : (max - min) / max;
           const key = `${Math.round(r / 32)}-${Math.round(g / 32)}-${Math.round(b / 32)}`;
           const prev = buckets.get(key) ?? { count: 0, r: 0, g: 0, b: 0, sat: 0 };
-          buckets.set(key, { count: prev.count + 1, r: prev.r + r, g: prev.g + g, b: prev.b + b, sat: prev.sat + sat });
+          buckets.set(key, {
+            count: prev.count + 1,
+            r: prev.r + r,
+            g: prev.g + g,
+            b: prev.b + b,
+            sat: prev.sat + sat,
+          });
           totalLuma += 0.2126 * r + 0.7152 * g + 0.0722 * b;
         }
         const avgLuma = totalLuma / (data.length / 4);
@@ -80,7 +90,9 @@ function BookSpine({ book }: { book: Book }) {
       <div className="absolute inset-y-0 right-2 w-px bg-black/25" />
       <div className="absolute top-2 left-2 right-2 h-1 rounded-full bg-white/35" />
       <div className="absolute inset-0 px-3 py-2 flex flex-col justify-between">
-        <p className="text-[10px] font-semibold uppercase tracking-[0.15em] text-white/75">{authorInitials}</p>
+        <p className="text-[10px] font-semibold uppercase tracking-[0.15em] text-white/75">
+          {authorInitials}
+        </p>
         <p className="text-sm font-semibold text-white [writing-mode:vertical-rl] [text-orientation:mixed] leading-tight h-full whitespace-normal break-words">
           {book.title}
         </p>
@@ -99,13 +111,6 @@ function Library() {
   const readingBooks = books.filter((b) => b.status === "reading");
   const tbrBooks = books.filter((b) => b.status === "wishlist");
   const dnfBooks = books.filter((b) => b.status === "dnf");
-  const pastReadsByYear = Array.from(
-    new Set(
-      books
-        .filter((b) => b.status !== "dnf")
-        .flatMap((b) => b.reads.map((r) => new Date(r.finishedAt).getFullYear())),
-    ),
-  ).sort((a, b) => b - a);
 
   const allBooks = [...books].sort((a, b) => {
     const la = lastReadDate(a);
@@ -116,8 +121,17 @@ function Library() {
     return b.addedAt.localeCompare(a.addedAt);
   });
 
+  const pastBooks = completedBooks(allBooks);
+  const pastReadsByYear = completionYears(pastBooks);
+
   const activeBooks =
-    tab === "reading" ? readingBooks : tab === "tbr" ? tbrBooks : tab === "dnf" ? dnfBooks : allBooks;
+    tab === "reading"
+      ? readingBooks
+      : tab === "tbr"
+        ? tbrBooks
+        : tab === "dnf"
+          ? dnfBooks
+          : pastBooks;
 
   function formatDate(value?: string) {
     if (!value) return "—";
@@ -125,24 +139,37 @@ function Library() {
   }
 
   function bookBubbles(b: Book) {
-    const rating = Number((b.metadata as any)?.rating ?? 0);
-    const tags = Array.isArray((b.metadata as any)?.tags) ? ((b.metadata as any).tags as string[]) : [];
+    const rating = typeof b.metadata?.rating === "number" ? b.metadata.rating : 0;
+    const tags = Array.isArray(b.metadata?.tags)
+      ? b.metadata.tags.filter((tag): tag is string => typeof tag === "string")
+      : [];
     const finishAt = b.reads.length > 0 ? b.reads[b.reads.length - 1]?.finishedAt : undefined;
 
     return (
       <div className="mt-2 flex flex-wrap gap-1.5">
-        <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-muted text-muted-foreground">Started {formatDate(b.addedAt)}</span>
+        <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-muted text-muted-foreground">
+          Added {formatDate(b.addedAt)}
+        </span>
         {b.status === "reading" ? (
-          <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-primary/10 text-primary">p. {b.currentPage || 0}</span>
+          <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-primary/10 text-primary">
+            p. {b.currentPage || 0}
+          </span>
         ) : (
-          <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-primary/10 text-primary">Finished {formatDate(finishAt)}</span>
+          <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-primary/10 text-primary">
+            Finished {formatDate(finishAt)}
+          </span>
         )}
         <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-gold/15 text-gold-foreground inline-flex items-center gap-1">
-          <Star className="h-3 w-3" /> {rating || 0}/5
+          <Star className="h-3 w-3" /> {rating > 0 ? `${rating}/5` : "Not rated"}
         </span>
-        <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-muted text-muted-foreground">{totalReads(b)} reads</span>
+        <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-muted text-muted-foreground">
+          {totalReads(b)} reads
+        </span>
         {tags.slice(0, 3).map((tag) => (
-          <span key={tag} className="text-[10px] px-1.5 py-0.5 rounded-full bg-card border border-border">
+          <span
+            key={tag}
+            className="text-[10px] px-1.5 py-0.5 rounded-full bg-card border border-border"
+          >
             #{tag}
           </span>
         ))}
@@ -164,7 +191,13 @@ function Library() {
                 tab === t ? "bg-card text-foreground shadow-sm" : "text-muted-foreground"
               }`}
             >
-              {t === "reading" ? "Current Reads" : t === "finished" ? "Past Reads" : t === "tbr" ? "TBR" : "DNF"}
+              {t === "reading"
+                ? "Current Reads"
+                : t === "finished"
+                  ? "Past Reads"
+                  : t === "tbr"
+                    ? "TBR"
+                    : "DNF"}
             </button>
           ))}
         </div>
@@ -264,7 +297,7 @@ function Library() {
             <div key={y}>
               <h3 className="font-display text-lg mb-2">{y}</h3>
               <ul className="space-y-2">
-                {allBooks
+                {pastBooks
                   .filter((b) => readsInYear(b, y) > 0)
                   .map((b) => (
                     <li key={b.id}>
@@ -304,17 +337,22 @@ function Library() {
               reads: r.finishedAt ? [{ finishedAt: r.finishedAt }] : [],
               addedAt: r.addedAt,
               extraReads: r.extraReads,
-              metadata: {
-                source: r.source,
-                sourceKey: r.key,
-                sourceUrl: r.sourceUrl,
-                languageCodes: r.languageCodes,
-                firstPublishYear: r.firstPublishYear,
-                publishYear: r.publishYear,
-                editionCount: r.editionCount,
-                isbn: r.isbn,
-                publisher: r.publisher,
-              },
+              metadata: Object.fromEntries(
+                Object.entries({
+                  source: r.source,
+                  sourceKey: r.key,
+                  sourceUrl: r.sourceUrl,
+                  languageCodes: r.languageCodes,
+                  firstPublishYear: r.firstPublishYear,
+                  publishYear: r.publishYear,
+                  editionCount: r.editionCount,
+                  isbn: r.isbn,
+                  publisher: r.publisher,
+                }).filter(
+                  (entry): entry is [string, Exclude<(typeof entry)[1], undefined>] =>
+                    entry[1] !== undefined,
+                ),
+              ),
             });
             setSearching(false);
           }}

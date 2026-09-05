@@ -123,7 +123,7 @@ function RootShell({ children }: { children: React.ReactNode }) {
 }
 
 function AppShell() {
-  const { settings, preferences } = useStore();
+  const { settings, preferences, dataError, dataLoading, reload } = useStore();
   const { user, loading } = useAuth();
   const { pathname } = useLocation();
   const navigate = useNavigate();
@@ -237,6 +237,18 @@ function AppShell() {
       {!hideNav && <DesktopSidebar />}
       <div className="min-w-0 pb-24 md:pb-0">
         <div className="mx-auto w-full max-w-[1440px]">
+          {dataError && (
+            <div role="alert" className="m-4 rounded-md border border-destructive p-3 text-sm">
+              <p>{dataError}</p>
+              <button
+                disabled={dataLoading}
+                onClick={() => void reload().catch(() => {})}
+                className="mt-2 underline"
+              >
+                {dataLoading ? "Retrying…" : "Retry loading data"}
+              </button>
+            </div>
+          )}
           <Outlet />
         </div>
       </div>
