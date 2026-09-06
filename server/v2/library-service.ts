@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import { and, eq, sql } from "drizzle-orm";
+import { and, eq, sql, ilike, or } from "drizzle-orm";
 import { z } from "zod";
 import type { db } from "../db.ts";
 import {
@@ -101,7 +101,7 @@ function fingerprint(operation: string, data: object) {
   return createHash("sha256").update(JSON.stringify({ operation, data })).digest("hex");
 }
 
-/** Dormant v2 service: no production routes call it. All private access takes a server-derived actor. */
+/** All private access takes a server-derived actor. */
 export function createLibraryService(database: Database, provider: CatalogProvider) {
   async function mutate(
     actor: Actor,
@@ -241,6 +241,44 @@ export function createLibraryService(database: Database, provider: CatalogProvid
         .innerJoin(works, eq(works.id, userBooks.workId))
         .where(eq(userBooks.userId, actor.userId))
         .orderBy(userBooks.addedAt, userBooks.id);
+    },
+
+    async libraryPage(actor: Actor, input: { offset?: number; query?: string; status?: string }) {
+      z.number().int().positive().parse(actor.userId);
+      const data = z
+        .object({
+          offset: z.number().int().min(0).max(100000).default(0),
+          query: z.string().trim().max(200).default(""),
+          status: z
+            .enum(["all", "want_to_read", "reading", "paused", "read", "dnf"])
+            .default("all"),
+        })
+        .parse(input);
+      const term = `%${data.query.replace(/[\\%_]/g, "\\$&")}%`;
+      const rows = await database
+        .select({
+          id: userBooks.id,
+          version: userBooks.version,
+          status: userBooks.status,
+          title: works.title,
+          authors: works.authors,
+          coverUrl: works.coverUrl,
+        })
+        .from(userBooks)
+        .innerJoin(works, eq(works.id, userBooks.workId))
+        .where(
+          and(
+            eq(userBooks.userId, actor.userId),
+            data.status === "all" ? undefined : eq(userBooks.status, data.status),
+            data.query
+              ? or(ilike(works.title, term), ilike(sql`${works.authors}::text`, term))
+              : undefined,
+          ),
+        )
+        .orderBy(userBooks.addedAt, userBooks.id)
+        .limit(25)
+        .offset(data.offset);
+      return { items: rows.slice(0, 24), nextOffset: rows.length > 24 ? data.offset + 24 : null };
     },
 
     async startReading(actor: Actor, input: z.input<typeof startSchema>) {
@@ -426,7 +464,7 @@ export function createLibraryService(database: Database, provider: CatalogProvid
     async readingHistory(actor: Actor, userBookId: string) {
       id.parse(userBookId);
       return database.transaction(async (tx) => {
-        await ownedBook(tx, actor, userBookId);
+        const book = await ownedBook(tx, actor, userBookId);
         const sessions = await tx
           .select()
           .from(readingSessions)
@@ -438,7 +476,11 @@ export function createLibraryService(database: Database, provider: CatalogProvid
           .innerJoin(readingSessions, eq(readingSessions.id, progressEntries.readingSessionId))
           .where(eq(readingSessions.userBookId, userBookId))
           .orderBy(progressEntries.createdAt, progressEntries.id);
-        return { sessions, entries: entries.map(({ entry }) => entry) };
+        return {
+          userBookVersion: book.version,
+          sessions,
+          entries: entries.map(({ entry }) => entry),
+        };
       });
     },
   };

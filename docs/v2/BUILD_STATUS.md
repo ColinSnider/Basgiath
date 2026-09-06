@@ -29,8 +29,8 @@ The initial v2 migration's two referenced composite indexes were deliberately mo
 
 ## Deliberate limits of this slice
 
-- No current routes call these services yet. The visible application remains v1.1; Rowan UI wiring is the next slice.
-- Current methods use full-library reads. Pagination and stable HTTP DTO serialization precede connection to large live accounts.
+- `/rowan` now calls these services through authenticated, development-only server functions. The legacy application remains separate.
+- The UI uses owner-scoped pages of 24 books, title/author search, status filters, list/grid views, and explicit history DTOs. The original full-library method remains for internal callers.
 - Provider saves accept canonical work references only. Explicit edition picking, manual entry, ISBN routing, and multi-provider merging come next. Unknown formats stay unknown.
 - Author names are temporarily stored on works; normalized author/series tables are still pending.
 - Current progress uses integer pages/seconds/percent. Backward/backdated corrections are rejected until a correction editor and recalculation policy exist.
@@ -41,4 +41,14 @@ The initial v2 migration's two referenced composite indexes were deliberately mo
 
 ## Next implementation slice
 
-Build the Rowan Library and Current Reading screens against these services in a dedicated local development environment, then add shelf/rating/margin operations with the same owner checks and transaction rules. Keep local storage and legacy Basgiath identifiers stable.
+Add shelf/rating/margin operations with the same owner checks and transaction rules. Keep local storage and legacy Basgiath identifiers stable.
+
+## Phase 2: development UI
+
+`/rowan` supports catalog search/save, filtered library pages, list/grid views, start/pause/resume/progress/finish/DNF/reread, and reading history. Failed transport requests retain the original mutation key and payload for retry. Domain conflicts refresh server state. Rowan bypasses the legacy store provider.
+
+To run locally, configure `DATABASE_URL` for your disposable legacy development database and `ROWAN_DATABASE_URL` for a separate development database containing the matching legacy user IDs/usernames. Existing login sessions are validated in `DATABASE_URL`; all v2 library operations use `ROWAN_DATABASE_URL`. Do not point either connection at production. Apply the existing legacy schema and `migrations-v2/0000_catalog_reading_foundation.sql` to the isolated database before enabling the screen; this code never runs migrations automatically.
+
+Set `ROWAN_V2_ENABLED=true` and `OPEN_LIBRARY_USER_AGENT` to a real application/contact identity, run `npm run dev`, sign in, then open `/rowan`. The gate rejects production mode, missing configuration, and matching host/port/database identities (including different credentials). Different DNS aliases cannot be detected; provision distinct databases deliberately. No production rollout or backfill is included.
+
+The history view currently uses device-local dates and shows recorded observations, not a calendar or inferred daily totals. Audio input is explicitly labeled in seconds. Edition selection, shelves, half-star ratings, and the full Home redesign remain later slices.

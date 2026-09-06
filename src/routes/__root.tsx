@@ -258,6 +258,9 @@ function AppShell() {
 }
 
 function InnerApp() {
+  const { pathname } = useLocation();
+  // Rowan owns its state; entering the development workspace must not load the legacy store.
+  if (pathname === "/rowan") return <Outlet />;
   return (
     <StoreProvider>
       <AppShell />
