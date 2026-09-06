@@ -1,0 +1,445 @@
+import { createHash } from "node:crypto";
+import { and, eq, sql } from "drizzle-orm";
+import { z } from "zod";
+import type { db } from "../db.ts";
+import {
+  works,
+  editions,
+  externalMappings,
+  userBooks,
+  readingSessions,
+  progressEntries,
+  mutationReceipts,
+} from "../../shared/schema-v2.ts";
+
+export type Actor = { userId: number };
+type ErrorCode =
+  | "NOT_FOUND"
+  | "VERSION_CONFLICT"
+  | "INVALID_TRANSITION"
+  | "IDEMPOTENCY_CONFLICT"
+  | "PROVIDER_UNAVAILABLE";
+export class DomainError extends Error {
+  readonly code: ErrorCode;
+  constructor(code: ErrorCode, message: string) {
+    super(message);
+    this.code = code;
+    this.name = "DomainError";
+  }
+}
+const id = z.string().uuid();
+const instant = z.string().datetime({ offset: true });
+const version = z.number().int().nonnegative();
+const providerRefSchema = z
+  .object({ provider: z.string().min(1), externalId: z.string().min(1) })
+  .strict();
+const catalogRecordSchema = z
+  .object({
+    title: z.string().trim().min(1),
+    authors: z.array(z.string().min(1)),
+    coverUrl: z.string().url().nullable(),
+    edition: z
+      .object({
+        externalId: z.string().min(1),
+        format: z.enum(["book", "audiobook", "ebook", "unknown"]),
+        pageCount: z.number().int().positive().nullable(),
+        durationSeconds: z.number().int().positive().nullable(),
+        language: z.string().nullable(),
+      })
+      .strict()
+      .nullable(),
+  })
+  .strict();
+
+export interface CatalogProvider {
+  // The implementation fetches this work from the provider. Never trust client metadata here.
+  fetchWork(ref: z.infer<typeof providerRefSchema>): Promise<z.infer<typeof catalogRecordSchema>>;
+}
+const saveSchema = z.object({ key: id, ref: providerRefSchema }).strict();
+const startSchema = z
+  .object({
+    key: id,
+    userBookId: id,
+    expectedVersion: version,
+    startedAt: instant.nullable(),
+    unit: z.enum(["page", "second", "percent"]),
+    position: z.number().int().nonnegative().default(0),
+  })
+  .strict();
+const progressSchema = z
+  .object({
+    key: id,
+    sessionId: id,
+    expectedVersion: version,
+    position: z.number().int().nonnegative(),
+    occurredAt: instant,
+  })
+  .strict();
+const transitionSchema = z
+  .object({
+    key: id,
+    sessionId: id,
+    expectedVersion: version,
+    action: z.enum(["pause", "resume", "finish", "dnf"]),
+    occurredAt: instant.nullable(),
+  })
+  .strict();
+type MutationResult = {
+  workId: string;
+  userBookId: string;
+  sessionId: string | null;
+  version: number;
+};
+type Database = typeof db;
+type Transaction = Parameters<Parameters<Database["transaction"]>[0]>[0];
+
+function expectVersion(actual: number, expected: number) {
+  if (actual !== expected)
+    throw new DomainError("VERSION_CONFLICT", "The record changed. Refresh before saving again.");
+}
+function fingerprint(operation: string, data: object) {
+  return createHash("sha256").update(JSON.stringify({ operation, data })).digest("hex");
+}
+
+/** Dormant v2 service: no production routes call it. All private access takes a server-derived actor. */
+export function createLibraryService(database: Database, provider: CatalogProvider) {
+  async function mutate(
+    actor: Actor,
+    key: string,
+    hash: string,
+    action: (tx: Transaction) => Promise<MutationResult>,
+  ): Promise<MutationResult> {
+    z.number().int().positive().parse(actor.userId);
+    return database.transaction(async (tx) => {
+      // Serialize per actor so receipt checks, versions, and reading lifecycle stay atomic.
+      await tx.execute(sql`select pg_advisory_xact_lock(21071, ${actor.userId})`);
+      const [receipt] = await tx
+        .select()
+        .from(mutationReceipts)
+        .where(and(eq(mutationReceipts.userId, actor.userId), eq(mutationReceipts.key, key)));
+      if (receipt) {
+        if (receipt.fingerprint !== hash)
+          throw new DomainError(
+            "IDEMPOTENCY_CONFLICT",
+            "This request key was already used for different data.",
+          );
+        return z
+          .object({ workId: id, userBookId: id, sessionId: id.nullable(), version })
+          .parse(receipt.result);
+      }
+      const result = await action(tx);
+      await tx
+        .insert(mutationReceipts)
+        .values({ userId: actor.userId, key, fingerprint: hash, result });
+      return result;
+    });
+  }
+
+  async function ownedBook(tx: Transaction, actor: Actor, bookId: string) {
+    const [book] = await tx
+      .select()
+      .from(userBooks)
+      .where(and(eq(userBooks.id, bookId), eq(userBooks.userId, actor.userId)))
+      .for("update");
+    if (!book) throw new DomainError("NOT_FOUND", "Book not found.");
+    return book;
+  }
+  async function ownedSession(tx: Transaction, actor: Actor, sessionId: string) {
+    const [result] = await tx
+      .select({ session: readingSessions, book: userBooks })
+      .from(readingSessions)
+      .innerJoin(userBooks, eq(userBooks.id, readingSessions.userBookId))
+      .where(and(eq(readingSessions.id, sessionId), eq(userBooks.userId, actor.userId)))
+      .for("update");
+    if (!result) throw new DomainError("NOT_FOUND", "Reading attempt not found.");
+    return result;
+  }
+
+  return {
+    async saveWork(actor: Actor, input: z.input<typeof saveSchema>) {
+      const data = saveSchema.parse(input);
+      // Known catalog entries remain usable while the provider is unavailable.
+      const match = and(
+        eq(externalMappings.provider, data.ref.provider),
+        eq(externalMappings.entityKind, "work"),
+        eq(externalMappings.externalId, data.ref.externalId),
+      );
+      const [known] = await database.select().from(externalMappings).where(match);
+      let fetched: z.infer<typeof catalogRecordSchema> | null = null;
+      if (!known) {
+        try {
+          fetched = catalogRecordSchema.parse(await provider.fetchWork(data.ref));
+        } catch {
+          throw new DomainError("PROVIDER_UNAVAILABLE", "Catalog lookup failed. Try again.");
+        }
+      }
+      return mutate(actor, data.key, fingerprint("save", data), async (tx) => {
+        // Different users saving the same provider work converge on one canonical ID.
+        await tx.execute(
+          sql`select pg_advisory_xact_lock(hashtextextended(${JSON.stringify(data.ref)}, 0))`,
+        );
+        const [mapping] = await tx.select().from(externalMappings).where(match);
+        let workId = mapping?.workId;
+        let editionId: string | null = null;
+        if (!workId) {
+          if (!fetched)
+            throw new DomainError(
+              "PROVIDER_UNAVAILABLE",
+              "Catalog identity changed. Retry lookup.",
+            );
+          const [work] = await tx
+            .insert(works)
+            .values({ title: fetched.title, authors: fetched.authors, coverUrl: fetched.coverUrl })
+            .returning();
+          workId = work.id;
+          await tx.insert(externalMappings).values({ ...data.ref, entityKind: "work", workId });
+          if (fetched.edition) {
+            const { externalId, ...details } = fetched.edition;
+            const [edition] = await tx
+              .insert(editions)
+              .values({ ...details, workId })
+              .returning();
+            editionId = edition.id;
+            await tx.insert(externalMappings).values({
+              provider: data.ref.provider,
+              entityKind: "edition",
+              externalId,
+              workId,
+              editionId,
+            });
+          }
+        } else {
+          const [edition] = await tx
+            .select()
+            .from(editions)
+            .where(eq(editions.workId, workId))
+            .orderBy(editions.id)
+            .limit(1);
+          editionId = edition?.id ?? null;
+        }
+        const [existing] = await tx
+          .select()
+          .from(userBooks)
+          .where(and(eq(userBooks.userId, actor.userId), eq(userBooks.workId, workId)));
+        const book =
+          existing ??
+          (
+            await tx
+              .insert(userBooks)
+              .values({ userId: actor.userId, workId, selectedEditionId: editionId })
+              .returning()
+          )[0];
+        return { workId, userBookId: book.id, sessionId: null, version: book.version };
+      });
+    },
+
+    async listLibrary(actor: Actor) {
+      z.number().int().positive().parse(actor.userId);
+      return database
+        .select({ userBook: userBooks, work: works })
+        .from(userBooks)
+        .innerJoin(works, eq(works.id, userBooks.workId))
+        .where(eq(userBooks.userId, actor.userId))
+        .orderBy(userBooks.addedAt, userBooks.id);
+    },
+
+    async startReading(actor: Actor, input: z.input<typeof startSchema>) {
+      const data = startSchema.parse(input);
+      return mutate(actor, data.key, fingerprint("start", data), async (tx) => {
+        const book = await ownedBook(tx, actor, data.userBookId);
+        expectVersion(book.version, data.expectedVersion);
+        const [open] = await tx
+          .select()
+          .from(readingSessions)
+          .where(
+            and(
+              eq(readingSessions.userBookId, book.id),
+              sql`${readingSessions.state} in ('active', 'paused')`,
+            ),
+          );
+        if (open)
+          throw new DomainError(
+            "INVALID_TRANSITION",
+            "This book already has an open reading attempt.",
+          );
+        const [edition] = book.selectedEditionId
+          ? await tx.select().from(editions).where(eq(editions.id, book.selectedEditionId))
+          : [];
+        if (
+          edition &&
+          ((data.unit === "second" && !["audiobook", "unknown"].includes(edition.format)) ||
+            (data.unit === "page" && edition.format === "audiobook"))
+        ) {
+          throw new DomainError(
+            "INVALID_TRANSITION",
+            "Progress unit does not match the selected edition.",
+          );
+        }
+        const total =
+          data.unit === "percent"
+            ? 100
+            : data.unit === "page"
+              ? (edition?.pageCount ?? null)
+              : (edition?.durationSeconds ?? null);
+        if (total !== null && data.position > total)
+          throw new DomainError("INVALID_TRANSITION", "Progress exceeds the edition length.");
+        const [session] = await tx
+          .insert(readingSessions)
+          .values({
+            userBookId: book.id,
+            workId: book.workId,
+            editionId: book.selectedEditionId,
+            startedAt: data.startedAt ? new Date(data.startedAt) : null,
+            unit: data.unit,
+            total,
+            position: data.position,
+          })
+          .returning();
+        await tx.insert(progressEntries).values({
+          readingSessionId: session.id,
+          kind: "baseline",
+          position: data.position,
+          occurredAt: data.startedAt ? new Date(data.startedAt) : null,
+        });
+        await tx
+          .update(userBooks)
+          .set({ status: "reading", version: book.version + 1 })
+          .where(eq(userBooks.id, book.id));
+        return {
+          workId: book.workId,
+          userBookId: book.id,
+          sessionId: session.id,
+          version: session.version,
+        };
+      });
+    },
+
+    async recordProgress(actor: Actor, input: z.input<typeof progressSchema>) {
+      const data = progressSchema.parse(input);
+      return mutate(actor, data.key, fingerprint("progress", data), async (tx) => {
+        const { session, book } = await ownedSession(tx, actor, data.sessionId);
+        expectVersion(session.version, data.expectedVersion);
+        if (session.state !== "active")
+          throw new DomainError("INVALID_TRANSITION", "Resume reading before logging progress.");
+        const [latest] = await tx
+          .select()
+          .from(progressEntries)
+          .where(eq(progressEntries.readingSessionId, session.id))
+          .orderBy(sql`${progressEntries.occurredAt} desc nulls last`)
+          .limit(1);
+        if (latest?.occurredAt && new Date(data.occurredAt) < latest.occurredAt)
+          throw new DomainError(
+            "INVALID_TRANSITION",
+            "Backdated corrections require the later history editor.",
+          );
+        if (
+          data.position < session.position ||
+          (session.total !== null && data.position > session.total)
+        )
+          throw new DomainError(
+            "INVALID_TRANSITION",
+            "Use a correction for backward progress; progress cannot exceed the edition length.",
+          );
+        await tx.insert(progressEntries).values({
+          readingSessionId: session.id,
+          kind: "observation",
+          position: data.position,
+          occurredAt: new Date(data.occurredAt),
+        });
+        await tx
+          .update(readingSessions)
+          .set({ position: data.position, version: session.version + 1 })
+          .where(eq(readingSessions.id, session.id));
+        return {
+          workId: book.workId,
+          userBookId: book.id,
+          sessionId: session.id,
+          version: session.version + 1,
+        };
+      });
+    },
+
+    async transitionReading(actor: Actor, input: z.input<typeof transitionSchema>) {
+      const data = transitionSchema.parse(input);
+      return mutate(actor, data.key, fingerprint("transition", data), async (tx) => {
+        const { session, book } = await ownedSession(tx, actor, data.sessionId);
+        expectVersion(session.version, data.expectedVersion);
+        const allowed =
+          data.action === "resume"
+            ? session.state === "paused"
+            : data.action === "pause"
+              ? session.state === "active"
+              : ["active", "paused"].includes(session.state);
+        if (!allowed)
+          throw new DomainError("INVALID_TRANSITION", "That reading transition is not available.");
+        const terminal = data.action === "finish" || data.action === "dnf";
+        const finishedAt = terminal && data.occurredAt ? new Date(data.occurredAt) : null;
+        const [latest] = await tx
+          .select()
+          .from(progressEntries)
+          .where(eq(progressEntries.readingSessionId, session.id))
+          .orderBy(sql`${progressEntries.occurredAt} desc nulls last`)
+          .limit(1);
+        if (
+          finishedAt &&
+          ((session.startedAt && finishedAt < session.startedAt) ||
+            (latest?.occurredAt && finishedAt < latest.occurredAt))
+        )
+          throw new DomainError(
+            "INVALID_TRANSITION",
+            "Finish cannot precede recorded reading activity.",
+          );
+        const state =
+          data.action === "finish"
+            ? "completed"
+            : data.action === "resume"
+              ? "active"
+              : data.action === "pause"
+                ? "paused"
+                : "dnf";
+        const status =
+          data.action === "finish"
+            ? "read"
+            : data.action === "resume"
+              ? "reading"
+              : data.action === "pause"
+                ? "paused"
+                : "dnf";
+        await tx
+          .update(readingSessions)
+          .set({ state, finishedAt, version: session.version + 1 })
+          .where(eq(readingSessions.id, session.id));
+        await tx
+          .update(userBooks)
+          .set({ status, version: book.version + 1 })
+          .where(eq(userBooks.id, book.id));
+        // Finishing does not fabricate an observed last-day page/audio delta.
+        return {
+          workId: book.workId,
+          userBookId: book.id,
+          sessionId: session.id,
+          version: session.version + 1,
+        };
+      });
+    },
+
+    async readingHistory(actor: Actor, userBookId: string) {
+      id.parse(userBookId);
+      return database.transaction(async (tx) => {
+        await ownedBook(tx, actor, userBookId);
+        const sessions = await tx
+          .select()
+          .from(readingSessions)
+          .where(eq(readingSessions.userBookId, userBookId))
+          .orderBy(readingSessions.id);
+        const entries = await tx
+          .select({ entry: progressEntries })
+          .from(progressEntries)
+          .innerJoin(readingSessions, eq(readingSessions.id, progressEntries.readingSessionId))
+          .where(eq(readingSessions.userBookId, userBookId))
+          .orderBy(progressEntries.createdAt, progressEntries.id);
+        return { sessions, entries: entries.map(({ entry }) => entry) };
+      });
+    },
+  };
+}

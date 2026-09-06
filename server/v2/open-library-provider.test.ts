@@ -1,0 +1,77 @@
+import assert from "node:assert/strict";
+import test from "node:test";
+import { createOpenLibraryProvider } from "./open-library-provider.ts";
+
+test("search collapses work keys, rejects malformed IDs and deduplicates concurrent requests", async () => {
+  let count = 0;
+  const provider = createOpenLibraryProvider({
+    userAgent: "Rowan test fixture",
+    intervalMs: 0,
+    fetchImpl: async (url, options) => {
+      count++;
+      assert.ok(String(url).startsWith("https://openlibrary.org/search.json?"));
+      assert.equal(options?.redirect, "error");
+      return Response.json({
+        docs: [
+          { key: "/works/OL1W", title: "Book", author_name: ["Author"] },
+          { key: "/works/OL1W", title: "Another edition" },
+          { key: "made-up", title: "Bad key" },
+          { key: "/works/OL2W", title: "Different work", cover_i: 42 },
+        ],
+      });
+    },
+  });
+  const [a, b] = await Promise.all([provider.search("Book"), provider.search("Book")]);
+  assert.equal(count, 1);
+  assert.equal(a.length, 2);
+  assert.deepEqual(a, b);
+  await provider.search("Book");
+  assert.equal(count, 1);
+});
+
+test("work lookup keeps actual edition length and never treats work median pages as edition data", async () => {
+  const provider = createOpenLibraryProvider({
+    userAgent: "Rowan test fixture",
+    intervalMs: 0,
+    fetchImpl: async (url) =>
+      Response.json(
+        String(url).includes("editions.json")
+          ? {
+              entries: [
+                {
+                  key: "/books/OL2M",
+                  number_of_pages: 321,
+                  languages: [{ key: "/languages/eng" }],
+                },
+              ],
+            }
+          : { docs: [{ key: "/works/OL1W", title: "Book", number_of_pages_median: 900 }] },
+      ),
+  });
+  const work = await provider.fetchWork({ provider: "openlibrary", externalId: "/works/OL1W" });
+  assert.equal(work.edition?.pageCount, 321);
+  assert.equal(work.edition?.format, "unknown");
+  assert.equal(work.edition?.externalId, "/books/OL2M");
+});
+
+test("edition failure preserves work, invalid URLs/IDs never reach the network", async () => {
+  let count = 0;
+  const provider = createOpenLibraryProvider({
+    userAgent: "Rowan test fixture",
+    intervalMs: 0,
+    fetchImpl: async (url) => {
+      count++;
+      return String(url).includes("editions.json")
+        ? new Response("", { status: 503 })
+        : Response.json({ docs: [{ key: "/works/OL1W", title: "Book" }] });
+    },
+  });
+  const work = await provider.fetchWork({ provider: "openlibrary", externalId: "/works/OL1W" });
+  assert.equal(work.edition, null);
+  assert.equal(work.title, "Book");
+  await assert.rejects(
+    provider.fetchWork({ provider: "openlibrary", externalId: "https://internal.invalid/secrets" }),
+  );
+  await assert.rejects(provider.fetchWork({ provider: "other", externalId: "/works/OL1W" }));
+  assert.equal(count, 2);
+});

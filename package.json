@@ -13,7 +13,8 @@
     "format": "prettier --write .",
     "db:push": "drizzle-kit push",
     "db:migrate": "drizzle-kit migrate",
-    "test": "node --experimental-strip-types --test src/lib/*.test.js src/lib/*.test.ts server/*.test.ts",
+    "test": "node --experimental-strip-types --test src/lib/*.test.js src/lib/*.test.ts server/*.test.ts server/catalog/*.test.ts server/v2/*.test.ts",
+    "test:v2": "node --experimental-strip-types --test server/catalog/*.test.ts server/v2/*.test.ts",
     "typecheck": "tsc --noEmit"
   },
   "engines": {
