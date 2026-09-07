@@ -34,6 +34,7 @@ export function createOpenLibraryProvider(options: {
   const ttl = options.ttlMs ?? 15 * 60 * 1000;
   const cache = new Map<string, { expires: number; value: unknown }>();
   const pending = new Map<string, Promise<unknown>>();
+  const selectedWorks = new Map<string, { expires: number; value: WorkSearchResult }>();
   let queue: Promise<unknown> = Promise.resolve();
   let nextRequestAt = 0;
 
@@ -50,7 +51,7 @@ export function createOpenLibraryProvider(options: {
         nextRequestAt = Date.now() + intervalMs;
         const response = await fetchImpl(`https://openlibrary.org${path}`, {
           headers: { "User-Agent": options.userAgent, Accept: "application/json" },
-          signal: AbortSignal.timeout(5000),
+          signal: AbortSignal.timeout(20_000),
           redirect: "error",
         });
         if (!response.ok) {
@@ -93,7 +94,11 @@ export function createOpenLibraryProvider(options: {
       const found = new Map<string, WorkSearchResult>();
       for (const raw of response.docs.slice(0, 20)) {
         const result = mapDoc(raw);
-        if (result && !found.has(result.ref.externalId)) found.set(result.ref.externalId, result);
+        if (result && !found.has(result.ref.externalId)) {
+          found.set(result.ref.externalId, result);
+          if (selectedWorks.size >= 100) selectedWorks.delete(selectedWorks.keys().next().value!);
+          selectedWorks.set(result.ref.externalId, { expires: Date.now() + ttl, value: result });
+        }
       }
       return [...found.values()];
     },
@@ -101,8 +106,14 @@ export function createOpenLibraryProvider(options: {
       if (ref.provider !== "openlibrary") throw new Error("Unsupported catalog provider.");
       const key = workKey.parse(ref.externalId);
       const params = new URLSearchParams({ q: `key:${key}`, fields, limit: "1" });
-      const response = searchSchema.parse(await get(`/search.json?${params}`));
-      const result = response.docs.map(mapDoc).find((doc) => doc?.ref.externalId === key);
+      const cached = selectedWorks.get(key);
+      const result =
+        cached && cached.expires > Date.now()
+          ? cached.value
+          : searchSchema
+              .parse(await get(`/search.json?${params}`))
+              .docs.map(mapDoc)
+              .find((doc) => doc?.ref.externalId === key);
       if (!result) throw new Error("Work not found in Open Library.");
       let edition: Awaited<ReturnType<CatalogProvider["fetchWork"]>>["edition"] = null;
       try {

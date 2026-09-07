@@ -1,7 +1,8 @@
 import { createHash } from "node:crypto";
-import { and, eq, sql, ilike, or } from "drizzle-orm";
+import { and, eq, sql, ilike, or, desc } from "drizzle-orm";
 import { z } from "zod";
 import type { db } from "../db.ts";
+import { goals, userSettings } from "../../shared/schema.ts";
 import {
   works,
   editions,
@@ -160,6 +161,162 @@ export function createLibraryService(database: Database, provider: CatalogProvid
   }
 
   return {
+    async archive(actor: Actor) {
+      z.number().int().positive().parse(actor.userId);
+      return database.transaction(
+        async (tx) => {
+          const owned = sql`select ${userBooks.id} from ${userBooks} where ${userBooks.userId} = ${actor.userId}`;
+          const ownedWorks = sql`select ${userBooks.workId} from ${userBooks} where ${userBooks.userId} = ${actor.userId}`;
+          const attempts = sql`select ${readingSessions.id} from ${readingSessions} where ${readingSessions.userBookId} in (${owned})`;
+          return JSON.stringify(
+            {
+              format: "rowan-archive",
+              version: 2,
+              exportedAt: new Date().toISOString(),
+              userBooks: await tx
+                .select()
+                .from(userBooks)
+                .where(eq(userBooks.userId, actor.userId)),
+              works: await tx
+                .select()
+                .from(works)
+                .where(sql`${works.id} in (${ownedWorks})`),
+              editions: await tx
+                .select()
+                .from(editions)
+                .where(sql`${editions.workId} in (${ownedWorks})`),
+              externalMappings: await tx
+                .select()
+                .from(externalMappings)
+                .where(sql`${externalMappings.workId} in (${ownedWorks})`),
+              readingSessions: await tx
+                .select()
+                .from(readingSessions)
+                .where(sql`${readingSessions.userBookId} in (${owned})`),
+              progressEntries: await tx
+                .select()
+                .from(progressEntries)
+                .where(sql`${progressEntries.readingSessionId} in (${attempts})`),
+              ratings: await tx
+                .select()
+                .from(ratings)
+                .where(sql`${ratings.userBookId} in (${owned})`),
+              margins: await tx
+                .select()
+                .from(margins)
+                .where(sql`${margins.userBookId} in (${owned})`),
+              shelves: await tx.select().from(shelves).where(eq(shelves.userId, actor.userId)),
+              shelfItems: await tx
+                .select()
+                .from(shelfItems)
+                .where(eq(shelfItems.userId, actor.userId)),
+              goals: await tx.select().from(goals).where(eq(goals.userId, actor.userId)),
+              settings: await tx
+                .select()
+                .from(userSettings)
+                .where(eq(userSettings.userId, actor.userId)),
+            },
+            null,
+            2,
+          );
+        },
+        { isolationLevel: "repeatable read", accessMode: "read only" },
+      );
+    },
+
+    async marginJournal(actor: Actor, input: { query: string; offset: number }) {
+      z.number().int().positive().parse(actor.userId);
+      const data = z
+        .object({ query: z.string().trim().max(200), offset: z.number().int().min(0).max(100000) })
+        .strict()
+        .parse(input);
+      const term = `%${data.query.replace(/[\\%_]/g, "\\$&")}%`;
+      const rows = await database
+        .select({
+          id: margins.id,
+          body: margins.body,
+          locator: margins.locator,
+          updatedAt: margins.updatedAt,
+          book: {
+            id: userBooks.id,
+            version: userBooks.version,
+            status: userBooks.status,
+            title: works.title,
+            authors: works.authors,
+            coverUrl: works.coverUrl,
+            isFavorite: userBooks.isFavorite,
+            halfStars: ratings.halfStars,
+          },
+        })
+        .from(margins)
+        .innerJoin(userBooks, eq(userBooks.id, margins.userBookId))
+        .innerJoin(works, eq(works.id, userBooks.workId))
+        .leftJoin(ratings, eq(ratings.userBookId, userBooks.id))
+        .where(
+          and(
+            eq(userBooks.userId, actor.userId),
+            sql`${margins.deletedAt} is null`,
+            data.query ? or(ilike(margins.body, term), ilike(works.title, term)) : undefined,
+          ),
+        )
+        .orderBy(desc(margins.updatedAt), margins.id)
+        .limit(25)
+        .offset(data.offset);
+      return {
+        items: rows.slice(0, 24).map((row) => ({ ...row, updatedAt: row.updatedAt.toISOString() })),
+        nextOffset: rows.length > 24 ? data.offset + 24 : null,
+      };
+    },
+    async setAnnualGoal(actor: Actor, input: { key: string; year: number; target: number }) {
+      const data = z
+        .object({
+          key: id,
+          year: z.number().int().min(1900).max(9998),
+          target: z.number().int().min(1).max(10000),
+        })
+        .strict()
+        .parse(input);
+      z.number().int().positive().parse(actor.userId);
+      return database.transaction(async (tx) => {
+        await tx.execute(sql`select pg_advisory_xact_lock(21071, ${actor.userId})`);
+        const hash = fingerprint("annualGoal", data);
+        const [receipt] = await tx
+          .select()
+          .from(mutationReceipts)
+          .where(
+            and(eq(mutationReceipts.userId, actor.userId), eq(mutationReceipts.key, data.key)),
+          );
+        if (receipt) {
+          if (receipt.fingerprint !== hash)
+            throw new DomainError(
+              "IDEMPOTENCY_CONFLICT",
+              "This request key was already used for different data.",
+            );
+          return;
+        }
+        const goalId = `rowan:${actor.userId}:${data.year}:books`;
+        await tx
+          .insert(goals)
+          .values({
+            id: goalId,
+            userId: actor.userId,
+            metric: "books",
+            timeframe: String(data.year),
+            target: data.target,
+          })
+          .onConflictDoUpdate({
+            target: goals.id,
+            set: { target: data.target },
+            setWhere: eq(goals.userId, actor.userId),
+          });
+        await tx.insert(mutationReceipts).values({
+          userId: actor.userId,
+          key: data.key,
+          fingerprint: hash,
+          result: { target: data.target, year: data.year },
+        });
+      });
+    },
     async saveWork(actor: Actor, input: z.input<typeof saveSchema>) {
       const data = saveSchema.parse(input);
       // Known catalog entries remain usable while the provider is unavailable.
@@ -235,6 +392,148 @@ export function createLibraryService(database: Database, provider: CatalogProvid
           )[0];
         return { workId, userBookId: book.id, sessionId: null, version: book.version };
       });
+    },
+
+    async setEdition(
+      actor: Actor,
+      input: {
+        key: string;
+        userBookId: string;
+        expectedVersion: number;
+        format: "book" | "ebook" | "audiobook";
+        total: number | null;
+      },
+    ) {
+      const data = z
+        .object({
+          key: id,
+          userBookId: id,
+          expectedVersion: version,
+          format: z.enum(["book", "ebook", "audiobook"]),
+          total: z.number().int().positive().max(10000000).nullable(),
+        })
+        .strict()
+        .parse(input);
+      return mutate(actor, data.key, fingerprint("edition", data), async (tx) => {
+        const book = await ownedBook(tx, actor, data.userBookId);
+        expectVersion(book.version, data.expectedVersion);
+        const [edition] = await tx
+          .insert(editions)
+          .values({
+            workId: book.workId,
+            format: data.format,
+            pageCount: data.format === "audiobook" ? null : data.total,
+            durationSeconds: data.format === "audiobook" ? data.total : null,
+          })
+          .returning();
+        await tx
+          .update(userBooks)
+          .set({ selectedEditionId: edition.id, version: book.version + 1 })
+          .where(eq(userBooks.id, book.id));
+        return {
+          workId: book.workId,
+          userBookId: book.id,
+          sessionId: null,
+          version: book.version + 1,
+        };
+      });
+    },
+
+    async saveManual(
+      actor: Actor,
+      input: {
+        key: string;
+        title: string;
+        author: string;
+        format: "book" | "ebook" | "audiobook";
+        total: number | null;
+      },
+    ) {
+      const data = z
+        .object({
+          key: id,
+          title: z.string().trim().min(1).max(500),
+          author: z.string().trim().max(300),
+          format: z.enum(["book", "ebook", "audiobook"]),
+          total: z.number().int().positive().max(10000000).nullable(),
+        })
+        .strict()
+        .parse(input);
+      return mutate(actor, data.key, fingerprint("manual", data), async (tx) => {
+        const [work] = await tx
+          .insert(works)
+          .values({ title: data.title, authors: data.author ? [data.author] : [] })
+          .returning();
+        const [edition] = await tx
+          .insert(editions)
+          .values({
+            workId: work.id,
+            format: data.format,
+            pageCount: data.format === "audiobook" ? null : data.total,
+            durationSeconds: data.format === "audiobook" ? data.total : null,
+          })
+          .returning();
+        const [book] = await tx
+          .insert(userBooks)
+          .values({ userId: actor.userId, workId: work.id, selectedEditionId: edition.id })
+          .returning();
+        return { workId: work.id, userBookId: book.id, sessionId: null, version: book.version };
+      });
+    },
+
+    async insights(actor: Actor, year: number) {
+      z.number().int().positive().parse(actor.userId);
+      z.number().int().min(1900).max(9998).parse(year);
+      const from = new Date(Date.UTC(year, 0, 1));
+      const to = new Date(Date.UTC(year + 1, 0, 1));
+      const books = await database
+        .select({
+          status: userBooks.status,
+          halfStars: ratings.halfStars,
+          favorite: userBooks.isFavorite,
+        })
+        .from(userBooks)
+        .leftJoin(ratings, eq(ratings.userBookId, userBooks.id))
+        .where(eq(userBooks.userId, actor.userId));
+      const finished = await database
+        .select({ workId: readingSessions.workId, finishedAt: readingSessions.finishedAt })
+        .from(readingSessions)
+        .innerJoin(userBooks, eq(userBooks.id, readingSessions.userBookId))
+        .where(
+          and(
+            eq(userBooks.userId, actor.userId),
+            eq(readingSessions.state, "completed"),
+            sql`${readingSessions.finishedAt} >= ${from} and ${readingSessions.finishedAt} < ${to}`,
+          ),
+        );
+      const months = Array.from({ length: 12 }, () => 0);
+      for (const read of finished) if (read.finishedAt) months[read.finishedAt.getUTCMonth()]++;
+      const rated = books.filter((book) => book.halfStars !== null);
+      const [goal] = await database
+        .select({ target: goals.target })
+        .from(goals)
+        .where(
+          and(eq(goals.userId, actor.userId), eq(goals.id, `rowan:${actor.userId}:${year}:books`)),
+        );
+      return {
+        year,
+        goal: goal?.target ?? null,
+        libraryCount: books.length,
+        finishedReads: finished.length,
+        uniqueWorks: new Set(finished.map((read) => read.workId)).size,
+        months,
+        favorites: books.filter((book) => book.favorite).length,
+        ratedBooks: rated.length,
+        averageRating: rated.length
+          ? rated.reduce((sum, book) => sum + book.halfStars!, 0) / rated.length / 2
+          : null,
+        statuses: Object.fromEntries(
+          ["want_to_read", "reading", "paused", "read", "dnf"].map((status) => [
+            status,
+            books.filter((book) => book.status === status).length,
+          ]),
+        ),
+      };
     },
 
     async listLibrary(actor: Actor) {
@@ -428,6 +727,7 @@ export function createLibraryService(database: Database, provider: CatalogProvid
         status?: string;
         favoritesOnly?: boolean;
         shelfId?: string;
+        sort?: "newest" | "oldest" | "title" | "rating";
       },
     ) {
       z.number().int().positive().parse(actor.userId);
@@ -437,6 +737,7 @@ export function createLibraryService(database: Database, provider: CatalogProvid
           query: z.string().trim().max(200).default(""),
           favoritesOnly: z.boolean().default(false),
           shelfId: id.optional(),
+          sort: z.enum(["newest", "oldest", "title", "rating"]).default("newest"),
           status: z
             .enum(["all", "want_to_read", "reading", "paused", "read", "dnf"])
             .default("all"),
@@ -470,7 +771,16 @@ export function createLibraryService(database: Database, provider: CatalogProvid
               : undefined,
           ),
         )
-        .orderBy(userBooks.addedAt, userBooks.id)
+        .orderBy(
+          data.sort === "title"
+            ? works.title
+            : data.sort === "rating"
+              ? sql`${ratings.halfStars} desc nulls last`
+              : data.sort === "oldest"
+                ? userBooks.addedAt
+                : desc(userBooks.addedAt),
+          userBooks.id,
+        )
         .limit(25)
         .offset(data.offset);
       return { items: rows.slice(0, 24), nextOffset: rows.length > 24 ? data.offset + 24 : null };
@@ -768,6 +1078,12 @@ export function createLibraryService(database: Database, provider: CatalogProvid
       id.parse(userBookId);
       return database.transaction(async (tx) => {
         const book = await ownedBook(tx, actor, userBookId);
+        const [edition] = book.selectedEditionId
+          ? await tx
+              .select()
+              .from(editions)
+              .where(and(eq(editions.id, book.selectedEditionId), eq(editions.workId, book.workId)))
+          : [];
         const [rating] = await tx.select().from(ratings).where(eq(ratings.userBookId, book.id));
         const sessions = await tx
           .select()
@@ -782,6 +1098,13 @@ export function createLibraryService(database: Database, provider: CatalogProvid
           .orderBy(progressEntries.createdAt, progressEntries.id);
         return {
           userBookVersion: book.version,
+          edition: edition
+            ? {
+                format: edition.format,
+                pageCount: edition.pageCount,
+                durationSeconds: edition.durationSeconds,
+              }
+            : null,
           margins: await tx
             .select({
               id: margins.id,

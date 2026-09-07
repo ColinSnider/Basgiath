@@ -2,6 +2,25 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { createOpenLibraryProvider } from "./open-library-provider.ts";
 
+test("saving a search result survives a subsequent work lookup outage", async () => {
+  let searchRequests = 0;
+  const provider = createOpenLibraryProvider({
+    userAgent: "Rowan test fixture",
+    intervalMs: 0,
+    fetchImpl: async (url) => {
+      if (String(url).includes("editions.json")) return new Response("", { status: 503 });
+      searchRequests++;
+      if (searchRequests > 1) throw new Error("Search temporarily offline");
+      return Response.json({ docs: [{ key: "/works/OL1W", title: "Saved from search" }] });
+    },
+  });
+  const [result] = await provider.search("Book");
+  const work = await provider.fetchWork(result.ref);
+  assert.equal(work.title, "Saved from search");
+  assert.equal(work.edition, null);
+  assert.equal(searchRequests, 1);
+});
+
 test("search collapses work keys, rejects malformed IDs and deduplicates concurrent requests", async () => {
   let count = 0;
   const provider = createOpenLibraryProvider({

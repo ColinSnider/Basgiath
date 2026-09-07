@@ -5,19 +5,39 @@ import { books as legacyBooks, sessions, users } from "../../shared/schema";
 import { db } from "../../server/db";
 import { getRowanRuntime, rowanEnabled } from "../../server/v2/runtime";
 import { DomainError } from "../../server/v2/library-service";
-import {
-  editions,
-  externalMappings,
-  progressEntries,
-  readingSessions,
-  userBooks,
-  works,
-} from "../../shared/schema-v2";
-import { and } from "drizzle-orm";
+import { importLegacyLibrary } from "../../server/v2/legacy-import";
 
 const key = z.string().uuid();
 const moment = z.string().datetime({ offset: true });
 const command = z.discriminatedUnion("type", [
+  z
+    .object({
+      type: z.literal("edition"),
+      key,
+      userBookId: key,
+      expectedVersion: z.number().int().nonnegative(),
+      format: z.enum(["book", "ebook", "audiobook"]),
+      total: z.number().int().positive().max(10000000).nullable(),
+    })
+    .strict(),
+  z
+    .object({
+      type: z.literal("annualGoal"),
+      key,
+      year: z.number().int().min(1900).max(9998),
+      target: z.number().int().min(1).max(10000),
+    })
+    .strict(),
+  z
+    .object({
+      type: z.literal("manual"),
+      key,
+      title: z.string().trim().min(1).max(500),
+      author: z.string().trim().max(300),
+      format: z.enum(["book", "ebook", "audiobook"]),
+      total: z.number().int().positive().max(10000000).nullable(),
+    })
+    .strict(),
   z
     .object({
       type: z.literal("margin"),
@@ -106,118 +126,23 @@ const command = z.discriminatedUnion("type", [
 ]);
 export type RowanCommand = z.infer<typeof command>;
 
-async function context(sessionId: string) {
+async function context(sessionId: string, importLibrary = true) {
   const runtime = getRowanRuntime();
   // Existing login is read-only here; personal v2 writes use the separate database.
   const [session] = await db.select().from(sessions).where(eq(sessions.id, sessionId));
   if (!session || session.expiresAt <= new Date())
     throw new Error("Sign in to the development account again.");
+  if (!importLibrary) return { ...runtime, actor: { userId: session.userId } };
   const [source] = await db
-    .select({ username: users.username })
-    .from(users)
-    .where(eq(users.id, session.userId));
-  const [target] = await runtime.database
-    .select({ username: users.username })
+    .select({ id: users.id, username: users.username, displayName: users.displayName })
     .from(users)
     .where(eq(users.id, session.userId));
   if (!source) throw new Error("The signed-in staging account could not be found.");
-  if (!target) {
-    const [sourceUser] = await db.select().from(users).where(eq(users.id, session.userId));
-    await runtime.database.insert(users).values({
-      id: sourceUser.id,
-      username: sourceUser.username,
-      password: sourceUser.password,
-      displayName: sourceUser.displayName,
-      email: sourceUser.email,
-    });
-  } else if (source.username !== target.username) {
-    throw new Error("Development account is missing from the isolated database.");
-  }
   const legacyRows = await db
     .select()
     .from(legacyBooks)
     .where(eq(legacyBooks.userId, session.userId));
-  for (const legacy of legacyRows) {
-    const [known] = await runtime.database
-      .select({ workId: externalMappings.workId })
-      .from(externalMappings)
-      .where(
-        and(
-          eq(externalMappings.provider, "legacy"),
-          eq(externalMappings.entityKind, "work"),
-          eq(externalMappings.externalId, legacy.id),
-        ),
-      );
-    if (known) continue;
-    const [work] = await runtime.database
-      .insert(works)
-      .values({
-        title: legacy.title,
-        authors: legacy.author ? [legacy.author] : [],
-        coverUrl: legacy.coverUrl,
-      })
-      .returning();
-    await runtime.database
-      .insert(externalMappings)
-      .values({ provider: "legacy", entityKind: "work", externalId: legacy.id, workId: work.id });
-    const format = legacy.format === "audiobook" ? "audiobook" : "book";
-    const [edition] = await runtime.database
-      .insert(editions)
-      .values({
-        workId: work.id,
-        format,
-        pageCount: format === "book" ? legacy.totalPages : null,
-        durationSeconds:
-          format === "audiobook" && legacy.durationMinutes ? legacy.durationMinutes * 60 : null,
-        language: null,
-      })
-      .returning();
-    const [membership] = await runtime.database
-      .insert(userBooks)
-      .values({
-        userId: session.userId,
-        workId: work.id,
-        selectedEditionId: edition.id,
-        status:
-          legacy.status === "read"
-            ? "read"
-            : legacy.status === "dnf"
-              ? "dnf"
-              : legacy.status === "reading"
-                ? "reading"
-                : "want_to_read",
-        isFavorite: Boolean((legacy.metadata as Record<string, unknown> | null)?.favorite),
-        legacyMetadata: legacy.metadata ?? {},
-      })
-      .returning();
-    if (legacy.status === "reading" || legacy.status === "paused") {
-      const position = Math.max(0, legacy.currentPage ?? 0);
-      const [sessionRow] = await runtime.database
-        .insert(readingSessions)
-        .values({
-          userBookId: membership.id,
-          workId: work.id,
-          editionId: edition.id,
-          state: legacy.status === "paused" ? "paused" : "active",
-          startedAt: legacy.addedAt,
-          unit: format === "audiobook" ? "second" : "page",
-          total:
-            format === "audiobook"
-              ? legacy.durationMinutes
-                ? legacy.durationMinutes * 60
-                : null
-              : legacy.totalPages,
-          position,
-        })
-        .returning();
-      await runtime.database.insert(progressEntries).values({
-        readingSessionId: sessionRow.id,
-        kind: "baseline",
-        position,
-        occurredAt: legacy.addedAt,
-      });
-    }
-  }
+  await importLegacyLibrary(runtime.database, source, legacyRows);
   return { ...runtime, actor: { userId: session.userId } };
 }
 export const rowanStatus = createServerFn({ method: "GET" }).handler(() => ({
@@ -233,6 +158,7 @@ export const rowanLibrary = createServerFn({ method: "POST" })
         status: z.string(),
         favoritesOnly: z.boolean().optional(),
         shelfId: key.optional(),
+        sort: z.enum(["newest", "oldest", "title", "rating"]).optional(),
       })
       .strict(),
   )
@@ -243,8 +169,34 @@ export const rowanLibrary = createServerFn({ method: "POST" })
 export const rowanSearch = createServerFn({ method: "POST" })
   .inputValidator(z.object({ sessionId: key, query: z.string().trim().min(1).max(200) }).strict())
   .handler(async ({ data }) => {
-    const { provider } = await context(data.sessionId);
+    const { provider } = await context(data.sessionId, false);
     return provider.search(data.query);
+  });
+export const rowanInsights = createServerFn({ method: "POST" })
+  .inputValidator(z.object({ sessionId: key, year: z.number().int().min(1900).max(9998) }).strict())
+  .handler(async ({ data }) => {
+    const { library, actor } = await context(data.sessionId);
+    return library.insights(actor, data.year);
+  });
+export const rowanArchive = createServerFn({ method: "POST" })
+  .inputValidator(z.object({ sessionId: key }).strict())
+  .handler(async ({ data }) => {
+    const { library, actor } = await context(data.sessionId);
+    return library.archive(actor);
+  });
+export const rowanJournal = createServerFn({ method: "POST" })
+  .inputValidator(
+    z
+      .object({
+        sessionId: key,
+        query: z.string().max(200),
+        offset: z.number().int().min(0).max(100000),
+      })
+      .strict(),
+  )
+  .handler(async ({ data: { sessionId, ...input } }) => {
+    const { library, actor } = await context(sessionId);
+    return library.marginJournal(actor, input);
   });
 export const rowanShelves = createServerFn({ method: "POST" })
   .inputValidator(z.object({ sessionId: key }).strict())
@@ -276,6 +228,7 @@ export const rowanHistory = createServerFn({ method: "POST" })
     return {
       shelfIds: (await shelfService.membership(actor, data.userBookId)).map((item) => item.shelfId),
       userBookVersion: history.userBookVersion,
+      edition: history.edition,
       margins: history.margins.map((margin) => ({
         ...margin,
         createdAt: margin.createdAt.toISOString(),
@@ -309,6 +262,21 @@ export const rowanMutate = createServerFn({ method: "POST" })
     try {
       // Narrow the discriminated union before passing validated commands to the domain.
       switch (data.command.type) {
+        case "edition": {
+          const { type, ...value } = data.command;
+          await library.setEdition(actor, value);
+          break;
+        }
+        case "annualGoal": {
+          const { type, ...value } = data.command;
+          await library.setAnnualGoal(actor, value);
+          break;
+        }
+        case "manual": {
+          const { type, ...value } = data.command;
+          await library.saveManual(actor, value);
+          break;
+        }
         case "margin": {
           const { type, ...value } = data.command;
           await library.changeMargin(actor, value);

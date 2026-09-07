@@ -5,6 +5,10 @@ import { useAuth } from "@/lib/auth-context";
 import { Margins } from "@/components/rowan/Margins";
 import { RowanHome } from "@/components/rowan/Home";
 import { ReadingCalendar } from "@/components/rowan/ReadingCalendar";
+import { Insights } from "@/components/rowan/Insights";
+import { ManualBook } from "@/components/rowan/ManualBook";
+import { Journal } from "@/components/rowan/Journal";
+import { EditionForm } from "@/components/rowan/EditionForm";
 import {
   rowanStatus,
   rowanLibrary,
@@ -12,6 +16,7 @@ import {
   rowanHistory,
   rowanMutate,
   rowanShelves,
+  rowanArchive,
   type RowanCommand,
 } from "@/lib/rowan-fns";
 
@@ -64,17 +69,27 @@ function Workspace({ sessionId }: { sessionId: string }) {
     retry: false,
   });
   const [offset, setOffset] = useState(0);
-  const [view, setView] = useState<"grid" | "list">("grid");
+  const [view, setView] = useState<"grid" | "list" | "bookshelf">("grid");
+  const [sort, setSort] = useState<"newest" | "oldest" | "title" | "rating">("newest");
   const [searchText, setSearchText] = useState("");
   const [catalogQuery, setCatalogQuery] = useState("");
   const [selected, setSelected] = useState<Item | null>(null);
   const [notice, setNotice] = useState("");
+  const [exporting, setExporting] = useState(false);
   const retry = useRef<RowanCommand | null>(null);
   const library = useQuery({
-    queryKey: ["rowan", sessionId, "library", query, status, offset, favoritesOnly, shelfId],
+    queryKey: ["rowan", sessionId, "library", query, status, offset, favoritesOnly, shelfId, sort],
     queryFn: () =>
       rowanLibrary({
-        data: { sessionId, query, status, offset, favoritesOnly, shelfId: shelfId || undefined },
+        data: {
+          sessionId,
+          query,
+          status,
+          offset,
+          favoritesOnly,
+          shelfId: shelfId || undefined,
+          sort,
+        },
       }),
     retry: false,
   });
@@ -114,6 +129,55 @@ function Workspace({ sessionId }: { sessionId: string }) {
           Basgiath library
         </Link>
       </header>
+      <nav
+        aria-label="Rowan navigation"
+        className="flex flex-wrap gap-3 sticky top-0 z-10 bg-background py-3 border-b border-border"
+      >
+        <a className={control} href="#reading-home">
+          Home
+        </a>
+        <a className={control} href="#library-heading">
+          All books
+        </a>
+        <a className={control} href="#find-books">
+          Find books
+        </a>
+        <a className={control} href="#reading-history">
+          Calendar
+        </a>
+        <a className={control} href="#insights">
+          Insights
+        </a>
+        <a className={control} href="#journal">
+          Margins
+        </a>
+        <button
+          className={control}
+          disabled={exporting}
+          onClick={async () => {
+            setExporting(true);
+            try {
+              const json = await rowanArchive({ data: { sessionId } });
+              const url = URL.createObjectURL(new Blob([json], { type: "application/json" }));
+              const link = document.createElement("a");
+              link.href = url;
+              link.download = `rowan-archive-${new Date().toISOString().slice(0, 10)}.json`;
+              link.click();
+              setTimeout(() => URL.revokeObjectURL(url), 1000);
+              setNotice(
+                "Archive downloaded. Keep it somewhere safe. V2 archive restore is not available yet.",
+              );
+            } catch {
+              setNotice("Your archive could not be downloaded. Try again.");
+            } finally {
+              setExporting(false);
+            }
+          }}
+        >
+          {exporting ? "Exporting…" : "Export archive"}
+        </button>
+      </nav>
+      <div id="reading-home" />
       <RowanHome
         sessionId={sessionId}
         openBook={setSelected}
@@ -123,8 +187,11 @@ function Workspace({ sessionId }: { sessionId: string }) {
             ?.scrollIntoView({ behavior: "smooth", block: "start" })
         }
       />
-      <ReadingCalendar sessionId={sessionId} openBook={setSelected} />
+      <div id="reading-history">
+        <ReadingCalendar sessionId={sessionId} openBook={setSelected} />
+      </div>
       <section
+        id="find-books"
         className="rounded-2xl border border-border bg-card p-5 space-y-4"
         aria-label="Find a book"
       >
@@ -133,7 +200,9 @@ function Workspace({ sessionId }: { sessionId: string }) {
           className="flex gap-2"
           onSubmit={(e) => {
             e.preventDefault();
-            setCatalogQuery(searchText.trim());
+            const query = searchText.trim();
+            if (query === catalogQuery) void catalog.refetch();
+            else setCatalogQuery(query);
           }}
         >
           <input
@@ -149,7 +218,19 @@ function Workspace({ sessionId }: { sessionId: string }) {
           </button>
         </form>
         {catalog.isFetching && <p role="status">Searching Open Library…</p>}
-        {catalog.isError && <p role="alert">Catalog search is unavailable. Please try again.</p>}
+        {catalog.isError && (
+          <div role="alert" className="flex items-center gap-3">
+            <p>Catalog search is unavailable.</p>
+            <button
+              type="button"
+              className={control}
+              disabled={catalog.isFetching}
+              onClick={() => void catalog.refetch()}
+            >
+              Retry search
+            </button>
+          </div>
+        )}
         {catalog.data && !catalog.data.length && (
           <p>No matching books. Try another title or author.</p>
         )}
@@ -175,6 +256,7 @@ function Workspace({ sessionId }: { sessionId: string }) {
           </ul>
         )}
       </section>
+      <ManualBook run={run} busy={busy} />
       <div role="status" aria-live="polite">
         {notice}
         {mutation.isError && retry.current && (
@@ -305,14 +387,28 @@ function Workspace({ sessionId }: { sessionId: string }) {
           >
             Favorites
           </button>
-          {(["grid", "list"] as const).map((mode) => (
+          <select
+            aria-label="Sort library"
+            className={control}
+            value={sort}
+            onChange={(event) => {
+              setSort(event.target.value as typeof sort);
+              setOffset(0);
+            }}
+          >
+            <option value="newest">Recently added</option>
+            <option value="oldest">Oldest added</option>
+            <option value="title">Title A–Z</option>
+            <option value="rating">Highest rated</option>
+          </select>
+          {(["grid", "list", "bookshelf"] as const).map((mode) => (
             <button
               key={mode}
               className={control}
               aria-pressed={view === mode}
               onClick={() => setView(mode)}
             >
-              {mode === "grid" ? "Grid" : "List"}
+              {mode === "grid" ? "Grid" : mode === "list" ? "List" : "Bookshelf"}
             </button>
           ))}
         </div>
@@ -332,9 +428,20 @@ function Workspace({ sessionId }: { sessionId: string }) {
               : "Your Rowan library starts here. Search above to save your first book."}
           </p>
         )}
-        <ul className={view === "grid" ? "grid grid-cols-2 gap-4 lg:grid-cols-4" : "space-y-3"}>
+        <ul
+          className={
+            view === "grid"
+              ? "grid grid-cols-2 gap-4 lg:grid-cols-4"
+              : view === "bookshelf"
+                ? "grid grid-cols-3 gap-x-3 gap-y-6 md:grid-cols-6"
+                : "space-y-3"
+          }
+        >
           {library.data?.items.map((book) => (
-            <li key={book.id}>
+            <li
+              key={book.id}
+              className={view === "bookshelf" ? "border-b-8 border-primary/30 pb-2" : undefined}
+            >
               <button
                 className={`w-full rounded-xl border border-border bg-card p-4 text-left hover:border-primary ${view === "list" ? "flex items-center gap-4" : "h-full"}`}
                 onClick={() => setSelected(book)}
@@ -344,7 +451,7 @@ function Workspace({ sessionId }: { sessionId: string }) {
                     src={book.coverUrl}
                     alt=""
                     loading="lazy"
-                    className={`rounded object-contain ${view === "grid" ? "h-40 w-full mb-3" : "h-16 w-12"}`}
+                    className={`rounded object-contain ${view !== "list" ? "h-40 w-full mb-3" : "h-16 w-12"}`}
                   />
                 ) : (
                   <div
@@ -401,6 +508,8 @@ function Workspace({ sessionId }: { sessionId: string }) {
           </button>
         </div>
       </section>
+      <Insights sessionId={sessionId} run={run} busy={busy} />
+      <Journal sessionId={sessionId} openBook={setSelected} />
       {selected && (
         <ReadingPanel
           key={selected.id}
@@ -469,6 +578,13 @@ function ReadingPanel({
       )}
       {history.data && (
         <>
+          <EditionForm
+            key={history.data.userBookVersion}
+            userBookId={book.id}
+            history={history.data}
+            run={run}
+            busy={busy}
+          />
           <Margins margins={history.data.margins} userBookId={book.id} busy={busy} run={run} />
           <div className="flex flex-wrap items-center gap-3">
             <button

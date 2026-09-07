@@ -7,6 +7,7 @@ import { eq } from "drizzle-orm";
 import { users, books as legacyBooks } from "../../shared/schema.ts";
 import * as schema from "../../shared/schema-v2.ts";
 import { createLibraryService, DomainError, type CatalogProvider } from "./library-service.ts";
+import { importLegacyLibrary } from "./legacy-import.ts";
 import { createShelfService } from "./shelf-service.ts";
 
 const key = () => crypto.randomUUID();
@@ -629,6 +630,133 @@ test("v2 catalog and reading lifecycle work against isolated PostgreSQL", async 
       assert.equal(cleared.halfStars, null);
       assert.equal(cleared.isFavorite, true);
       assert.deepEqual(await database.select().from(legacyBooks), original);
+    },
+  );
+  await t.test(
+    "legacy partial imports gain current sessions once without changing source data",
+    async () => {
+      const [work] = await database
+        .insert(schema.works)
+        .values({ title: "Imported audio", authors: [] })
+        .returning();
+      await database.insert(schema.externalMappings).values({
+        provider: "legacy",
+        entityKind: "work",
+        externalId: "partial-audio",
+        workId: work.id,
+      });
+      const [book] = await database
+        .insert(schema.userBooks)
+        .values({ userId: 2, workId: work.id, status: "reading" })
+        .returning();
+      const row = {
+        ...original[0],
+        id: "partial-audio",
+        userId: 2,
+        format: "audiobook",
+        currentPage: 99,
+        currentMinute: 12,
+        durationMinutes: 120,
+        status: "reading",
+        reads: [],
+      };
+      const target = database as unknown as Parameters<typeof importLegacyLibrary>[0];
+      await importLegacyLibrary(target, { id: 2, username: "two", displayName: "Reader" }, [row]);
+      await importLegacyLibrary(target, { id: 2, username: "two", displayName: "Reader" }, [row]);
+      const imported = await database
+        .select()
+        .from(schema.readingSessions)
+        .where(eq(schema.readingSessions.userBookId, book.id));
+      assert.equal(imported.length, 1);
+      assert.equal(imported[0].position, 720);
+      assert.equal(imported[0].total, 7200);
+      assert.equal(imported[0].startedAt, null);
+      const [baseline] = await database
+        .select()
+        .from(schema.progressEntries)
+        .where(eq(schema.progressEntries.readingSessionId, imported[0].id));
+      assert.equal(baseline.occurredAt, null);
+      assert.deepEqual(await database.select().from(legacyBooks), original);
+    },
+  );
+  await t.test(
+    "manual books, annual goals, insights and archives preserve ownership and retries",
+    async () => {
+      const command = {
+        key: key(),
+        title: "A manual book",
+        author: "Local author",
+        format: "ebook" as const,
+        total: 240,
+      };
+      const manual = await service.saveManual(actor, command);
+      assert.deepEqual(await service.saveManual(actor, command), manual);
+      await assert.rejects(
+        service.saveManual(actor, { ...command, title: "Changed" }),
+        code("IDEMPOTENCY_CONFLICT"),
+      );
+      const goal = { key: key(), year: 2026, target: 12 };
+      await service.setAnnualGoal(actor, goal);
+      await service.setAnnualGoal(actor, { ...goal, key: key(), target: 24 });
+      await service.setAnnualGoal(actor, goal);
+      assert.equal((await service.insights(actor, 2026)).goal, 24);
+      assert.equal((await service.insights(other, 2026)).goal, null);
+      const archive = JSON.parse(await service.archive(actor));
+      assert.equal(archive.format, "rowan-archive");
+      assert.ok(archive.userBooks.some((book: { id: string }) => book.id === manual.userBookId));
+      assert.ok(
+        archive.userBooks.every((book: { userId: number }) => book.userId === actor.userId),
+      );
+      assert.equal(archive.users, undefined);
+      assert.ok(!archive.works.some((work: { title: string }) => work.title === "Imported audio"));
+      const results = await service.libraryPage(actor, { query: "A manual book", sort: "title" });
+      assert.equal(results.items[0].id, manual.userBookId);
+      const attempt = await service.startReading(actor, {
+        key: key(),
+        userBookId: manual.userBookId,
+        expectedVersion: 0,
+        startedAt: null,
+        unit: "page",
+        position: 0,
+      });
+      const before = await service.readingHistory(actor, manual.userBookId);
+      const edition = {
+        key: key(),
+        userBookId: manual.userBookId,
+        expectedVersion: before.userBookVersion,
+        format: "audiobook" as const,
+        total: 3600,
+      };
+      await service.setEdition(actor, edition);
+      await service.setEdition(actor, edition);
+      const after = await service.readingHistory(actor, manual.userBookId);
+      assert.equal(after.edition?.durationSeconds, 3600);
+      assert.equal(after.sessions.find((session) => session.id === attempt.sessionId)?.total, 240);
+      assert.equal(
+        after.sessions.find((session) => session.id === attempt.sessionId)?.unit,
+        "page",
+      );
+      await assert.rejects(
+        service.setEdition(other, { ...edition, key: key() }),
+        code("NOT_FOUND"),
+      );
+      const marginId = key();
+      await service.changeMargin(actor, {
+        key: key(),
+        userBookId: manual.userBookId,
+        marginId,
+        expectedVersion: null,
+        action: "save",
+        body: "A unique private passage",
+      });
+      assert.equal(
+        (await service.marginJournal(actor, { query: "unique private", offset: 0 })).items.length,
+        1,
+      );
+      assert.equal(
+        (await service.marginJournal(other, { query: "unique private", offset: 0 })).items.length,
+        0,
+      );
     },
   );
 });
