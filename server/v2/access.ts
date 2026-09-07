@@ -1,7 +1,7 @@
 /** Development only: compare database identities rather than full URLs/passwords. */
 export function rowanEnabled(env: Record<string, string | undefined>) {
   if (
-    env.NODE_ENV === "production" ||
+    env.ROWAN_V2_ENV !== "staging" ||
     env.ROWAN_V2_ENABLED !== "true" ||
     !env.OPEN_LIBRARY_USER_AGENT?.trim()
   )
