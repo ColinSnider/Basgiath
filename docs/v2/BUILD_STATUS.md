@@ -36,12 +36,12 @@ The initial v2 migration's two referenced composite indexes were deliberately mo
 - Current progress uses integer pages/seconds/percent. Backward/backdated corrections are rejected until a correction editor and recalculation policy exist.
 - Unknown starts/finishes remain null. Date-only precision and diary timezone semantics need implementation before legacy backfill.
 - One active/paused attempt per relationship is enforced for new use. Legacy duplicate/multiple-active-copy conflicts must be represented before applying this policy to migrated accounts.
-- Ratings, shelves, margins, insights, archives, source capture, and production migration/recovery remain subsequent slices. Raw legacy book metadata has a reserved storage field but no backfill has run.
+- Insights, archives, source capture, and production migration/recovery remain subsequent slices. Raw legacy book metadata has a reserved storage field but no backfill has run.
 - Actor IDs must be supplied by a validated server session. The service actor is not a client request field; authorization wiring is required before exposing endpoints.
 
 ## Next implementation slice
 
-Add shelf/rating/margin operations with the same owner checks and transaction rules. Keep local storage and legacy Basgiath identifiers stable.
+Add series and insights. Keep local storage and legacy Basgiath identifiers stable.
 
 ## Phase 2: development UI
 
@@ -51,4 +51,24 @@ To run locally, configure `DATABASE_URL` for your disposable legacy development 
 
 Set `ROWAN_V2_ENABLED=true` and `OPEN_LIBRARY_USER_AGENT` to a real application/contact identity, run `npm run dev`, sign in, then open `/rowan`. The gate rejects production mode, missing configuration, and matching host/port/database identities (including different credentials). Different DNS aliases cannot be detected; provision distinct databases deliberately. No production rollout or backfill is included.
 
-The history view currently uses device-local dates and shows recorded observations, not a calendar or inferred daily totals. Audio input is explicitly labeled in seconds. Edition selection, shelves, half-star ratings, and the full Home redesign remain later slices.
+The history view currently uses device-local dates and shows recorded observations, not a calendar or inferred daily totals. Audio input is explicitly labeled in seconds. Edition selection and the full Home redesign remain later slices.
+
+## Phase 3: personal library organization
+
+Implemented private shelves (create, rename, add/remove membership, filter), favorites with a library filter, and personal ratings from 0.5 to 5 stars. Clearing a rating removes it without affecting favorites or reading history. Ratings use integer half-star units in their own table; no community aggregate or public rating exposure is included.
+
+Shelf changes and personal book changes share the actor transaction lock and durable retry receipts. Version checks reject stale edits. Composite foreign keys ensure a shelf and its books belong to the same account. Shelf removal means removing membership only; it never deletes a book. Shelf deletion and manual ordering are deferred.
+
+Apply `migrations-v2/0001_personal_library.sql` after the initial v2 migration in the isolated development database before using this version of `/rowan`. It adds shelves, shelf items, ratings, and an owner-pair index; existing legacy rows and prior migration files are untouched. The development gate from Phase 2 still applies.
+
+### Private book margins
+
+Apply `migrations-v2/0002_book_margins.sql` after `0001` in the isolated database. Book details now support private text margins with an optional free-text location, editing, and confirmed deletion. All writes use owner checks, version checks, and mutation receipts. Deleted margins retain their text in the database with a deletion timestamp and are excluded from the UI. No restore UI or revision archive exists yet. Text renders as plain text; no HTML execution. New drafts clear only after their own save is confirmed, and edit drafts survive conflicts. Legacy margins are not migrated in this slice.
+
+## Phase 4: Home reading overview
+
+`/rowan` opens with Last / Current / Next. Last uses the most recent completed attempt (known finish dates first), including past reads of a currently reread book. Current shows up to six active/paused attempts, active first, using the attempt's progress snapshot; unknown totals stay unknown. Next shows the three most recently saved want-to-read books, not a manually ordered queue. These owner-scoped queries are independent of Library filters and pagination. Cards focus and scroll to the existing book controls; mutations refresh the overview. No new database migration is needed for Home.
+
+## Phase 5: reading calendar
+
+The monthly calendar groups recorded starts, observed progress, completions, and dated DNF events by device-local day. Month boundaries are sent as explicit instants, including local timezone offsets and daylight-saving changes; server queries use inclusive start/exclusive end. Baselines do not count as progress events, unknown dates remain absent, and logged positions are not presented as daily pages/minutes read. Day buttons reveal events and open the book controls. Previous/next month, current month, empty/error/loading states, and an explicit truncation notice are included. Queries are owner-scoped, limited to 32 days, and capped at 1,000 events per kind. A saved diary timezone, derived daily totals, and corrections remain deferred. No schema change is required.

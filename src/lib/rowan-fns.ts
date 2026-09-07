@@ -11,6 +11,50 @@ const moment = z.string().datetime({ offset: true });
 const command = z.discriminatedUnion("type", [
   z
     .object({
+      type: z.literal("margin"),
+      key,
+      userBookId: key,
+      marginId: key,
+      expectedVersion: z.number().int().nonnegative().nullable(),
+      action: z.enum(["save", "delete"]),
+      body: z.string().trim().min(1).max(10000).optional(),
+      locator: z.string().trim().max(120).nullable().optional(),
+    })
+    .strict(),
+  z
+    .object({ type: z.literal("shelfCreate"), key, name: z.string().trim().min(1).max(120) })
+    .strict(),
+  z
+    .object({
+      type: z.literal("shelfRename"),
+      key,
+      shelfId: key,
+      name: z.string().trim().min(1).max(120),
+      expectedVersion: z.number().int().nonnegative(),
+    })
+    .strict(),
+  z
+    .object({
+      type: z.literal("shelfItem"),
+      key,
+      shelfId: key,
+      userBookId: key,
+      present: z.boolean(),
+      expectedVersion: z.number().int().nonnegative(),
+    })
+    .strict(),
+  z
+    .object({
+      type: z.literal("personalize"),
+      key,
+      userBookId: key,
+      expectedVersion: z.number().int().nonnegative(),
+      isFavorite: z.boolean().optional(),
+      halfStars: z.number().int().min(1).max(10).nullable().optional(),
+    })
+    .strict(),
+  z
+    .object({
       type: z.literal("save"),
       key,
       ref: z.object({
@@ -82,6 +126,8 @@ export const rowanLibrary = createServerFn({ method: "POST" })
         offset: z.number().int().nonnegative(),
         query: z.string().max(200),
         status: z.string(),
+        favoritesOnly: z.boolean().optional(),
+        shelfId: key.optional(),
       })
       .strict(),
   )
@@ -95,13 +141,43 @@ export const rowanSearch = createServerFn({ method: "POST" })
     const { provider } = await context(data.sessionId);
     return provider.search(data.query);
   });
+export const rowanShelves = createServerFn({ method: "POST" })
+  .inputValidator(z.object({ sessionId: key }).strict())
+  .handler(async ({ data }) => {
+    const { shelfService, actor } = await context(data.sessionId);
+    return (await shelfService.list(actor)).map((shelf) => ({
+      id: shelf.id,
+      name: shelf.name,
+      version: shelf.version,
+    }));
+  });
+export const rowanHome = createServerFn({ method: "POST" })
+  .inputValidator(z.object({ sessionId: key }).strict())
+  .handler(async ({ data }) => {
+    const { library, actor } = await context(data.sessionId);
+    return library.home(actor);
+  });
+export const rowanCalendar = createServerFn({ method: "POST" })
+  .inputValidator(z.object({ sessionId: key, from: moment, to: moment }).strict())
+  .handler(async ({ data: { sessionId, ...range } }) => {
+    const { library, actor } = await context(sessionId);
+    return library.calendar(actor, range);
+  });
 export const rowanHistory = createServerFn({ method: "POST" })
   .inputValidator(z.object({ sessionId: key, userBookId: key }).strict())
   .handler(async ({ data }) => {
-    const { library, actor } = await context(data.sessionId);
+    const { library, shelfService, actor } = await context(data.sessionId);
     const history = await library.readingHistory(actor, data.userBookId);
     return {
+      shelfIds: (await shelfService.membership(actor, data.userBookId)).map((item) => item.shelfId),
       userBookVersion: history.userBookVersion,
+      margins: history.margins.map((margin) => ({
+        ...margin,
+        createdAt: margin.createdAt.toISOString(),
+        updatedAt: margin.updatedAt.toISOString(),
+      })),
+      isFavorite: history.isFavorite,
+      halfStars: history.halfStars,
       sessions: history.sessions.map((s) => ({
         id: s.id,
         state: s.state,
@@ -124,10 +200,35 @@ export const rowanHistory = createServerFn({ method: "POST" })
 export const rowanMutate = createServerFn({ method: "POST" })
   .inputValidator(z.object({ sessionId: key, command }).strict())
   .handler(async ({ data }) => {
-    const { library, actor } = await context(data.sessionId);
+    const { library, shelfService, actor } = await context(data.sessionId);
     try {
       // Narrow the discriminated union before passing validated commands to the domain.
       switch (data.command.type) {
+        case "margin": {
+          const { type, ...value } = data.command;
+          await library.changeMargin(actor, value);
+          break;
+        }
+        case "shelfCreate": {
+          const { type, ...value } = data.command;
+          await shelfService.create(actor, value);
+          break;
+        }
+        case "shelfRename": {
+          const { type, ...value } = data.command;
+          await shelfService.rename(actor, value);
+          break;
+        }
+        case "shelfItem": {
+          const { type, ...value } = data.command;
+          await shelfService.setItem(actor, value);
+          break;
+        }
+        case "personalize": {
+          const { type, ...value } = data.command;
+          await library.personalize(actor, value);
+          break;
+        }
         case "save": {
           const { type, ...value } = data.command;
           await library.saveWork(actor, value);

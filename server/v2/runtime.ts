@@ -4,6 +4,7 @@ import * as schema from "../../shared/schema";
 import { createLibraryService } from "./library-service";
 import { createOpenLibraryProvider } from "./open-library-provider";
 import { rowanEnabled as enabled } from "./access";
+import { createShelfService } from "./shelf-service";
 
 export function rowanEnabled() {
   return enabled(process.env);
@@ -15,7 +16,12 @@ function createRuntime() {
     schema,
   });
   const provider = createOpenLibraryProvider({ userAgent: process.env.OPEN_LIBRARY_USER_AGENT! });
-  return { database, provider, library: createLibraryService(database, provider) };
+  return {
+    database,
+    provider,
+    library: createLibraryService(database, provider),
+    shelfService: createShelfService(database),
+  };
 }
 export function getRowanRuntime() {
   if (!rowanEnabled()) throw new Error("Rowan development workspace is disabled.");

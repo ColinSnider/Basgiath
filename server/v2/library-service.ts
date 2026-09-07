@@ -10,6 +10,10 @@ import {
   readingSessions,
   progressEntries,
   mutationReceipts,
+  ratings,
+  shelves,
+  shelfItems,
+  margins,
 } from "../../shared/schema-v2.ts";
 
 export type Actor = { userId: number };
@@ -243,12 +247,196 @@ export function createLibraryService(database: Database, provider: CatalogProvid
         .orderBy(userBooks.addedAt, userBooks.id);
     },
 
-    async libraryPage(actor: Actor, input: { offset?: number; query?: string; status?: string }) {
+    async calendar(actor: Actor, input: { from: string; to: string }) {
+      z.number().int().positive().parse(actor.userId);
+      const data = z
+        .object({ from: instant, to: instant })
+        .strict()
+        .refine((d) => {
+          const span = Date.parse(d.to) - Date.parse(d.from);
+          return span > 0 && span <= 32 * 86400000;
+        }, "Choose a range of at most 32 days.")
+        .parse(input);
+      const from = new Date(data.from),
+        to = new Date(data.to);
+      const book = {
+        id: userBooks.id,
+        version: userBooks.version,
+        status: userBooks.status,
+        title: works.title,
+        authors: works.authors,
+        coverUrl: works.coverUrl,
+        isFavorite: userBooks.isFavorite,
+        halfStars: ratings.halfStars,
+      };
+      const inRange = (
+        column:
+          | typeof progressEntries.occurredAt
+          | typeof readingSessions.startedAt
+          | typeof readingSessions.finishedAt,
+      ) =>
+        and(sql`${column} >= ${from}`, sql`${column} < ${to}`, eq(userBooks.userId, actor.userId));
+      const [observations, starts, finishes] = await Promise.all([
+        database
+          .select({
+            id: progressEntries.id,
+            at: progressEntries.occurredAt,
+            position: progressEntries.position,
+            unit: readingSessions.unit,
+            book,
+          })
+          .from(progressEntries)
+          .innerJoin(readingSessions, eq(readingSessions.id, progressEntries.readingSessionId))
+          .innerJoin(userBooks, eq(userBooks.id, readingSessions.userBookId))
+          .innerJoin(works, eq(works.id, userBooks.workId))
+          .leftJoin(ratings, eq(ratings.userBookId, userBooks.id))
+          .where(and(inRange(progressEntries.occurredAt), eq(progressEntries.kind, "observation")))
+          .orderBy(progressEntries.occurredAt, progressEntries.id)
+          .limit(1001),
+        database
+          .select({ id: readingSessions.id, at: readingSessions.startedAt, book })
+          .from(readingSessions)
+          .innerJoin(userBooks, eq(userBooks.id, readingSessions.userBookId))
+          .innerJoin(works, eq(works.id, userBooks.workId))
+          .leftJoin(ratings, eq(ratings.userBookId, userBooks.id))
+          .where(inRange(readingSessions.startedAt))
+          .orderBy(readingSessions.startedAt, readingSessions.id)
+          .limit(1001),
+        database
+          .select({
+            id: readingSessions.id,
+            at: readingSessions.finishedAt,
+            state: readingSessions.state,
+            book,
+          })
+          .from(readingSessions)
+          .innerJoin(userBooks, eq(userBooks.id, readingSessions.userBookId))
+          .innerJoin(works, eq(works.id, userBooks.workId))
+          .leftJoin(ratings, eq(ratings.userBookId, userBooks.id))
+          .where(
+            and(
+              inRange(readingSessions.finishedAt),
+              sql`${readingSessions.state} in ('completed', 'dnf')`,
+            ),
+          )
+          .orderBy(readingSessions.finishedAt, readingSessions.id)
+          .limit(1001),
+      ]);
+      const events = [
+        ...observations.slice(0, 1000).map((e) => ({
+          id: `progress:${e.id}`,
+          at: e.at!.toISOString(),
+          kind: "progress" as const,
+          position: e.position,
+          unit: e.unit,
+          book: e.book,
+        })),
+        ...starts.slice(0, 1000).map((e) => ({
+          id: `start:${e.id}`,
+          at: e.at!.toISOString(),
+          kind: "start" as const,
+          position: null,
+          unit: null,
+          book: e.book,
+        })),
+        ...finishes.slice(0, 1000).map((e) => ({
+          id: `finish:${e.id}`,
+          at: e.at!.toISOString(),
+          kind: e.state === "completed" ? ("finish" as const) : ("dnf" as const),
+          position: null,
+          unit: null,
+          book: e.book,
+        })),
+      ].sort((a, b) => a.at.localeCompare(b.at) || a.id.localeCompare(b.id));
+      return {
+        events,
+        truncated: [observations, starts, finishes].some((rows) => rows.length > 1000),
+      };
+    },
+
+    async home(actor: Actor) {
+      z.number().int().positive().parse(actor.userId);
+      const book = {
+        id: userBooks.id,
+        version: userBooks.version,
+        status: userBooks.status,
+        title: works.title,
+        authors: works.authors,
+        coverUrl: works.coverUrl,
+        isFavorite: userBooks.isFavorite,
+        halfStars: ratings.halfStars,
+      };
+      // Select from the whole account, independent of Library pagination and filters.
+      const [last, current, next] = await Promise.all([
+        database
+          .select({ book, finishedAt: readingSessions.finishedAt })
+          .from(readingSessions)
+          .innerJoin(userBooks, eq(userBooks.id, readingSessions.userBookId))
+          .innerJoin(works, eq(works.id, userBooks.workId))
+          .leftJoin(ratings, eq(ratings.userBookId, userBooks.id))
+          .where(and(eq(userBooks.userId, actor.userId), eq(readingSessions.state, "completed")))
+          .orderBy(sql`${readingSessions.finishedAt} desc nulls last`, readingSessions.id)
+          .limit(1),
+        database
+          .select({
+            book,
+            state: readingSessions.state,
+            position: readingSessions.position,
+            total: readingSessions.total,
+            unit: readingSessions.unit,
+          })
+          .from(readingSessions)
+          .innerJoin(userBooks, eq(userBooks.id, readingSessions.userBookId))
+          .innerJoin(works, eq(works.id, userBooks.workId))
+          .leftJoin(ratings, eq(ratings.userBookId, userBooks.id))
+          .where(
+            and(
+              eq(userBooks.userId, actor.userId),
+              sql`${readingSessions.state} in ('active', 'paused')`,
+            ),
+          )
+          .orderBy(
+            sql`case when ${readingSessions.state} = 'active' then 0 else 1 end`,
+            sql`${readingSessions.startedAt} desc nulls last`,
+            readingSessions.id,
+          )
+          .limit(7),
+        database
+          .select(book)
+          .from(userBooks)
+          .innerJoin(works, eq(works.id, userBooks.workId))
+          .leftJoin(ratings, eq(ratings.userBookId, userBooks.id))
+          .where(and(eq(userBooks.userId, actor.userId), eq(userBooks.status, "want_to_read")))
+          .orderBy(sql`${userBooks.addedAt} desc`, userBooks.id)
+          .limit(3),
+      ]);
+      return {
+        last: last[0]
+          ? { book: last[0].book, finishedAt: last[0].finishedAt?.toISOString() ?? null }
+          : null,
+        current: current.slice(0, 6),
+        hasMoreCurrent: current.length > 6,
+        next,
+      };
+    },
+
+    async libraryPage(
+      actor: Actor,
+      input: {
+        offset?: number;
+        query?: string;
+        status?: string;
+        favoritesOnly?: boolean;
+        shelfId?: string;
+      },
+    ) {
       z.number().int().positive().parse(actor.userId);
       const data = z
         .object({
           offset: z.number().int().min(0).max(100000).default(0),
           query: z.string().trim().max(200).default(""),
+          favoritesOnly: z.boolean().default(false),
+          shelfId: id.optional(),
           status: z
             .enum(["all", "want_to_read", "reading", "paused", "read", "dnf"])
             .default("all"),
@@ -263,12 +451,19 @@ export function createLibraryService(database: Database, provider: CatalogProvid
           title: works.title,
           authors: works.authors,
           coverUrl: works.coverUrl,
+          isFavorite: userBooks.isFavorite,
+          halfStars: ratings.halfStars,
         })
         .from(userBooks)
         .innerJoin(works, eq(works.id, userBooks.workId))
+        .leftJoin(ratings, eq(ratings.userBookId, userBooks.id))
         .where(
           and(
             eq(userBooks.userId, actor.userId),
+            data.favoritesOnly ? eq(userBooks.isFavorite, true) : undefined,
+            data.shelfId
+              ? sql`exists (select 1 from ${shelfItems} join ${shelves} on ${shelves.id} = ${shelfItems.shelfId} where ${shelfItems.userBookId} = ${userBooks.id} and ${shelves.id} = ${data.shelfId} and ${shelves.userId} = ${actor.userId})`
+              : undefined,
             data.status === "all" ? undefined : eq(userBooks.status, data.status),
             data.query
               ? or(ilike(works.title, term), ilike(sql`${works.authors}::text`, term))
@@ -279,6 +474,114 @@ export function createLibraryService(database: Database, provider: CatalogProvid
         .limit(25)
         .offset(data.offset);
       return { items: rows.slice(0, 24), nextOffset: rows.length > 24 ? data.offset + 24 : null };
+    },
+
+    async changeMargin(
+      actor: Actor,
+      input: {
+        key: string;
+        userBookId: string;
+        marginId: string;
+        expectedVersion: number | null;
+        action: "save" | "delete";
+        body?: string;
+        locator?: string | null;
+      },
+    ) {
+      const data = z
+        .object({
+          key: id,
+          userBookId: id,
+          marginId: id,
+          expectedVersion: version.nullable(),
+          action: z.enum(["save", "delete"]),
+          body: z.string().trim().min(1).max(10000).optional(),
+          locator: z.string().trim().max(120).nullable().optional(),
+        })
+        .strict()
+        .refine((d) => d.action !== "save" || d.body !== undefined, "A margin needs text.")
+        .parse(input);
+      return mutate(actor, data.key, fingerprint("margin", data), async (tx) => {
+        const book = await ownedBook(tx, actor, data.userBookId);
+        const [existing] = await tx.select().from(margins).where(eq(margins.id, data.marginId));
+        if (existing && (existing.userBookId !== book.id || existing.deletedAt))
+          throw new DomainError("NOT_FOUND", "Margin not found.");
+        if (data.expectedVersion === null) {
+          if (existing)
+            throw new DomainError(
+              "VERSION_CONFLICT",
+              "This margin already exists. Refresh before editing.",
+            );
+          if (data.action !== "save") throw new DomainError("NOT_FOUND", "Margin not found.");
+          await tx.insert(margins).values({
+            id: data.marginId,
+            userBookId: book.id,
+            body: data.body!,
+            locator: data.locator || null,
+          });
+        } else {
+          if (!existing) throw new DomainError("NOT_FOUND", "Margin not found.");
+          expectVersion(existing.version, data.expectedVersion);
+          await tx
+            .update(margins)
+            .set(
+              data.action === "delete"
+                ? { deletedAt: new Date(), updatedAt: new Date(), version: existing.version + 1 }
+                : {
+                    body: data.body!,
+                    locator: data.locator === undefined ? existing.locator : data.locator || null,
+                    updatedAt: new Date(),
+                    version: existing.version + 1,
+                  },
+            )
+            .where(eq(margins.id, existing.id));
+        }
+        return { workId: book.workId, userBookId: book.id, sessionId: null, version: book.version };
+      });
+    },
+
+    async personalize(
+      actor: Actor,
+      input: {
+        key: string;
+        userBookId: string;
+        expectedVersion: number;
+        isFavorite?: boolean;
+        halfStars?: number | null;
+      },
+    ) {
+      const data = z
+        .object({
+          key: id,
+          userBookId: id,
+          expectedVersion: version,
+          isFavorite: z.boolean().optional(),
+          halfStars: z.number().int().min(1).max(10).nullable().optional(),
+        })
+        .strict()
+        .refine((d) => d.isFavorite !== undefined || d.halfStars !== undefined, "Choose a change.")
+        .parse(input);
+      return mutate(actor, data.key, fingerprint("personalize", data), async (tx) => {
+        const book = await ownedBook(tx, actor, data.userBookId);
+        expectVersion(book.version, data.expectedVersion);
+        if (data.halfStars === null)
+          await tx.delete(ratings).where(eq(ratings.userBookId, book.id));
+        else if (data.halfStars !== undefined)
+          await tx
+            .insert(ratings)
+            .values({ userBookId: book.id, halfStars: data.halfStars })
+            .onConflictDoUpdate({ target: ratings.userBookId, set: { halfStars: data.halfStars } });
+        await tx
+          .update(userBooks)
+          .set({ isFavorite: data.isFavorite ?? book.isFavorite, version: book.version + 1 })
+          .where(eq(userBooks.id, book.id));
+        return {
+          workId: book.workId,
+          userBookId: book.id,
+          sessionId: null,
+          version: book.version + 1,
+        };
+      });
     },
 
     async startReading(actor: Actor, input: z.input<typeof startSchema>) {
@@ -465,6 +768,7 @@ export function createLibraryService(database: Database, provider: CatalogProvid
       id.parse(userBookId);
       return database.transaction(async (tx) => {
         const book = await ownedBook(tx, actor, userBookId);
+        const [rating] = await tx.select().from(ratings).where(eq(ratings.userBookId, book.id));
         const sessions = await tx
           .select()
           .from(readingSessions)
@@ -478,6 +782,20 @@ export function createLibraryService(database: Database, provider: CatalogProvid
           .orderBy(progressEntries.createdAt, progressEntries.id);
         return {
           userBookVersion: book.version,
+          margins: await tx
+            .select({
+              id: margins.id,
+              body: margins.body,
+              locator: margins.locator,
+              version: margins.version,
+              createdAt: margins.createdAt,
+              updatedAt: margins.updatedAt,
+            })
+            .from(margins)
+            .where(and(eq(margins.userBookId, book.id), sql`${margins.deletedAt} is null`))
+            .orderBy(margins.createdAt, margins.id),
+          isFavorite: book.isFavorite,
+          halfStars: rating?.halfStars ?? null,
           sessions,
           entries: entries.map(({ entry }) => entry),
         };

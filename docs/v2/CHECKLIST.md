@@ -49,16 +49,16 @@ See [build status](BUILD_STATUS.md) for limits. The complete domain and operatio
 
 ## UI
 
-- [ ] Home Last / Current / Next
+- [x] Home Last / Current / Next
 - [ ] Library overview
 - [ ] All Books search/filter/sort
 - [ ] List/grid/bookshelf parity
-- [ ] Real shelves
+- [x] Real shelves: create, rename, membership, library filter
 - [ ] Work-first detail / edition secondary
-- [ ] Reading history/calendar
+- [x] Recorded reading history and monthly calendar
 - [ ] Series tracking
 - [ ] Margins expansion
-- [ ] Favorites and half-stars
+- [x] Favorites and private half-star ratings
 - [ ] Contextual community rating
 - [ ] Insights and goals
 

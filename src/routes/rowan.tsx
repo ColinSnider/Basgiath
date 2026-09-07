@@ -1,13 +1,17 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useAuth } from "@/lib/auth-context";
+import { Margins } from "@/components/rowan/Margins";
+import { RowanHome } from "@/components/rowan/Home";
+import { ReadingCalendar } from "@/components/rowan/ReadingCalendar";
 import {
   rowanStatus,
   rowanLibrary,
   rowanSearch,
   rowanHistory,
   rowanMutate,
+  rowanShelves,
   type RowanCommand,
 } from "@/lib/rowan-fns";
 
@@ -51,6 +55,14 @@ function Workspace({ sessionId }: { sessionId: string }) {
   const cache = useQueryClient();
   const [query, setQuery] = useState("");
   const [status, setStatus] = useState("all");
+  const [favoritesOnly, setFavoritesOnly] = useState(false);
+  const [shelfId, setShelfId] = useState("");
+  const [shelfName, setShelfName] = useState("");
+  const shelves = useQuery({
+    queryKey: ["rowan", sessionId, "shelves"],
+    queryFn: () => rowanShelves({ data: { sessionId } }),
+    retry: false,
+  });
   const [offset, setOffset] = useState(0);
   const [view, setView] = useState<"grid" | "list">("grid");
   const [searchText, setSearchText] = useState("");
@@ -59,8 +71,11 @@ function Workspace({ sessionId }: { sessionId: string }) {
   const [notice, setNotice] = useState("");
   const retry = useRef<RowanCommand | null>(null);
   const library = useQuery({
-    queryKey: ["rowan", sessionId, "library", query, status, offset],
-    queryFn: () => rowanLibrary({ data: { sessionId, query, status, offset } }),
+    queryKey: ["rowan", sessionId, "library", query, status, offset, favoritesOnly, shelfId],
+    queryFn: () =>
+      rowanLibrary({
+        data: { sessionId, query, status, offset, favoritesOnly, shelfId: shelfId || undefined },
+      }),
     retry: false,
   });
   const catalog = useQuery({
@@ -99,6 +114,16 @@ function Workspace({ sessionId }: { sessionId: string }) {
           Basgiath library
         </Link>
       </header>
+      <RowanHome
+        sessionId={sessionId}
+        openBook={setSelected}
+        showLibrary={() =>
+          document
+            .getElementById("library-heading")
+            ?.scrollIntoView({ behavior: "smooth", block: "start" })
+        }
+      />
+      <ReadingCalendar sessionId={sessionId} openBook={setSelected} />
       <section
         className="rounded-2xl border border-border bg-card p-5 space-y-4"
         aria-label="Find a book"
@@ -163,6 +188,80 @@ function Workspace({ sessionId }: { sessionId: string }) {
         )}
       </div>
       <section className="space-y-4" aria-labelledby="library-heading">
+        <div className="space-y-3">
+          <h2 className="font-display text-2xl">Your shelves</h2>
+          <form
+            className="flex flex-wrap gap-2"
+            onSubmit={(e) => {
+              e.preventDefault();
+              run({ type: "shelfCreate", key: crypto.randomUUID(), name: shelfName.trim() });
+            }}
+          >
+            <input
+              className={control}
+              aria-label="New shelf name"
+              placeholder="A shelf for your books"
+              maxLength={120}
+              required
+              value={shelfName}
+              onChange={(e) => setShelfName(e.target.value)}
+            />
+            <button className={control} disabled={busy || !shelfName.trim()}>
+              Create shelf
+            </button>
+          </form>
+          {shelves.isPending && <p role="status">Loading shelves…</p>}
+          {shelves.isError && (
+            <p role="alert">
+              Shelves could not load.{" "}
+              <button className={control} onClick={() => void shelves.refetch()}>
+                Retry
+              </button>
+            </p>
+          )}
+          {shelves.data?.length === 0 && (
+            <p className="text-sm text-muted-foreground">
+              Make a shelf for a mood, a season, or a collection.
+            </p>
+          )}
+          <div className="flex flex-wrap gap-2">
+            <button
+              className={control}
+              aria-pressed={!shelfId}
+              onClick={() => {
+                setShelfId("");
+                setOffset(0);
+                setSelected(null);
+              }}
+            >
+              All shelves
+            </button>
+            {shelves.data?.map((shelf) => (
+              <button
+                className={control}
+                key={shelf.id}
+                aria-pressed={shelfId === shelf.id}
+                onClick={() => {
+                  setShelfId(shelf.id);
+                  setOffset(0);
+                  setSelected(null);
+                }}
+              >
+                {shelf.name}
+              </button>
+            ))}
+          </div>
+          {shelves.data
+            ?.filter((shelf) => shelf.id === shelfId)
+            .map((shelf) => (
+              <RenameShelf
+                key={`${shelf.id}:${shelf.version}`}
+                shelf={shelf}
+                busy={busy}
+                run={run}
+              />
+            ))}
+        </div>
         <h2 id="library-heading" className="font-display text-3xl">
           Your library
         </h2>
@@ -195,6 +294,17 @@ function Workspace({ sessionId }: { sessionId: string }) {
               </option>
             ))}
           </select>
+          <button
+            className={control}
+            aria-pressed={favoritesOnly}
+            onClick={() => {
+              setFavoritesOnly(!favoritesOnly);
+              setOffset(0);
+              setSelected(null);
+            }}
+          >
+            Favorites
+          </button>
           {(["grid", "list"] as const).map((mode) => (
             <button
               key={mode}
@@ -217,7 +327,7 @@ function Workspace({ sessionId }: { sessionId: string }) {
         )}
         {library.data && !library.data.items.length && (
           <p className="py-8 text-muted-foreground">
-            {query || status !== "all"
+            {query || status !== "all" || favoritesOnly || shelfId
               ? "No books match these filters."
               : "Your Rowan library starts here. Search above to save your first book."}
           </p>
@@ -245,7 +355,18 @@ function Workspace({ sessionId }: { sessionId: string }) {
                   </div>
                 )}
                 <div>
-                  <h3 className="font-medium">{book.title}</h3>
+                  <h3 className="font-medium">
+                    {book.title}
+                    {book.isFavorite && <span aria-label="Favorite"> ♥</span>}
+                  </h3>
+                  {book.halfStars !== null && (
+                    <p
+                      className="text-sm"
+                      aria-label={`Your rating: ${book.halfStars / 2} out of 5 stars`}
+                    >
+                      {book.halfStars / 2} / 5 ★
+                    </p>
+                  )}
                   <p className="text-sm text-muted-foreground">
                     {book.authors.join(", ") || "Unknown author"}
                   </p>
@@ -286,6 +407,7 @@ function Workspace({ sessionId }: { sessionId: string }) {
           book={library.data?.items.find((b) => b.id === selected.id) ?? selected}
           sessionId={sessionId}
           busy={busy}
+          shelves={shelves.data ?? []}
           run={run}
           close={() => setSelected(null)}
         />
@@ -300,15 +422,22 @@ function ReadingPanel({
   busy,
   run,
   close,
+  shelves,
 }: {
   book: Item;
   sessionId: string;
   busy: boolean;
   run: (command: RowanCommand) => void;
   close: () => void;
+  shelves: Awaited<ReturnType<typeof rowanShelves>>;
 }) {
   const [unit, setUnit] = useState<"page" | "second" | "percent">("page");
   const [position, setPosition] = useState("");
+  const panel = useRef<HTMLElement>(null);
+  useEffect(() => {
+    panel.current?.focus({ preventScroll: true });
+    panel.current?.scrollIntoView({ block: "start" });
+  }, []);
   const history = useQuery({
     queryKey: ["rowan", sessionId, "history", book.id],
     queryFn: () => rowanHistory({ data: { sessionId, userBookId: book.id } }),
@@ -318,6 +447,8 @@ function ReadingPanel({
   const value = Number(position);
   return (
     <section
+      ref={panel}
+      tabIndex={-1}
       className="rounded-2xl border border-primary bg-card p-5 space-y-4"
       aria-label={`Reading details for ${book.title}`}
     >
@@ -338,6 +469,74 @@ function ReadingPanel({
       )}
       {history.data && (
         <>
+          <Margins margins={history.data.margins} userBookId={book.id} busy={busy} run={run} />
+          <div className="flex flex-wrap items-center gap-3">
+            <button
+              className={control}
+              disabled={busy}
+              aria-pressed={history.data.isFavorite}
+              onClick={() =>
+                run({
+                  type: "personalize",
+                  key: crypto.randomUUID(),
+                  userBookId: book.id,
+                  expectedVersion: history.data!.userBookVersion,
+                  isFavorite: !history.data!.isFavorite,
+                })
+              }
+            >
+              {history.data.isFavorite ? "♥ Favorite" : "♡ Add to favorites"}
+            </button>
+            <label className="text-sm">
+              Your rating{" "}
+              <select
+                className={control}
+                disabled={busy}
+                value={history.data.halfStars ?? ""}
+                onChange={(e) =>
+                  run({
+                    type: "personalize",
+                    key: crypto.randomUUID(),
+                    userBookId: book.id,
+                    expectedVersion: history.data!.userBookVersion,
+                    halfStars: e.target.value === "" ? null : Number(e.target.value),
+                  })
+                }
+              >
+                <option value="">Not rated</option>
+                {Array.from({ length: 10 }, (_, i) => i + 1).map((value) => (
+                  <option key={value} value={value}>
+                    {value / 2} / 5
+                  </option>
+                ))}
+              </select>
+            </label>
+          </div>
+          {shelves.length > 0 && (
+            <fieldset className="flex flex-wrap gap-3">
+              <legend className="mb-2 text-sm font-medium">On your shelves</legend>
+              {shelves.map((shelf) => (
+                <label className="flex items-center gap-2 text-sm" key={shelf.id}>
+                  <input
+                    type="checkbox"
+                    checked={history.data!.shelfIds.includes(shelf.id)}
+                    disabled={busy}
+                    onChange={(e) =>
+                      run({
+                        type: "shelfItem",
+                        key: crypto.randomUUID(),
+                        shelfId: shelf.id,
+                        userBookId: book.id,
+                        present: e.target.checked,
+                        expectedVersion: shelf.version,
+                      })
+                    }
+                  />
+                  {shelf.name}
+                </label>
+              ))}
+            </fieldset>
+          )}
           {active ? (
             <>
               <p>
@@ -479,5 +678,44 @@ function ReadingPanel({
         </>
       )}
     </section>
+  );
+}
+
+function RenameShelf({
+  shelf,
+  busy,
+  run,
+}: {
+  shelf: Awaited<ReturnType<typeof rowanShelves>>[number];
+  busy: boolean;
+  run: (command: RowanCommand) => void;
+}) {
+  const [name, setName] = useState(shelf.name);
+  return (
+    <form
+      className="flex flex-wrap gap-2"
+      onSubmit={(e) => {
+        e.preventDefault();
+        run({
+          type: "shelfRename",
+          key: crypto.randomUUID(),
+          shelfId: shelf.id,
+          expectedVersion: shelf.version,
+          name: name.trim(),
+        });
+      }}
+    >
+      <input
+        className={control}
+        aria-label="Rename selected shelf"
+        maxLength={120}
+        required
+        value={name}
+        onChange={(e) => setName(e.target.value)}
+      />
+      <button className={control} disabled={busy || !name.trim() || name.trim() === shelf.name}>
+        Rename shelf
+      </button>
+    </form>
   );
 }

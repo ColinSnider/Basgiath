@@ -103,6 +103,7 @@ export const userBooks = v2.table(
   (t) => [
     uniqueIndex("user_work_membership").on(t.userId, t.workId),
     uniqueIndex("user_book_work_pair").on(t.id, t.workId),
+    uniqueIndex("user_book_owner_pair").on(t.id, t.userId),
     foreignKey({
       columns: [t.selectedEditionId, t.workId],
       foreignColumns: [editions.id, editions.workId],
@@ -194,10 +195,87 @@ export const mutationReceipts = v2.table(
   (t) => [uniqueIndex("actor_mutation_key").on(t.userId, t.key)],
 );
 
+export const shelves = v2.table(
+  "shelves",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    userId: integer("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "restrict" }),
+    name: text("name").notNull(),
+    version: integer("version").notNull().default(0),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    uniqueIndex("shelf_user_name").on(t.userId, t.name),
+    uniqueIndex("shelf_user_pair").on(t.id, t.userId),
+    check("shelf_name_not_blank", sql`length(trim(${t.name})) > 0`),
+  ],
+);
+
+export const shelfItems = v2.table(
+  "shelf_items",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    shelfId: uuid("shelf_id").notNull(),
+    userId: integer("user_id").notNull(),
+    userBookId: uuid("user_book_id").notNull(),
+    addedAt: timestamp("added_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    uniqueIndex("shelf_item_membership").on(t.shelfId, t.userBookId),
+    foreignKey({
+      columns: [t.shelfId, t.userId],
+      foreignColumns: [shelves.id, shelves.userId],
+    }),
+    foreignKey({
+      columns: [t.userBookId, t.userId],
+      foreignColumns: [userBooks.id, userBooks.userId],
+    }),
+  ],
+);
+
+export const ratings = v2.table(
+  "ratings",
+  {
+    userBookId: uuid("user_book_id")
+      .primaryKey()
+      .references(() => userBooks.id, { onDelete: "cascade" }),
+    halfStars: integer("half_stars").notNull(),
+  },
+  (t) => [check("rating_half_stars", sql`${t.halfStars} between 1 and 10`)],
+);
+
+export const margins = v2.table(
+  "margins",
+  {
+    id: uuid("id").primaryKey(),
+    userBookId: uuid("user_book_id")
+      .notNull()
+      .references(() => userBooks.id, { onDelete: "restrict" }),
+    body: text("body").notNull(),
+    locator: text("locator"),
+    version: integer("version").notNull().default(0),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+    deletedAt: timestamp("deleted_at", { withTimezone: true }),
+  },
+  (t) => [
+    index("margin_book_history").on(t.userBookId, t.createdAt),
+    check("margin_body_length", sql`length(trim(${t.body})) between 1 and 10000`),
+    check("margin_locator_length", sql`${t.locator} is null or length(${t.locator}) <= 120`),
+  ],
+);
+
 export const userBookRelations = relations(userBooks, ({ one, many }) => ({
   work: one(works, { fields: [userBooks.workId], references: [works.id] }),
   sessions: many(readingSessions),
 }));
 export const sessionRelations = relations(readingSessions, ({ one }) => ({
   userBook: one(userBooks, { fields: [readingSessions.userBookId], references: [userBooks.id] }),
+}));
+export const shelfRelations = relations(shelves, ({ many }) => ({ items: many(shelfItems) }));
+export const shelfItemRelations = relations(shelfItems, ({ one }) => ({
+  shelf: one(shelves, { fields: [shelfItems.shelfId], references: [shelves.id] }),
+  userBook: one(userBooks, { fields: [shelfItems.userBookId], references: [userBooks.id] }),
 }));
