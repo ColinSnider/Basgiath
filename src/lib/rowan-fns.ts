@@ -5,7 +5,14 @@ import { books as legacyBooks, sessions, users } from "../../shared/schema";
 import { db } from "../../server/db";
 import { getRowanRuntime, rowanEnabled } from "../../server/v2/runtime";
 import { DomainError } from "../../server/v2/library-service";
-import { editions, externalMappings, userBooks, works } from "../../shared/schema-v2";
+import {
+  editions,
+  externalMappings,
+  progressEntries,
+  readingSessions,
+  userBooks,
+  works,
+} from "../../shared/schema-v2";
 import { and } from "drizzle-orm";
 
 const key = z.string().uuid();
@@ -165,21 +172,51 @@ async function context(sessionId: string) {
         language: null,
       })
       .returning();
-    await runtime.database.insert(userBooks).values({
-      userId: session.userId,
-      workId: work.id,
-      selectedEditionId: edition.id,
-      status:
-        legacy.status === "read"
-          ? "read"
-          : legacy.status === "dnf"
-            ? "dnf"
-            : legacy.status === "reading"
-              ? "reading"
-              : "want_to_read",
-      isFavorite: Boolean((legacy.metadata as Record<string, unknown> | null)?.favorite),
-      legacyMetadata: legacy.metadata ?? {},
-    });
+    const [membership] = await runtime.database
+      .insert(userBooks)
+      .values({
+        userId: session.userId,
+        workId: work.id,
+        selectedEditionId: edition.id,
+        status:
+          legacy.status === "read"
+            ? "read"
+            : legacy.status === "dnf"
+              ? "dnf"
+              : legacy.status === "reading"
+                ? "reading"
+                : "want_to_read",
+        isFavorite: Boolean((legacy.metadata as Record<string, unknown> | null)?.favorite),
+        legacyMetadata: legacy.metadata ?? {},
+      })
+      .returning();
+    if (legacy.status === "reading" || legacy.status === "paused") {
+      const position = Math.max(0, legacy.currentPage ?? 0);
+      const [sessionRow] = await runtime.database
+        .insert(readingSessions)
+        .values({
+          userBookId: membership.id,
+          workId: work.id,
+          editionId: edition.id,
+          state: legacy.status === "paused" ? "paused" : "active",
+          startedAt: legacy.addedAt,
+          unit: format === "audiobook" ? "second" : "page",
+          total:
+            format === "audiobook"
+              ? legacy.durationMinutes
+                ? legacy.durationMinutes * 60
+                : null
+              : legacy.totalPages,
+          position,
+        })
+        .returning();
+      await runtime.database.insert(progressEntries).values({
+        readingSessionId: sessionRow.id,
+        kind: "baseline",
+        position,
+        occurredAt: legacy.addedAt,
+      });
+    }
   }
   return { ...runtime, actor: { userId: session.userId } };
 }
