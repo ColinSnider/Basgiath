@@ -9,6 +9,8 @@ import { Insights } from "@/components/rowan/Insights";
 import { ManualBook } from "@/components/rowan/ManualBook";
 import { Journal } from "@/components/rowan/Journal";
 import { EditionForm } from "@/components/rowan/EditionForm";
+import { Goals } from "@/components/rowan/Goals";
+import { DataSyncPanel } from "@/components/rowan/DataSyncPanel";
 import {
   rowanStatus,
   rowanLibrary,
@@ -156,6 +158,9 @@ function Workspace({ sessionId }: { sessionId: string }) {
         <a className={control} href="#insights">
           Insights
         </a>
+        <a className={control} href="#goals">
+          Goals
+        </a>
         <a className={control} href="#journal">
           Margins
         </a>
@@ -188,7 +193,7 @@ function Workspace({ sessionId }: { sessionId: string }) {
       <div id="reading-home" />
       <RowanHome
         sessionId={sessionId}
-        openBook={setSelected}
+        openBook={(book) => setSelected({ ...book, tags: [] })}
         showLibrary={() =>
           document
             .getElementById("library-heading")
@@ -196,7 +201,10 @@ function Workspace({ sessionId }: { sessionId: string }) {
         }
       />
       <div id="reading-history">
-        <ReadingCalendar sessionId={sessionId} openBook={setSelected} />
+        <ReadingCalendar
+          sessionId={sessionId}
+          openBook={(book) => setSelected({ ...book, tags: [] })}
+        />
       </div>
       <section
         id="find-books"
@@ -534,6 +542,15 @@ function Workspace({ sessionId }: { sessionId: string }) {
                   <p className="mt-2 text-xs text-primary">
                     {statuses[book.status as keyof typeof statuses]}
                   </p>
+                  {book.tags.length > 0 && (
+                    <div className="mt-2 flex flex-wrap gap-1">
+                      {book.tags.slice(0, 3).map((tag) => (
+                        <span className="rounded-full bg-muted px-2 py-0.5 text-[11px]" key={tag}>
+                          {tag}
+                        </span>
+                      ))}
+                    </div>
+                  )}
                 </div>
               </button>
             </li>
@@ -563,7 +580,9 @@ function Workspace({ sessionId }: { sessionId: string }) {
         </div>
       </section>
       <Insights sessionId={sessionId} run={run} busy={busy} />
-      <Journal sessionId={sessionId} openBook={setSelected} />
+      <Goals sessionId={sessionId} />
+      <DataSyncPanel sessionId={sessionId} />
+      <Journal sessionId={sessionId} openBook={(book) => setSelected({ ...book, tags: [] })} />
       {selected && (
         <ReadingPanel
           key={selected.id}
@@ -681,6 +700,7 @@ function ReadingPanel({
                 ))}
               </select>
             </label>
+            <TagEditor book={book} history={history.data} busy={busy} run={run} />
           </div>
           {shelves.length > 0 && (
             <fieldset className="flex flex-wrap gap-3">
@@ -848,6 +868,52 @@ function ReadingPanel({
         </>
       )}
     </section>
+  );
+}
+
+function TagEditor({
+  book,
+  history,
+  busy,
+  run,
+}: {
+  book: Item;
+  history: Awaited<ReturnType<typeof rowanHistory>>;
+  busy: boolean;
+  run: (command: RowanCommand) => void;
+}) {
+  const [value, setValue] = useState(history.tags.join(", "));
+  return (
+    <form
+      className="flex items-center gap-2"
+      onSubmit={(event) => {
+        event.preventDefault();
+        run({
+          type: "personalize",
+          key: crypto.randomUUID(),
+          userBookId: book.id,
+          expectedVersion: history.userBookVersion,
+          tags: value
+            .split(",")
+            .map((tag) => tag.trim())
+            .filter(Boolean),
+        });
+      }}
+    >
+      <label className="text-sm">
+        Tags{" "}
+        <input
+          className={control}
+          value={value}
+          onChange={(event) => setValue(event.target.value)}
+          placeholder="fantasy, reread"
+          maxLength={500}
+        />
+      </label>
+      <button className={control} disabled={busy}>
+        Save tags
+      </button>
+    </form>
   );
 }
 

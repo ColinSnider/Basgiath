@@ -161,6 +161,56 @@ export function createLibraryService(database: Database, provider: CatalogProvid
   }
 
   return {
+    async goals(actor: Actor) {
+      z.number().int().positive().parse(actor.userId);
+      return database
+        .select()
+        .from(goals)
+        .where(eq(goals.userId, actor.userId))
+        .orderBy(desc(goals.createdAt));
+    },
+    async saveGoal(
+      actor: Actor,
+      input: {
+        key: string;
+        id?: string;
+        metric: "books" | "pages" | "minutes";
+        target: number;
+        timeframe: "week" | "month" | "year";
+      },
+    ) {
+      const data = z
+        .object({
+          key: id,
+          id: id.optional(),
+          metric: z.enum(["books", "pages", "minutes"]),
+          target: z.number().int().positive().max(10000000),
+          timeframe: z.enum(["week", "month", "year"]),
+        })
+        .strict()
+        .parse(input);
+      const result = await database.transaction(async (tx) => {
+        await tx.execute(sql`select pg_advisory_xact_lock(21071, ${actor.userId})`);
+        const goalId = data.id ?? crypto.randomUUID();
+        const [saved] = await tx
+          .insert(goals)
+          .values({
+            id: goalId,
+            userId: actor.userId,
+            metric: data.metric,
+            target: data.target,
+            timeframe: data.timeframe,
+          })
+          .onConflictDoUpdate({
+            target: goals.id,
+            set: { metric: data.metric, target: data.target, timeframe: data.timeframe },
+            setWhere: eq(goals.userId, actor.userId),
+          })
+          .returning();
+        return saved;
+      });
+      return result;
+    },
     async archive(actor: Actor) {
       z.number().int().positive().parse(actor.userId);
       return database.transaction(
@@ -496,6 +546,7 @@ export function createLibraryService(database: Database, provider: CatalogProvid
         .select({
           status: userBooks.status,
           halfStars: ratings.halfStars,
+          tags: sql<string[]>`coalesce(${userBooks.legacyMetadata}->'tags', '[]'::jsonb)`,
           favorite: userBooks.isFavorite,
         })
         .from(userBooks)
@@ -760,6 +811,7 @@ export function createLibraryService(database: Database, provider: CatalogProvid
           coverUrl: works.coverUrl,
           isFavorite: userBooks.isFavorite,
           halfStars: ratings.halfStars,
+          tags: sql<string[]>`coalesce(${userBooks.legacyMetadata}->'tags', '[]'::jsonb)`,
         })
         .from(userBooks)
         .innerJoin(works, eq(works.id, userBooks.workId))
@@ -773,7 +825,11 @@ export function createLibraryService(database: Database, provider: CatalogProvid
               : undefined,
             data.status === "all" ? undefined : eq(userBooks.status, data.status),
             data.query
-              ? or(ilike(works.title, term), ilike(sql`${works.authors}::text`, term))
+              ? or(
+                  ilike(works.title, term),
+                  ilike(sql`${works.authors}::text`, term),
+                  ilike(sql`${userBooks.legacyMetadata}->>'tags'`, term),
+                )
               : undefined,
           ),
         )
@@ -864,6 +920,7 @@ export function createLibraryService(database: Database, provider: CatalogProvid
         expectedVersion: number;
         isFavorite?: boolean;
         halfStars?: number | null;
+        tags?: string[];
       },
     ) {
       const data = z
@@ -873,6 +930,7 @@ export function createLibraryService(database: Database, provider: CatalogProvid
           expectedVersion: version,
           isFavorite: z.boolean().optional(),
           halfStars: z.number().int().min(1).max(10).nullable().optional(),
+          tags: z.array(z.string().trim().min(1).max(40)).max(50).optional(),
         })
         .strict()
         .refine((d) => d.isFavorite !== undefined || d.halfStars !== undefined, "Choose a change.")
@@ -889,7 +947,16 @@ export function createLibraryService(database: Database, provider: CatalogProvid
             .onConflictDoUpdate({ target: ratings.userBookId, set: { halfStars: data.halfStars } });
         await tx
           .update(userBooks)
-          .set({ isFavorite: data.isFavorite ?? book.isFavorite, version: book.version + 1 })
+          .set({
+            isFavorite: data.isFavorite ?? book.isFavorite,
+            legacyMetadata: data.tags
+              ? {
+                  ...(book.legacyMetadata ?? {}),
+                  tags: [...new Set(data.tags.map((tag) => tag.trim()).filter(Boolean))],
+                }
+              : book.legacyMetadata,
+            version: book.version + 1,
+          })
           .where(eq(userBooks.id, book.id));
         return {
           workId: book.workId,
@@ -1125,6 +1192,9 @@ export function createLibraryService(database: Database, provider: CatalogProvid
             .orderBy(margins.createdAt, margins.id),
           isFavorite: book.isFavorite,
           halfStars: rating?.halfStars ?? null,
+          tags: Array.isArray(book.legacyMetadata?.tags)
+            ? book.legacyMetadata.tags.filter((tag): tag is string => typeof tag === "string")
+            : [],
           sessions,
           entries: entries.map(({ entry }) => entry),
         };

@@ -7,6 +7,15 @@ import { getRowanRuntime, rowanEnabled } from "../../server/v2/runtime";
 import { DomainError } from "../../server/v2/library-service";
 import { importLegacyLibrary } from "../../server/v2/legacy-import";
 import { qualitySearch } from "../../server/v2/search-quality";
+import { margins as legacyMargins, goals as legacyGoals, userSettings } from "../../shared/schema";
+import {
+  userBooks as v2Books,
+  margins as v2Margins,
+  shelves as v2Shelves,
+  legacySyncSnapshots,
+} from "../../shared/schema-v2";
+import { count } from "drizzle-orm";
+import { createHash } from "node:crypto";
 
 const key = z.string().uuid();
 const moment = z.string().datetime({ offset: true });
@@ -81,6 +90,7 @@ const command = z.discriminatedUnion("type", [
       expectedVersion: z.number().int().nonnegative(),
       isFavorite: z.boolean().optional(),
       halfStars: z.number().int().min(1).max(10).nullable().optional(),
+      tags: z.array(z.string().trim().min(1).max(40)).max(50).optional(),
     })
     .strict(),
   z
@@ -149,7 +159,19 @@ async function context(sessionId: string, importLibrary = true) {
     .select()
     .from(legacyBooks)
     .where(eq(legacyBooks.userId, session.userId));
-  await importLegacyLibrary(runtime.database, source, legacyRows);
+  const [legacyMarginRows, legacyGoalRows, legacySettingRows] = await Promise.all([
+    db.select().from(legacyMargins).where(eq(legacyMargins.userId, session.userId)),
+    db.select().from(legacyGoals).where(eq(legacyGoals.userId, session.userId)),
+    db.select().from(userSettings).where(eq(userSettings.userId, session.userId)),
+  ]);
+  await importLegacyLibrary(
+    runtime.database,
+    source,
+    legacyRows,
+    legacyMarginRows,
+    legacyGoalRows,
+    legacySettingRows[0],
+  );
   return { ...runtime, actor: { userId: session.userId } };
 }
 export const rowanStatus = createServerFn({ method: "GET" }).handler(() => ({
@@ -157,6 +179,115 @@ export const rowanStatus = createServerFn({ method: "GET" }).handler(() => ({
   googleBooksEnabled:
     process.env.GOOGLE_BOOKS_ENABLED === "true" && !!process.env.GOOGLE_BOOKS_API_KEY?.trim(),
 }));
+export const rowanSyncStatus = createServerFn({ method: "POST" })
+  .inputValidator(z.object({ sessionId: key }).strict())
+  .handler(async ({ data }) => {
+    const runtime = getRowanRuntime();
+    const [session] = await db.select().from(sessions).where(eq(sessions.id, data.sessionId));
+    if (!session || session.expiresAt <= new Date())
+      throw new Error("Sign in to the development account again.");
+    const userId = session.userId;
+    const [
+      [legacyBookCount],
+      [legacyMarginCount],
+      [legacyGoalCount],
+      [v2BookCount],
+      [v2MarginCount],
+      [v2GoalCount],
+      [v2ShelfCount],
+    ] = await Promise.all([
+      db.select({ count: count() }).from(legacyBooks).where(eq(legacyBooks.userId, userId)),
+      db.select({ count: count() }).from(legacyMargins).where(eq(legacyMargins.userId, userId)),
+      db.select({ count: count() }).from(legacyGoals).where(eq(legacyGoals.userId, userId)),
+      runtime.database.select({ count: count() }).from(v2Books).where(eq(v2Books.userId, userId)),
+      runtime.database
+        .select({ count: count() })
+        .from(v2Margins)
+        .innerJoin(v2Books, eq(v2Books.id, v2Margins.userBookId))
+        .where(eq(v2Books.userId, userId)),
+      runtime.database
+        .select({ count: count() })
+        .from(legacyGoals)
+        .where(eq(legacyGoals.userId, userId)),
+      runtime.database
+        .select({ count: count() })
+        .from(v2Shelves)
+        .where(eq(v2Shelves.userId, userId)),
+    ]);
+    return {
+      legacy: {
+        books: legacyBookCount.count,
+        margins: legacyMarginCount.count,
+        goals: legacyGoalCount.count,
+      },
+      v2: {
+        books: v2BookCount.count,
+        margins: v2MarginCount.count,
+        goals: v2GoalCount.count,
+        shelves: v2ShelfCount.count,
+      },
+      checkedAt: new Date().toISOString(),
+    };
+  });
+export const rowanSyncConflicts = createServerFn({ method: "POST" })
+  .inputValidator(z.object({ sessionId: key }).strict())
+  .handler(async ({ data }) => {
+    const runtime = getRowanRuntime();
+    const [session] = await db.select().from(sessions).where(eq(sessions.id, data.sessionId));
+    if (!session || session.expiresAt <= new Date())
+      throw new Error("Sign in to the development account again.");
+    const userId = session.userId;
+    const [sourceBooks, sourceMargins, sourceGoals, sourceSettings, snapshots] = await Promise.all([
+      db.select().from(legacyBooks).where(eq(legacyBooks.userId, userId)),
+      db.select().from(legacyMargins).where(eq(legacyMargins.userId, userId)),
+      db.select().from(legacyGoals).where(eq(legacyGoals.userId, userId)),
+      db.select().from(userSettings).where(eq(userSettings.userId, userId)),
+      runtime.database
+        .select()
+        .from(legacySyncSnapshots)
+        .where(eq(legacySyncSnapshots.userId, userId)),
+    ]);
+    const hash = (value: unknown) =>
+      createHash("sha256").update(JSON.stringify(value)).digest("hex");
+    const source = [
+      ...sourceBooks.map((row) => ({ kind: "book" as const, id: row.id, value: row })),
+      ...sourceMargins.map((row) => ({ kind: "margin" as const, id: row.id, value: row })),
+      ...sourceGoals.map((row) => ({ kind: "goal" as const, id: row.id, value: row })),
+      ...(sourceSettings[0]
+        ? [{ kind: "settings" as const, id: String(userId), value: sourceSettings[0] }]
+        : []),
+    ];
+    const known = new Map(snapshots.map((row) => [`${row.entityKind}:${row.sourceId}`, row]));
+    const changed = source
+      .filter((row) => known.get(`${row.kind}:${row.id}`)?.sourceHash !== hash(row.value))
+      .map((row) => ({
+        kind: row.kind,
+        sourceId: row.id,
+        reason: known.has(`${row.kind}:${row.id}`) ? "changed_since_snapshot" : "not_snapshotted",
+      }));
+    const sourceKeys = new Set(source.map((row) => `${row.kind}:${row.id}`));
+    const removed = snapshots
+      .filter((row) => !sourceKeys.has(`${row.entityKind}:${row.sourceId}`))
+      .map((row) => ({
+        kind: row.entityKind,
+        sourceId: row.sourceId,
+        reason: "removed_from_legacy",
+      }));
+    const [localEdits] = await Promise.all([
+      runtime.database
+        .select({ id: v2Books.id, version: v2Books.version, title: v2Books.legacyMetadata })
+        .from(v2Books)
+        .where(eq(v2Books.userId, userId)),
+    ]);
+    return {
+      changed,
+      removed,
+      localEdits: localEdits
+        .filter((row) => row.version > 0)
+        .map((row) => ({ userBookId: row.id, version: row.version })),
+      checkedAt: new Date().toISOString(),
+    };
+  });
 export const rowanLibrary = createServerFn({ method: "POST" })
   .inputValidator(
     z
@@ -199,6 +330,29 @@ export const rowanInsights = createServerFn({ method: "POST" })
   .handler(async ({ data }) => {
     const { library, actor } = await context(data.sessionId);
     return library.insights(actor, data.year);
+  });
+export const rowanGoals = createServerFn({ method: "POST" })
+  .inputValidator(z.object({ sessionId: key }).strict())
+  .handler(async ({ data }) => {
+    const { library, actor } = await context(data.sessionId);
+    return library.goals(actor);
+  });
+export const rowanSaveGoal = createServerFn({ method: "POST" })
+  .inputValidator(
+    z
+      .object({
+        sessionId: key,
+        key,
+        id: key.optional(),
+        metric: z.enum(["books", "pages", "minutes"]),
+        target: z.number().int().positive().max(10000000),
+        timeframe: z.enum(["week", "month", "year"]),
+      })
+      .strict(),
+  )
+  .handler(async ({ data: { sessionId, ...input } }) => {
+    const { library, actor } = await context(sessionId);
+    return library.saveGoal(actor, input);
   });
 export const rowanArchive = createServerFn({ method: "POST" })
   .inputValidator(z.object({ sessionId: key }).strict())
@@ -258,6 +412,7 @@ export const rowanHistory = createServerFn({ method: "POST" })
       })),
       isFavorite: history.isFavorite,
       halfStars: history.halfStars,
+      tags: history.tags,
       sessions: history.sessions.map((s) => ({
         id: s.id,
         state: s.state,

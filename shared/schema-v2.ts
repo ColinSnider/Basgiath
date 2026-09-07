@@ -267,6 +267,22 @@ export const margins = v2.table(
   ],
 );
 
+export const legacySyncSnapshots = v2.table(
+  "legacy_sync_snapshots",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    userId: integer("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "restrict" }),
+    entityKind: text("entity_kind").$type<"book" | "margin" | "goal" | "settings">().notNull(),
+    sourceId: text("source_id").notNull(),
+    sourceHash: text("source_hash").notNull(),
+    payload: jsonb("payload").$type<JsonValue>().notNull(),
+    observedAt: timestamp("observed_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [uniqueIndex("legacy_sync_source_identity").on(t.userId, t.entityKind, t.sourceId)],
+);
+
 export const userBookRelations = relations(userBooks, ({ one, many }) => ({
   work: one(works, { fields: [userBooks.workId], references: [works.id] }),
   sessions: many(readingSessions),
