@@ -31,6 +31,15 @@ export async function importLegacyLibrary(
   sourceGoals: legacySchema.GoalRow[] = [],
   sourceSettings?: legacySchema.UserSettingsRow,
 ) {
+  // Provenance is auxiliary. Older staging databases may not have received
+  // the audit-table migration yet, so never let that table prevent the core
+  // legacy-to-Rowan translation from running.
+  const snapshotTable = await database.execute(
+    sql`select to_regclass('v2.legacy_sync_snapshots') as name`,
+  );
+  const snapshotsAvailable = Boolean(
+    (snapshotTable as unknown as { rows?: Array<{ name?: string | null }> }).rows?.[0]?.name,
+  );
   await database.transaction(async (tx) => {
     await tx.execute(sql`select pg_advisory_xact_lock(21071, ${source.id})`);
     const [target] = await tx
@@ -135,27 +144,29 @@ export async function importLegacyLibrary(
           })
           .where(eq(userBooks.id, book.id));
       }
-      await tx
-        .insert(legacySyncSnapshots)
-        .values({
-          userId: source.id,
-          entityKind: "book",
-          sourceId: legacy.id,
-          sourceHash: snapshotHash(legacy),
-          payload: snapshotPayload(legacy),
-        })
-        .onConflictDoUpdate({
-          target: [
-            legacySyncSnapshots.userId,
-            legacySyncSnapshots.entityKind,
-            legacySyncSnapshots.sourceId,
-          ],
-          set: {
+      if (snapshotsAvailable) {
+        await tx
+          .insert(legacySyncSnapshots)
+          .values({
+            userId: source.id,
+            entityKind: "book",
+            sourceId: legacy.id,
             sourceHash: snapshotHash(legacy),
             payload: snapshotPayload(legacy),
-            observedAt: new Date(),
-          },
-        });
+          })
+          .onConflictDoUpdate({
+            target: [
+              legacySyncSnapshots.userId,
+              legacySyncSnapshots.entityKind,
+              legacySyncSnapshots.sourceId,
+            ],
+            set: {
+              sourceHash: snapshotHash(legacy),
+              payload: snapshotPayload(legacy),
+              observedAt: new Date(),
+            },
+          });
+      }
       const [existingSession] = await tx
         .select({ id: readingSessions.id })
         .from(readingSessions)
@@ -205,27 +216,29 @@ export async function importLegacyLibrary(
           target: legacySchema.goals.id,
           set: { metric: goal.metric, target: goal.target, timeframe: goal.timeframe },
         });
-      await tx
-        .insert(legacySyncSnapshots)
-        .values({
-          userId: source.id,
-          entityKind: "goal",
-          sourceId: goal.id,
-          sourceHash: snapshotHash(goal),
-          payload: snapshotPayload(goal),
-        })
-        .onConflictDoUpdate({
-          target: [
-            legacySyncSnapshots.userId,
-            legacySyncSnapshots.entityKind,
-            legacySyncSnapshots.sourceId,
-          ],
-          set: {
+      if (snapshotsAvailable) {
+        await tx
+          .insert(legacySyncSnapshots)
+          .values({
+            userId: source.id,
+            entityKind: "goal",
+            sourceId: goal.id,
             sourceHash: snapshotHash(goal),
             payload: snapshotPayload(goal),
-            observedAt: new Date(),
-          },
-        });
+          })
+          .onConflictDoUpdate({
+            target: [
+              legacySyncSnapshots.userId,
+              legacySyncSnapshots.entityKind,
+              legacySyncSnapshots.sourceId,
+            ],
+            set: {
+              sourceHash: snapshotHash(goal),
+              payload: snapshotPayload(goal),
+              observedAt: new Date(),
+            },
+          });
+      }
     }
     if (sourceSettings && sourceSettings.userId === source.id) {
       await tx
@@ -240,27 +253,29 @@ export async function importLegacyLibrary(
             fontScale: sourceSettings.fontScale,
           },
         });
-      await tx
-        .insert(legacySyncSnapshots)
-        .values({
-          userId: source.id,
-          entityKind: "settings",
-          sourceId: String(source.id),
-          sourceHash: snapshotHash(sourceSettings),
-          payload: snapshotPayload(sourceSettings),
-        })
-        .onConflictDoUpdate({
-          target: [
-            legacySyncSnapshots.userId,
-            legacySyncSnapshots.entityKind,
-            legacySyncSnapshots.sourceId,
-          ],
-          set: {
+      if (snapshotsAvailable) {
+        await tx
+          .insert(legacySyncSnapshots)
+          .values({
+            userId: source.id,
+            entityKind: "settings",
+            sourceId: String(source.id),
             sourceHash: snapshotHash(sourceSettings),
             payload: snapshotPayload(sourceSettings),
-            observedAt: new Date(),
-          },
-        });
+          })
+          .onConflictDoUpdate({
+            target: [
+              legacySyncSnapshots.userId,
+              legacySyncSnapshots.entityKind,
+              legacySyncSnapshots.sourceId,
+            ],
+            set: {
+              sourceHash: snapshotHash(sourceSettings),
+              payload: snapshotPayload(sourceSettings),
+              observedAt: new Date(),
+            },
+          });
+      }
     }
     for (const margin of sourceMargins.filter((row) => row.userId === source.id)) {
       const [mapping] = await tx
@@ -292,27 +307,29 @@ export async function importLegacyLibrary(
           updatedAt: margin.createdAt,
         })
         .onConflictDoNothing();
-      await tx
-        .insert(legacySyncSnapshots)
-        .values({
-          userId: source.id,
-          entityKind: "margin",
-          sourceId: margin.id,
-          sourceHash: snapshotHash(margin),
-          payload: snapshotPayload(margin),
-        })
-        .onConflictDoUpdate({
-          target: [
-            legacySyncSnapshots.userId,
-            legacySyncSnapshots.entityKind,
-            legacySyncSnapshots.sourceId,
-          ],
-          set: {
+      if (snapshotsAvailable) {
+        await tx
+          .insert(legacySyncSnapshots)
+          .values({
+            userId: source.id,
+            entityKind: "margin",
+            sourceId: margin.id,
             sourceHash: snapshotHash(margin),
             payload: snapshotPayload(margin),
-            observedAt: new Date(),
-          },
-        });
+          })
+          .onConflictDoUpdate({
+            target: [
+              legacySyncSnapshots.userId,
+              legacySyncSnapshots.entityKind,
+              legacySyncSnapshots.sourceId,
+            ],
+            set: {
+              sourceHash: snapshotHash(margin),
+              payload: snapshotPayload(margin),
+              observedAt: new Date(),
+            },
+          });
+      }
     }
   });
 }
