@@ -28,7 +28,21 @@ async function runMigrations() {
   }
 }
 
+async function runRowanMigrations() {
+  if (!process.env.ROWAN_DATABASE_URL || process.env.ROWAN_DATABASE_URL === process.env.DATABASE_URL) return;
+  const pool = new pg.Pool({ connectionString: process.env.ROWAN_DATABASE_URL });
+  try {
+    const db = drizzle(pool);
+    await migrate(db, { migrationsFolder: join(__dirname, "migrations") });
+    await migrate(db, { migrationsFolder: join(__dirname, "migrations-v2") });
+    console.log("Rowan database migrations applied successfully.");
+  } finally {
+    await pool.end();
+  }
+}
+
 await runMigrations();
+await runRowanMigrations();
 
 const MIME = {
   ".html": "text/html; charset=utf-8",

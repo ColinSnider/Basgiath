@@ -1,10 +1,12 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { eq } from "drizzle-orm";
-import { sessions, users } from "../../shared/schema";
+import { books as legacyBooks, sessions, users } from "../../shared/schema";
 import { db } from "../../server/db";
 import { getRowanRuntime, rowanEnabled } from "../../server/v2/runtime";
 import { DomainError } from "../../server/v2/library-service";
+import { editions, externalMappings, userBooks, works } from "../../shared/schema-v2";
+import { and } from "drizzle-orm";
 
 const key = z.string().uuid();
 const moment = z.string().datetime({ offset: true });
@@ -111,8 +113,74 @@ async function context(sessionId: string) {
     .select({ username: users.username })
     .from(users)
     .where(eq(users.id, session.userId));
-  if (!source || !target || source.username !== target.username)
+  if (!source) throw new Error("The signed-in staging account could not be found.");
+  if (!target) {
+    const [sourceUser] = await db.select().from(users).where(eq(users.id, session.userId));
+    await runtime.database.insert(users).values({
+      id: sourceUser.id,
+      username: sourceUser.username,
+      password: sourceUser.password,
+      displayName: sourceUser.displayName,
+      email: sourceUser.email,
+    });
+  } else if (source.username !== target.username) {
     throw new Error("Development account is missing from the isolated database.");
+  }
+  const legacyRows = await db
+    .select()
+    .from(legacyBooks)
+    .where(eq(legacyBooks.userId, session.userId));
+  for (const legacy of legacyRows) {
+    const [known] = await runtime.database
+      .select({ workId: externalMappings.workId })
+      .from(externalMappings)
+      .where(
+        and(
+          eq(externalMappings.provider, "legacy"),
+          eq(externalMappings.entityKind, "work"),
+          eq(externalMappings.externalId, legacy.id),
+        ),
+      );
+    if (known) continue;
+    const [work] = await runtime.database
+      .insert(works)
+      .values({
+        title: legacy.title,
+        authors: legacy.author ? [legacy.author] : [],
+        coverUrl: legacy.coverUrl,
+      })
+      .returning();
+    await runtime.database
+      .insert(externalMappings)
+      .values({ provider: "legacy", entityKind: "work", externalId: legacy.id, workId: work.id });
+    const format = legacy.format === "audiobook" ? "audiobook" : "book";
+    const [edition] = await runtime.database
+      .insert(editions)
+      .values({
+        workId: work.id,
+        format,
+        pageCount: format === "book" ? legacy.totalPages : null,
+        durationSeconds:
+          format === "audiobook" && legacy.durationMinutes ? legacy.durationMinutes * 60 : null,
+        language: null,
+      })
+      .returning();
+    await runtime.database.insert(userBooks).values({
+      userId: session.userId,
+      workId: work.id,
+      selectedEditionId: edition.id,
+      status:
+        legacy.status === "read"
+          ? "read"
+          : legacy.status === "dnf"
+            ? "dnf"
+            : legacy.status === "reading"
+              ? "reading"
+              : "want_to_read",
+      isFavorite: Boolean((legacy.metadata as Record<string, unknown> | null)?.favorite),
+      legacyMetadata: legacy.metadata ?? {},
+    });
+  }
   return { ...runtime, actor: { userId: session.userId } };
 }
 export const rowanStatus = createServerFn({ method: "GET" }).handler(() => ({
