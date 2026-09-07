@@ -1,6 +1,6 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
-import { eq } from "drizzle-orm";
+import { and, eq, sql } from "drizzle-orm";
 import { books as legacyBooks, sessions, users } from "../../shared/schema";
 import { db } from "../../server/db";
 import { getRowanRuntime, rowanEnabled } from "../../server/v2/runtime";
@@ -12,6 +12,10 @@ import {
   userBooks as v2Books,
   margins as v2Margins,
   shelves as v2Shelves,
+  shelfItems as v2ShelfItems,
+  readingSessions as v2ReadingSessions,
+  progressEntries as v2ProgressEntries,
+  ratings as v2Ratings,
   legacySyncSnapshots,
 } from "../../shared/schema-v2";
 import { count } from "drizzle-orm";
@@ -179,6 +183,30 @@ export const rowanStatus = createServerFn({ method: "GET" }).handler(() => ({
   googleBooksEnabled:
     process.env.GOOGLE_BOOKS_ENABLED === "true" && !!process.env.GOOGLE_BOOKS_API_KEY?.trim(),
 }));
+export const rowanSettings = createServerFn({ method: "POST" })
+  .inputValidator(z.object({ sessionId: key, patch: z.object({ darkMode: z.boolean().optional(), accentColor: z.string().trim().max(40).optional(), compactMode: z.boolean().optional(), fontScale: z.enum(["sm", "md", "lg"]).optional() }).strict() }).strict())
+  .handler(async ({ data }) => {
+    const { actor, database } = await context(data.sessionId, false);
+    await database.insert(userSettings).values({ userId: actor.userId, ...data.patch }).onConflictDoUpdate({ target: userSettings.userId, set: data.patch });
+    const [settings] = await database.select().from(userSettings).where(eq(userSettings.userId, actor.userId));
+    return settings;
+  });
+export const rowanDeleteBook = createServerFn({ method: "POST" })
+  .inputValidator(z.object({ sessionId: key, userBookId: key }).strict())
+  .handler(async ({ data }) => {
+    const { actor, database } = await context(data.sessionId, false);
+    await database.transaction(async (tx) => {
+      const [owned] = await tx.select({ id: v2Books.id }).from(v2Books).where(and(eq(v2Books.id, data.userBookId), eq(v2Books.userId, actor.userId)));
+      if (!owned) throw new Error("Book not found.");
+      await tx.delete(v2ProgressEntries).where(sql`${v2ProgressEntries.readingSessionId} in (select id from ${v2ReadingSessions} where ${v2ReadingSessions.userBookId} = ${data.userBookId})`);
+      await tx.delete(v2ReadingSessions).where(eq(v2ReadingSessions.userBookId, data.userBookId));
+      await tx.delete(v2ShelfItems).where(eq(v2ShelfItems.userBookId, data.userBookId));
+      await tx.delete(v2Ratings).where(eq(v2Ratings.userBookId, data.userBookId));
+      await tx.delete(v2Margins).where(eq(v2Margins.userBookId, data.userBookId));
+      await tx.delete(v2Books).where(eq(v2Books.id, data.userBookId));
+    });
+    return { ok: true as const };
+  });
 export const rowanSyncStatus = createServerFn({ method: "POST" })
   .inputValidator(z.object({ sessionId: key }).strict())
   .handler(async ({ data }) => {

@@ -19,6 +19,7 @@ import {
   rowanMutate,
   rowanShelves,
   rowanArchive,
+  rowanDeleteBook,
   type RowanCommand,
 } from "@/lib/rowan-fns";
 
@@ -164,6 +165,9 @@ function Workspace({ sessionId }: { sessionId: string }) {
         <a className={control} href="#journal">
           Margins
         </a>
+        <Link className={control} to="/settings">
+          Settings
+        </Link>
         <button
           className={control}
           disabled={exporting}
@@ -592,6 +596,12 @@ function Workspace({ sessionId }: { sessionId: string }) {
           shelves={shelves.data ?? []}
           run={run}
           close={() => setSelected(null)}
+          onDelete={async () => {
+            if (!window.confirm(`Permanently delete ${selected.title}?`)) return;
+            await rowanDeleteBook({ data: { sessionId, userBookId: selected.id } });
+            setSelected(null);
+            await cache.invalidateQueries({ queryKey: ["rowan", sessionId] });
+          }}
         />
       )}
     </main>
@@ -604,6 +614,7 @@ function ReadingPanel({
   busy,
   run,
   close,
+  onDelete,
   shelves,
 }: {
   book: Item;
@@ -611,6 +622,7 @@ function ReadingPanel({
   busy: boolean;
   run: (command: RowanCommand) => void;
   close: () => void;
+  onDelete: () => Promise<void>;
   shelves: Awaited<ReturnType<typeof rowanShelves>>;
 }) {
   const [unit, setUnit] = useState<"page" | "second" | "percent">("page");
@@ -636,9 +648,10 @@ function ReadingPanel({
     >
       <div className="flex justify-between gap-3">
         <h2 className="font-display text-2xl">{book.title}</h2>
-        <button className={control} onClick={close}>
-          Close
-        </button>
+        <div className="flex gap-2">
+          <button className={control} onClick={() => void onDelete()}>Delete permanently</button>
+          <button className={control} onClick={close}>Close</button>
+        </div>
       </div>
       {history.isPending && <p>Loading reading history…</p>}
       {history.isError && (
