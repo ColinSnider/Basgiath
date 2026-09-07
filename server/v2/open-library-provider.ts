@@ -7,6 +7,7 @@ const docSchema = z.object({
   title: z.string().min(1),
   author_name: z.array(z.string()).optional(),
   cover_i: z.number().int().positive().optional(),
+  subject: z.array(z.string()).optional(),
 });
 const searchSchema = z.object({ docs: z.array(z.unknown()) });
 const editionSchema = z.object({
@@ -19,6 +20,7 @@ export type WorkSearchResult = {
   title: string;
   authors: string[];
   coverUrl: string | null;
+  categories?: string[];
 };
 
 /** Create once per server process; keeps requests bounded and caches public metadata only. */
@@ -80,10 +82,11 @@ export function createOpenLibraryProvider(options: {
       ref: { provider: "openlibrary", externalId: doc.key },
       title: doc.title,
       authors: doc.author_name ?? [],
+      categories: doc.subject?.slice(0, 100) ?? [],
       coverUrl: doc.cover_i ? `https://covers.openlibrary.org/b/id/${doc.cover_i}-M.jpg` : null,
     };
   }
-  const fields = "key,title,author_name,cover_i";
+  const fields = "key,title,author_name,cover_i,subject";
   return {
     async search(query) {
       const trimmed = query.trim();

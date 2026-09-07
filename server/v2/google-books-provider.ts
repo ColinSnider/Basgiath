@@ -11,6 +11,7 @@ const volume = z.object({
     authors: z.array(z.string()).optional(),
     pageCount: z.number().int().positive().optional(),
     language: z.string().optional(),
+    categories: z.array(z.string()).optional(),
     imageLinks: z.object({ thumbnail: z.string().optional() }).optional(),
   }),
 });
@@ -83,6 +84,7 @@ export function createGoogleBooksProvider(options: {
           ref: { provider: "googlebooks", externalId: id },
           title: info.subtitle ? `${info.title}: ${info.subtitle}` : info.title,
           authors: info.authors ?? [],
+          categories: info.categories ?? [],
           coverUrl: cover(info.imageLinks?.thumbnail),
         });
       }

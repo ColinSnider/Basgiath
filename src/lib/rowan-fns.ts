@@ -6,6 +6,7 @@ import { db } from "../../server/db";
 import { getRowanRuntime, rowanEnabled } from "../../server/v2/runtime";
 import { DomainError } from "../../server/v2/library-service";
 import { importLegacyLibrary } from "../../server/v2/legacy-import";
+import { qualitySearch } from "../../server/v2/search-quality";
 
 const key = z.string().uuid();
 const moment = z.string().datetime({ offset: true });
@@ -181,12 +182,17 @@ export const rowanSearch = createServerFn({ method: "POST" })
         sessionId: key,
         query: z.string().trim().min(1).max(200),
         source: z.enum(["openlibrary", "googlebooks"]).default("openlibrary"),
+        includeExtras: z.boolean().default(false),
       })
       .strict(),
   )
   .handler(async ({ data }) => {
     const { provider } = await context(data.sessionId, false);
-    return provider.search(data.query, data.source);
+    return qualitySearch(
+      await provider.search(data.query, data.source),
+      data.query,
+      data.includeExtras,
+    );
   });
 export const rowanInsights = createServerFn({ method: "POST" })
   .inputValidator(z.object({ sessionId: key, year: z.number().int().min(1900).max(9998) }).strict())

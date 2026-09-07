@@ -77,6 +77,7 @@ function Workspace({ sessionId }: { sessionId: string }) {
   const [sort, setSort] = useState<"newest" | "oldest" | "title" | "rating">("newest");
   const [searchText, setSearchText] = useState("");
   const [catalogQuery, setCatalogQuery] = useState("");
+  const [includeExtras, setIncludeExtras] = useState(false);
   const [selected, setSelected] = useState<Item | null>(null);
   const [notice, setNotice] = useState("");
   const [exporting, setExporting] = useState(false);
@@ -98,8 +99,11 @@ function Workspace({ sessionId }: { sessionId: string }) {
     retry: false,
   });
   const catalog = useQuery({
-    queryKey: ["rowan", sessionId, "search", catalogQuery, catalogSource],
-    queryFn: () => rowanSearch({ data: { sessionId, query: catalogQuery, source: catalogSource } }),
+    queryKey: ["rowan", sessionId, "search", catalogQuery, catalogSource, includeExtras],
+    queryFn: () =>
+      rowanSearch({
+        data: { sessionId, query: catalogQuery, source: catalogSource, includeExtras },
+      }),
     enabled: !!catalogQuery,
     retry: false,
   });
@@ -200,6 +204,14 @@ function Workspace({ sessionId }: { sessionId: string }) {
         aria-label="Find a book"
       >
         <h2 className="font-display text-2xl">Your next good book</h2>
+        <label className="flex items-center gap-2 text-sm">
+          <input
+            type="checkbox"
+            checked={includeExtras}
+            onChange={(event) => setIncludeExtras(event.target.checked)}
+          />
+          Include companion books, collections and activities
+        </label>
         {googleBooksEnabled && (
           <label className="text-sm">
             Search source{" "}
