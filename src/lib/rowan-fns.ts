@@ -86,10 +86,16 @@ const command = z.discriminatedUnion("type", [
     .object({
       type: z.literal("save"),
       key,
-      ref: z.object({
-        provider: z.literal("openlibrary"),
-        externalId: z.string().regex(/^\/works\/OL\d+W$/),
-      }),
+      ref: z.union([
+        z.object({
+          provider: z.literal("openlibrary"),
+          externalId: z.string().regex(/^\/works\/OL\d+W$/),
+        }),
+        z.object({
+          provider: z.literal("googlebooks"),
+          externalId: z.string().regex(/^[A-Za-z0-9_-]{1,128}$/),
+        }),
+      ]),
     })
     .strict(),
   z
@@ -147,6 +153,8 @@ async function context(sessionId: string, importLibrary = true) {
 }
 export const rowanStatus = createServerFn({ method: "GET" }).handler(() => ({
   enabled: rowanEnabled(),
+  googleBooksEnabled:
+    process.env.GOOGLE_BOOKS_ENABLED === "true" && !!process.env.GOOGLE_BOOKS_API_KEY?.trim(),
 }));
 export const rowanLibrary = createServerFn({ method: "POST" })
   .inputValidator(
@@ -167,10 +175,18 @@ export const rowanLibrary = createServerFn({ method: "POST" })
     return library.libraryPage(actor, input);
   });
 export const rowanSearch = createServerFn({ method: "POST" })
-  .inputValidator(z.object({ sessionId: key, query: z.string().trim().min(1).max(200) }).strict())
+  .inputValidator(
+    z
+      .object({
+        sessionId: key,
+        query: z.string().trim().min(1).max(200),
+        source: z.enum(["openlibrary", "googlebooks"]).default("openlibrary"),
+      })
+      .strict(),
+  )
   .handler(async ({ data }) => {
     const { provider } = await context(data.sessionId, false);
-    return provider.search(data.query);
+    return provider.search(data.query, data.source);
   });
 export const rowanInsights = createServerFn({ method: "POST" })
   .inputValidator(z.object({ sessionId: key, year: z.number().int().min(1900).max(9998) }).strict())

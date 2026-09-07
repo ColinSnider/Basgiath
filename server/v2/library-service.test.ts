@@ -757,6 +757,41 @@ test("v2 catalog and reading lifecycle work against isolated PostgreSQL", async 
         (await service.marginJournal(other, { query: "unique private", offset: 0 })).items.length,
         0,
       );
+      const google = createLibraryService(
+        database as unknown as Parameters<typeof createLibraryService>[0],
+        {
+          async fetchWork() {
+            return {
+              title: "Google volume",
+              authors: ["Author"],
+              coverUrl: null,
+              edition: {
+                externalId: "google_volume",
+                format: "unknown",
+                pageCount: 123,
+                durationSeconds: null,
+                language: "en",
+              },
+            };
+          },
+        },
+      );
+      const googleCommand = {
+        key: key(),
+        ref: { provider: "googlebooks", externalId: "google_volume" },
+      };
+      const googleBook = await google.saveWork(actor, googleCommand);
+      assert.deepEqual(await google.saveWork(actor, googleCommand), googleBook);
+      const [mapping] = await database
+        .select()
+        .from(schema.externalMappings)
+        .where(eq(schema.externalMappings.externalId, "google_volume"));
+      assert.equal(mapping.entityKind, "volume");
+      assert.ok(mapping.editionId);
+      assert.equal(
+        (await google.saveWork(other, { ...googleCommand, key: key() })).workId,
+        googleBook.workId,
+      );
     },
   );
 });

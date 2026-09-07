@@ -15,7 +15,7 @@ const editionSchema = z.object({
   languages: z.array(z.object({ key: z.string() })).optional(),
 });
 export type WorkSearchResult = {
-  ref: { provider: "openlibrary"; externalId: string };
+  ref: { provider: "openlibrary" | "googlebooks"; externalId: string };
   title: string;
   authors: string[];
   coverUrl: string | null;

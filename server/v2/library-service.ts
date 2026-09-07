@@ -322,7 +322,7 @@ export function createLibraryService(database: Database, provider: CatalogProvid
       // Known catalog entries remain usable while the provider is unavailable.
       const match = and(
         eq(externalMappings.provider, data.ref.provider),
-        eq(externalMappings.entityKind, "work"),
+        eq(externalMappings.entityKind, data.ref.provider === "googlebooks" ? "volume" : "work"),
         eq(externalMappings.externalId, data.ref.externalId),
       );
       const [known] = await database.select().from(externalMappings).where(match);
@@ -341,7 +341,7 @@ export function createLibraryService(database: Database, provider: CatalogProvid
         );
         const [mapping] = await tx.select().from(externalMappings).where(match);
         let workId = mapping?.workId;
-        let editionId: string | null = null;
+        let editionId: string | null = mapping?.editionId ?? null;
         if (!workId) {
           if (!fetched)
             throw new DomainError(
@@ -353,7 +353,13 @@ export function createLibraryService(database: Database, provider: CatalogProvid
             .values({ title: fetched.title, authors: fetched.authors, coverUrl: fetched.coverUrl })
             .returning();
           workId = work.id;
-          await tx.insert(externalMappings).values({ ...data.ref, entityKind: "work", workId });
+          if (data.ref.provider !== "googlebooks")
+            await tx.insert(externalMappings).values({ ...data.ref, entityKind: "work", workId });
+          if (data.ref.provider === "googlebooks" && !fetched.edition)
+            throw new DomainError(
+              "PROVIDER_UNAVAILABLE",
+              "Google Books volume details are missing.",
+            );
           if (fetched.edition) {
             const { externalId, ...details } = fetched.edition;
             const [edition] = await tx
@@ -363,13 +369,13 @@ export function createLibraryService(database: Database, provider: CatalogProvid
             editionId = edition.id;
             await tx.insert(externalMappings).values({
               provider: data.ref.provider,
-              entityKind: "edition",
+              entityKind: data.ref.provider === "googlebooks" ? "volume" : "edition",
               externalId,
               workId,
               editionId,
             });
           }
-        } else {
+        } else if (!editionId) {
           const [edition] = await tx
             .select()
             .from(editions)

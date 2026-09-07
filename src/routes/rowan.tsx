@@ -57,6 +57,10 @@ function Rowan() {
 }
 
 function Workspace({ sessionId }: { sessionId: string }) {
+  const { googleBooksEnabled } = Route.useLoaderData();
+  const [catalogSource, setCatalogSource] = useState<"openlibrary" | "googlebooks">(
+    googleBooksEnabled ? "googlebooks" : "openlibrary",
+  );
   const cache = useQueryClient();
   const [query, setQuery] = useState("");
   const [status, setStatus] = useState("all");
@@ -94,8 +98,8 @@ function Workspace({ sessionId }: { sessionId: string }) {
     retry: false,
   });
   const catalog = useQuery({
-    queryKey: ["rowan", sessionId, "search", catalogQuery],
-    queryFn: () => rowanSearch({ data: { sessionId, query: catalogQuery } }),
+    queryKey: ["rowan", sessionId, "search", catalogQuery, catalogSource],
+    queryFn: () => rowanSearch({ data: { sessionId, query: catalogQuery, source: catalogSource } }),
     enabled: !!catalogQuery,
     retry: false,
   });
@@ -196,6 +200,19 @@ function Workspace({ sessionId }: { sessionId: string }) {
         aria-label="Find a book"
       >
         <h2 className="font-display text-2xl">Your next good book</h2>
+        {googleBooksEnabled && (
+          <label className="text-sm">
+            Search source{" "}
+            <select
+              className={control}
+              value={catalogSource}
+              onChange={(event) => setCatalogSource(event.target.value as typeof catalogSource)}
+            >
+              <option value="googlebooks">Google Books</option>
+              <option value="openlibrary">Open Library</option>
+            </select>
+          </label>
+        )}
         <form
           className="flex gap-2"
           onSubmit={(e) => {
@@ -217,7 +234,11 @@ function Workspace({ sessionId }: { sessionId: string }) {
             Search
           </button>
         </form>
-        {catalog.isFetching && <p role="status">Searching Open Library…</p>}
+        {catalog.isFetching && (
+          <p role="status">
+            Searching {catalogSource === "googlebooks" ? "Google Books" : "Open Library"}…
+          </p>
+        )}
         {catalog.isError && (
           <div role="alert" className="flex items-center gap-3">
             <p>Catalog search is unavailable.</p>
@@ -237,12 +258,33 @@ function Workspace({ sessionId }: { sessionId: string }) {
         {!!catalog.data?.length && (
           <ul className="max-h-80 overflow-auto divide-y divide-border">
             {catalog.data.map((book) => (
-              <li key={book.ref.externalId} className="flex items-center gap-3 py-3">
+              <li
+                key={`${book.ref.provider}:${book.ref.externalId}`}
+                className="flex items-center gap-3 py-3"
+              >
+                {book.coverUrl && (
+                  <img
+                    src={book.coverUrl}
+                    alt=""
+                    loading="lazy"
+                    className="h-20 w-14 object-contain"
+                  />
+                )}
                 <div className="min-w-0 flex-1">
                   <p className="font-medium">{book.title}</p>
                   <p className="text-sm text-muted-foreground">
                     {book.authors.join(", ") || "Unknown author"}
                   </p>
+                  {book.ref.provider === "googlebooks" && (
+                    <a
+                      className="text-xs underline"
+                      href={`https://books.google.com/books?id=${encodeURIComponent(book.ref.externalId)}`}
+                      target="_blank"
+                      rel="noreferrer"
+                    >
+                      View edition on Google Books
+                    </a>
+                  )}
                 </div>
                 <button
                   className={control}
