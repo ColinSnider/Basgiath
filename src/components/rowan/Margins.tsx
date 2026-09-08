@@ -37,6 +37,7 @@ function MarginCard({ margin, ...actions }: Actions & { margin: Margin }) {
         <MarginEditor margin={margin} {...actions} cancel={() => setEditing(false)} />
       ) : (
         <>
+          <p className="text-xs uppercase text-muted-foreground">{margin.kind}</p>
           {margin.locator && <p className="text-xs text-primary">{margin.locator}</p>}
           <p className="whitespace-pre-wrap break-words">{margin.body}</p>
           <p className="text-xs text-muted-foreground">
@@ -88,6 +89,7 @@ function MarginEditor({
   savedIds,
   ...actions
 }: Actions & { margin?: Margin; cancel?: () => void; savedIds?: string[] }) {
+  const [kind, setKind] = useState<"note" | "quote">(margin?.kind ?? "note");
   const [body, setBody] = useState(margin?.body ?? "");
   const [locator, setLocator] = useState(margin?.locator ?? "");
   const [submittedId, setSubmittedId] = useState<string | null>(null);
@@ -112,11 +114,24 @@ function MarginEditor({
           marginId,
           expectedVersion: margin?.version ?? null,
           action: "save",
+          kind,
           body: body.trim(),
           locator: locator.trim() || null,
         });
       }}
     >
+      <label className="block text-sm">
+        Type{" "}
+        <select
+          className={control}
+          value={kind}
+          onChange={(e) => setKind(e.target.value as typeof kind)}
+          disabled={actions.busy}
+        >
+          <option value="note">Note</option>
+          <option value="quote">Quote</option>
+        </select>
+      </label>
       <label className="block text-sm">
         {margin ? "Edit your margin" : "Write a margin"}
         <textarea

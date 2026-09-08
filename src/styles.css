@@ -100,14 +100,25 @@
   * {
     border-color: var(--color-border);
   }
-  html, body {
+  html,
+  body {
     background-color: var(--color-background);
     color: var(--color-foreground);
     font-family: var(--font-sans);
     -webkit-font-smoothing: antialiased;
   }
-  h1, h2, h3, h4, .font-display {
+  h1,
+  h2,
+  h3,
+  h4,
+  .font-display {
     font-family: var(--font-display);
     letter-spacing: -0.01em;
   }
+}
+html[data-rowan-compact="true"] #library-heading ~ div {
+  gap: 0.5rem;
+}
+html[data-rowan-compact="true"] main section {
+  padding: 0.75rem;
 }

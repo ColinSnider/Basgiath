@@ -22,6 +22,20 @@
       "when": 1788791996724,
       "tag": "0002_book_margins",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1788800000000,
+      "tag": "0003_legacy_sync_snapshots",
+      "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1788800000001,
+      "tag": "0004_account_state",
+      "breakpoints": true
     }
   ]
 }

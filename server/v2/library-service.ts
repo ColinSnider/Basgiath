@@ -1,3 +1,4 @@
+import { goalTimeframeSchema } from "../../shared/rowan-archive.ts";
 import { createHash } from "node:crypto";
 import { and, eq, sql, ilike, or, desc } from "drizzle-orm";
 import { z } from "zod";
@@ -15,6 +16,7 @@ import {
   shelves,
   shelfItems,
   margins,
+  accountState,
 } from "../../shared/schema-v2.ts";
 
 export type Actor = { userId: number };
@@ -95,6 +97,13 @@ type MutationResult = {
   sessionId: string | null;
   version: number;
 };
+const personalTitle = sql<string>`coalesce(${userBooks.legacyMetadata}->'rowanDetails'->>'title', ${works.title})`;
+const personalAuthors = sql<
+  string[]
+>`coalesce(${userBooks.legacyMetadata}->'rowanDetails'->'authors', ${works.authors})`;
+const personalCover = sql<
+  string | null
+>`case when ${userBooks.legacyMetadata}->'rowanDetails' ? 'coverUrl' then ${userBooks.legacyMetadata}->'rowanDetails'->>'coverUrl' else ${works.coverUrl} end`;
 type Database = typeof db;
 type Transaction = Parameters<Parameters<Database["transaction"]>[0]>[0];
 
@@ -176,22 +185,34 @@ export function createLibraryService(database: Database, provider: CatalogProvid
         id?: string;
         metric: "books" | "pages" | "minutes";
         target: number;
-        timeframe: "week" | "month" | "year";
+        timeframe: string;
       },
     ) {
       const data = z
         .object({
           key: id,
-          id: id.optional(),
+          id: z.string().min(1).max(200).optional(),
           metric: z.enum(["books", "pages", "minutes"]),
           target: z.number().int().positive().max(10000000),
-          timeframe: z.enum(["week", "month", "year"]),
+          timeframe: goalTimeframeSchema,
         })
         .strict()
         .parse(input);
       const result = await database.transaction(async (tx) => {
         await tx.execute(sql`select pg_advisory_xact_lock(21071, ${actor.userId})`);
-        const goalId = data.id ?? crypto.randomUUID();
+        const hash = fingerprint("saveGoal", data);
+        const [receipt] = await tx
+          .select()
+          .from(mutationReceipts)
+          .where(
+            and(eq(mutationReceipts.userId, actor.userId), eq(mutationReceipts.key, data.key)),
+          );
+        if (receipt) {
+          if (receipt.fingerprint !== hash)
+            throw new DomainError("IDEMPOTENCY_CONFLICT", "Request key already used.");
+          return;
+        }
+        const goalId = data.id ?? data.key;
         const [saved] = await tx
           .insert(goals)
           .values({
@@ -207,7 +228,19 @@ export function createLibraryService(database: Database, provider: CatalogProvid
             setWhere: eq(goals.userId, actor.userId),
           })
           .returning();
-        return saved;
+        if (!saved) throw new DomainError("NOT_FOUND", "Goal not found.");
+        await tx.insert(accountState).values({ userId: actor.userId }).onConflictDoNothing();
+        const [state] = await tx
+          .select()
+          .from(accountState)
+          .where(eq(accountState.userId, actor.userId));
+        await tx
+          .update(accountState)
+          .set({ excludedGoalIds: [...new Set([...state.excludedGoalIds, goalId])] })
+          .where(eq(accountState.userId, actor.userId));
+        await tx
+          .insert(mutationReceipts)
+          .values({ userId: actor.userId, key: data.key, fingerprint: hash, result: { ok: true } });
       });
       return result;
     },
@@ -285,15 +318,16 @@ export function createLibraryService(database: Database, provider: CatalogProvid
         .select({
           id: margins.id,
           body: margins.body,
+          kind: margins.kind,
           locator: margins.locator,
           updatedAt: margins.updatedAt,
           book: {
             id: userBooks.id,
             version: userBooks.version,
             status: userBooks.status,
-            title: works.title,
-            authors: works.authors,
-            coverUrl: works.coverUrl,
+            title: personalTitle,
+            authors: personalAuthors,
+            coverUrl: personalCover,
             isFavorite: userBooks.isFavorite,
             halfStars: ratings.halfStars,
           },
@@ -306,7 +340,7 @@ export function createLibraryService(database: Database, provider: CatalogProvid
           and(
             eq(userBooks.userId, actor.userId),
             sql`${margins.deletedAt} is null`,
-            data.query ? or(ilike(margins.body, term), ilike(works.title, term)) : undefined,
+            data.query ? or(ilike(margins.body, term), ilike(personalTitle, term)) : undefined,
           ),
         )
         .orderBy(desc(margins.updatedAt), margins.id)
@@ -369,6 +403,21 @@ export function createLibraryService(database: Database, provider: CatalogProvid
     },
     async saveWork(actor: Actor, input: z.input<typeof saveSchema>) {
       const data = saveSchema.parse(input);
+      const restoredMatch = and(
+        eq(userBooks.userId, actor.userId),
+        sql`${userBooks.legacyMetadata}->'archiveCatalogMappings' @> ${JSON.stringify([{ provider: data.ref.provider, externalId: data.ref.externalId, entityKind: data.ref.provider === "googlebooks" ? "volume" : "work" }])}::jsonb`,
+      );
+      const [restored] = await database.select().from(userBooks).where(restoredMatch).limit(1);
+      if (restored)
+        return mutate(actor, data.key, fingerprint("save", data), async (tx) => {
+          const book = await ownedBook(tx, actor, restored.id);
+          return {
+            workId: book.workId,
+            userBookId: book.id,
+            sessionId: null,
+            version: book.version,
+          };
+        });
       // Known catalog entries remain usable while the provider is unavailable.
       const match = and(
         eq(externalMappings.provider, data.ref.provider),
@@ -546,7 +595,9 @@ export function createLibraryService(database: Database, provider: CatalogProvid
         .select({
           status: userBooks.status,
           halfStars: ratings.halfStars,
-          tags: sql<string[]>`coalesce(${userBooks.legacyMetadata}->'tags', '[]'::jsonb)`,
+          tags: sql<
+            string[]
+          >`(select coalesce(jsonb_agg(value), '[]'::jsonb) from jsonb_array_elements(case when jsonb_typeof(${userBooks.legacyMetadata}->'tags') = 'array' then ${userBooks.legacyMetadata}->'tags' else '[]'::jsonb end) where jsonb_typeof(value) = 'string')`,
           favorite: userBooks.isFavorite,
         })
         .from(userBooks)
@@ -619,9 +670,9 @@ export function createLibraryService(database: Database, provider: CatalogProvid
         id: userBooks.id,
         version: userBooks.version,
         status: userBooks.status,
-        title: works.title,
-        authors: works.authors,
-        coverUrl: works.coverUrl,
+        title: personalTitle,
+        authors: personalAuthors,
+        coverUrl: personalCover,
         isFavorite: userBooks.isFavorite,
         halfStars: ratings.halfStars,
       };
@@ -716,9 +767,9 @@ export function createLibraryService(database: Database, provider: CatalogProvid
         id: userBooks.id,
         version: userBooks.version,
         status: userBooks.status,
-        title: works.title,
-        authors: works.authors,
-        coverUrl: works.coverUrl,
+        title: personalTitle,
+        authors: personalAuthors,
+        coverUrl: personalCover,
         isFavorite: userBooks.isFavorite,
         halfStars: ratings.halfStars,
       };
@@ -806,12 +857,14 @@ export function createLibraryService(database: Database, provider: CatalogProvid
           id: userBooks.id,
           version: userBooks.version,
           status: userBooks.status,
-          title: works.title,
-          authors: works.authors,
-          coverUrl: works.coverUrl,
+          title: personalTitle,
+          authors: personalAuthors,
+          coverUrl: personalCover,
           isFavorite: userBooks.isFavorite,
           halfStars: ratings.halfStars,
-          tags: sql<string[]>`coalesce(${userBooks.legacyMetadata}->'tags', '[]'::jsonb)`,
+          tags: sql<
+            string[]
+          >`(select coalesce(jsonb_agg(value), '[]'::jsonb) from jsonb_array_elements(case when jsonb_typeof(${userBooks.legacyMetadata}->'tags') = 'array' then ${userBooks.legacyMetadata}->'tags' else '[]'::jsonb end) where jsonb_typeof(value) = 'string')`,
         })
         .from(userBooks)
         .innerJoin(works, eq(works.id, userBooks.workId))
@@ -826,8 +879,8 @@ export function createLibraryService(database: Database, provider: CatalogProvid
             data.status === "all" ? undefined : eq(userBooks.status, data.status),
             data.query
               ? or(
-                  ilike(works.title, term),
-                  ilike(sql`${works.authors}::text`, term),
+                  ilike(personalTitle, term),
+                  ilike(sql`${personalAuthors}::text`, term),
                   ilike(sql`${userBooks.legacyMetadata}->>'tags'`, term),
                 )
               : undefined,
@@ -835,7 +888,7 @@ export function createLibraryService(database: Database, provider: CatalogProvid
         )
         .orderBy(
           data.sort === "title"
-            ? works.title
+            ? personalTitle
             : data.sort === "rating"
               ? sql`${ratings.halfStars} desc nulls last`
               : data.sort === "oldest"
@@ -857,6 +910,7 @@ export function createLibraryService(database: Database, provider: CatalogProvid
         expectedVersion: number | null;
         action: "save" | "delete";
         body?: string;
+        kind?: "note" | "quote";
         locator?: string | null;
       },
     ) {
@@ -867,6 +921,7 @@ export function createLibraryService(database: Database, provider: CatalogProvid
           marginId: id,
           expectedVersion: version.nullable(),
           action: z.enum(["save", "delete"]),
+          kind: z.enum(["note", "quote"]).optional(),
           body: z.string().trim().min(1).max(10000).optional(),
           locator: z.string().trim().max(120).nullable().optional(),
         })
@@ -889,6 +944,7 @@ export function createLibraryService(database: Database, provider: CatalogProvid
             id: data.marginId,
             userBookId: book.id,
             body: data.body!,
+            kind: data.kind ?? "note",
             locator: data.locator || null,
           });
         } else {
@@ -901,6 +957,7 @@ export function createLibraryService(database: Database, provider: CatalogProvid
                 ? { deletedAt: new Date(), updatedAt: new Date(), version: existing.version + 1 }
                 : {
                     body: data.body!,
+                    kind: data.kind ?? existing.kind,
                     locator: data.locator === undefined ? existing.locator : data.locator || null,
                     updatedAt: new Date(),
                     version: existing.version + 1,
@@ -1171,6 +1228,7 @@ export function createLibraryService(database: Database, provider: CatalogProvid
           .orderBy(progressEntries.createdAt, progressEntries.id);
         return {
           userBookVersion: book.version,
+          metadata: book.legacyMetadata,
           edition: edition
             ? {
                 format: edition.format,
@@ -1182,6 +1240,7 @@ export function createLibraryService(database: Database, provider: CatalogProvid
             .select({
               id: margins.id,
               body: margins.body,
+              kind: margins.kind,
               locator: margins.locator,
               version: margins.version,
               createdAt: margins.createdAt,

@@ -9,4 +9,5 @@ CREATE TABLE IF NOT EXISTS "v2"."legacy_sync_snapshots" (
   CONSTRAINT "legacy_sync_entity_kind" CHECK ("entity_kind" in ('book','margin','goal','settings')),
   CONSTRAINT "legacy_sync_user_fk" FOREIGN KEY ("user_id") REFERENCES "public"."users"("id") ON DELETE RESTRICT
 );
+--> statement-breakpoint
 CREATE UNIQUE INDEX IF NOT EXISTS "legacy_sync_source_identity" ON "v2"."legacy_sync_snapshots" ("user_id", "entity_kind", "source_id");

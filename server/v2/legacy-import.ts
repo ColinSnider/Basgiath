@@ -12,6 +12,8 @@ import {
   works,
   margins as v2Margins,
   legacySyncSnapshots,
+  accountState,
+  ratings,
 } from "../../shared/schema-v2.ts";
 
 function snapshotHash(value: unknown) {
@@ -49,6 +51,8 @@ export async function importLegacyLibrary(
     if (target && target.username !== source.username)
       throw new Error("Staging account identity mismatch.");
     if (!target) await tx.insert(legacySchema.users).values(source);
+    const [state] = await tx.select().from(accountState).where(eq(accountState.userId, source.id));
+    if (state?.mirrorPaused) return;
     for (const legacy of rows) {
       if (legacy.userId !== source.id) throw new Error("Legacy book owner mismatch.");
       const [known] = await tx
@@ -62,6 +66,7 @@ export async function importLegacyLibrary(
           ),
         );
       let workId = known?.workId;
+      if (workId && state?.excludedWorkIds.includes(workId)) continue;
       if (!workId) {
         const [work] = await tx
           .insert(works)
@@ -127,6 +132,18 @@ export async function importLegacyLibrary(
           .returning();
       }
       if (book.version === 0) {
+        const rating = legacy.metadata?.rating;
+        if (
+          typeof rating === "number" &&
+          rating > 0 &&
+          rating <= 5 &&
+          Number.isInteger(rating * 2)
+        ) {
+          await tx
+            .insert(ratings)
+            .values({ userBookId: book.id, halfStars: rating * 2 })
+            .onConflictDoUpdate({ target: ratings.userBookId, set: { halfStars: rating * 2 } });
+        }
         await tx
           .update(works)
           .set({
@@ -209,6 +226,7 @@ export async function importLegacyLibrary(
       }
     }
     for (const goal of sourceGoals.filter((row) => row.userId === source.id)) {
+      if (state?.excludedGoalIds.includes(goal.id)) continue;
       await tx
         .insert(legacySchema.goals)
         .values(goal)
@@ -240,7 +258,7 @@ export async function importLegacyLibrary(
           });
       }
     }
-    if (sourceSettings && sourceSettings.userId === source.id) {
+    if (sourceSettings && sourceSettings.userId === source.id && !state?.settingsEdited) {
       await tx
         .insert(legacySchema.userSettings)
         .values(sourceSettings)
@@ -302,11 +320,16 @@ export async function importLegacyLibrary(
           id: marginId,
           userBookId: book.id,
           body: margin.text,
+          kind: margin.type === "quote" ? "quote" : "note",
           locator: margin.page ? `p. ${margin.page}` : null,
           createdAt: margin.createdAt,
           updatedAt: margin.createdAt,
         })
-        .onConflictDoNothing();
+        .onConflictDoUpdate({
+          target: v2Margins.id,
+          set: { kind: margin.type === "quote" ? "quote" : "note" },
+          setWhere: eq(v2Margins.version, 0),
+        });
       if (snapshotsAvailable) {
         await tx
           .insert(legacySyncSnapshots)

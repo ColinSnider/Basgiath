@@ -1,3 +1,5 @@
+import { AccountSettings } from "@/components/rowan/AccountSettings";
+import { BookEditor } from "@/components/rowan/BookEditor";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useRef, useState } from "react";
@@ -19,7 +21,6 @@ import {
   rowanMutate,
   rowanShelves,
   rowanArchive,
-  rowanDeleteBook,
   type RowanCommand,
 } from "@/lib/rowan-fns";
 
@@ -165,9 +166,9 @@ function Workspace({ sessionId }: { sessionId: string }) {
         <a className={control} href="#journal">
           Margins
         </a>
-        <Link className={control} to="/settings">
+        <a className={control} href="#rowan-settings">
           Settings
-        </Link>
+        </a>
         <button
           className={control}
           disabled={exporting}
@@ -585,6 +586,14 @@ function Workspace({ sessionId }: { sessionId: string }) {
       </section>
       <Insights sessionId={sessionId} run={run} busy={busy} />
       <Goals sessionId={sessionId} />
+      <AccountSettings
+        sessionId={sessionId}
+        onReplaced={() => {
+          setSelected(null);
+          setOffset(0);
+          setShelfId("");
+        }}
+      />
       <DataSyncPanel sessionId={sessionId} />
       <Journal sessionId={sessionId} openBook={(book) => setSelected({ ...book, tags: [] })} />
       {selected && (
@@ -596,12 +605,6 @@ function Workspace({ sessionId }: { sessionId: string }) {
           shelves={shelves.data ?? []}
           run={run}
           close={() => setSelected(null)}
-          onDelete={async () => {
-            if (!window.confirm(`Permanently delete ${selected.title}?`)) return;
-            await rowanDeleteBook({ data: { sessionId, userBookId: selected.id } });
-            setSelected(null);
-            await cache.invalidateQueries({ queryKey: ["rowan", sessionId] });
-          }}
         />
       )}
     </main>
@@ -614,7 +617,6 @@ function ReadingPanel({
   busy,
   run,
   close,
-  onDelete,
   shelves,
 }: {
   book: Item;
@@ -622,7 +624,6 @@ function ReadingPanel({
   busy: boolean;
   run: (command: RowanCommand) => void;
   close: () => void;
-  onDelete: () => Promise<void>;
   shelves: Awaited<ReturnType<typeof rowanShelves>>;
 }) {
   const [unit, setUnit] = useState<"page" | "second" | "percent">("page");
@@ -649,8 +650,9 @@ function ReadingPanel({
       <div className="flex justify-between gap-3">
         <h2 className="font-display text-2xl">{book.title}</h2>
         <div className="flex gap-2">
-          <button className={control} onClick={() => void onDelete()}>Delete permanently</button>
-          <button className={control} onClick={close}>Close</button>
+          <button className={control} onClick={close}>
+            Close
+          </button>
         </div>
       </div>
       {history.isPending && <p>Loading reading history…</p>}
@@ -664,6 +666,13 @@ function ReadingPanel({
       )}
       {history.data && (
         <>
+          <BookEditor
+            key={`edit:${history.data.userBookVersion}`}
+            sessionId={sessionId}
+            book={book}
+            history={history.data}
+            close={close}
+          />
           <EditionForm
             key={history.data.userBookVersion}
             userBookId={book.id}

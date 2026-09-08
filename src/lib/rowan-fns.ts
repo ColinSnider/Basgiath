@@ -1,6 +1,8 @@
+import { createAccountService } from "../../server/v2/account-service";
+import { bookEditSchema, settingsSchema, goalTimeframeSchema } from "../../shared/rowan-archive";
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
-import { and, eq, sql } from "drizzle-orm";
+import { eq } from "drizzle-orm";
 import { books as legacyBooks, sessions, users } from "../../shared/schema";
 import { db } from "../../server/db";
 import { getRowanRuntime, rowanEnabled } from "../../server/v2/runtime";
@@ -12,10 +14,6 @@ import {
   userBooks as v2Books,
   margins as v2Margins,
   shelves as v2Shelves,
-  shelfItems as v2ShelfItems,
-  readingSessions as v2ReadingSessions,
-  progressEntries as v2ProgressEntries,
-  ratings as v2Ratings,
   legacySyncSnapshots,
 } from "../../shared/schema-v2";
 import { count } from "drizzle-orm";
@@ -60,6 +58,7 @@ const command = z.discriminatedUnion("type", [
       marginId: key,
       expectedVersion: z.number().int().nonnegative().nullable(),
       action: z.enum(["save", "delete"]),
+      kind: z.enum(["note", "quote"]).optional(),
       body: z.string().trim().min(1).max(10000).optional(),
       locator: z.string().trim().max(120).nullable().optional(),
     })
@@ -183,29 +182,74 @@ export const rowanStatus = createServerFn({ method: "GET" }).handler(() => ({
   googleBooksEnabled:
     process.env.GOOGLE_BOOKS_ENABLED === "true" && !!process.env.GOOGLE_BOOKS_API_KEY?.trim(),
 }));
+const accountCommand = z.discriminatedUnion("type", [
+  z.object({ type: z.literal("settings"), key, settings: settingsSchema }).strict(),
+  z
+    .object({
+      type: z.literal("deleteBook"),
+      key,
+      userBookId: key,
+      expectedVersion: z.number().int().nonnegative(),
+    })
+    .strict(),
+  z.object({ type: z.literal("deleteGoal"), key, goalId: z.string().min(1) }).strict(),
+  z.object({ type: z.literal("clear"), key, confirmation: z.literal("CLEAR") }).strict(),
+  z
+    .object({
+      type: z.literal("restore"),
+      key,
+      raw: z.string().max(20 * 1024 * 1024),
+      confirmation: z.literal("RESTORE"),
+    })
+    .strict(),
+  bookEditSchema.extend({ type: z.literal("editBook"), key }),
+]);
+export type RowanAccountCommand = z.infer<typeof accountCommand>;
 export const rowanSettings = createServerFn({ method: "POST" })
-  .inputValidator(z.object({ sessionId: key, patch: z.object({ darkMode: z.boolean().optional(), accentColor: z.string().trim().max(40).optional(), compactMode: z.boolean().optional(), fontScale: z.enum(["sm", "md", "lg"]).optional() }).strict() }).strict())
+  .inputValidator(z.object({ sessionId: key }).strict())
   .handler(async ({ data }) => {
-    const { actor, database } = await context(data.sessionId, false);
-    await database.insert(userSettings).values({ userId: actor.userId, ...data.patch }).onConflictDoUpdate({ target: userSettings.userId, set: data.patch });
-    const [settings] = await database.select().from(userSettings).where(eq(userSettings.userId, actor.userId));
-    return settings;
+    const { actor, database } = await context(data.sessionId);
+    return createAccountService(database).settings(actor);
   });
-export const rowanDeleteBook = createServerFn({ method: "POST" })
-  .inputValidator(z.object({ sessionId: key, userBookId: key }).strict())
+export const rowanAccountMutate = createServerFn({ method: "POST" })
+  .inputValidator(z.object({ sessionId: key, command: accountCommand }).strict())
   .handler(async ({ data }) => {
-    const { actor, database } = await context(data.sessionId, false);
-    await database.transaction(async (tx) => {
-      const [owned] = await tx.select({ id: v2Books.id }).from(v2Books).where(and(eq(v2Books.id, data.userBookId), eq(v2Books.userId, actor.userId)));
-      if (!owned) throw new Error("Book not found.");
-      await tx.delete(v2ProgressEntries).where(sql`${v2ProgressEntries.readingSessionId} in (select id from ${v2ReadingSessions} where ${v2ReadingSessions.userBookId} = ${data.userBookId})`);
-      await tx.delete(v2ReadingSessions).where(eq(v2ReadingSessions.userBookId, data.userBookId));
-      await tx.delete(v2ShelfItems).where(eq(v2ShelfItems.userBookId, data.userBookId));
-      await tx.delete(v2Ratings).where(eq(v2Ratings.userBookId, data.userBookId));
-      await tx.delete(v2Margins).where(eq(v2Margins.userBookId, data.userBookId));
-      await tx.delete(v2Books).where(eq(v2Books.id, data.userBookId));
-    });
-    return { ok: true as const };
+    const { actor, database } = await context(data.sessionId);
+    const service = createAccountService(database);
+    const c = data.command;
+    try {
+      switch (c.type) {
+        case "settings":
+          return await service.saveSettings(actor, c.key, c.settings);
+        case "deleteBook":
+          return await service.deleteBook(actor, c.key, {
+            userBookId: c.userBookId,
+            expectedVersion: c.expectedVersion,
+          });
+        case "deleteGoal":
+          return await service.deleteGoal(actor, c.key, c.goalId);
+        case "clear":
+          return await service.clear(actor, c.key);
+        case "restore":
+          return await service.restore(actor, c.key, c.raw);
+        case "editBook": {
+          const { type: _type, key: requestKey, ...input } = c;
+          return await service.editBook(actor, requestKey, input);
+        }
+      }
+    } catch (error) {
+      if (error instanceof DomainError) return { ok: false as const, message: error.message };
+      if (
+        error instanceof z.ZodError ||
+        error instanceof SyntaxError ||
+        (error instanceof Error && error.message.startsWith("Invalid archive:"))
+      )
+        return {
+          ok: false as const,
+          message: "The supplied data is invalid. No changes were saved.",
+        };
+      throw new Error("The result could not be confirmed. Retry the same request.");
+    }
   });
 export const rowanSyncStatus = createServerFn({ method: "POST" })
   .inputValidator(z.object({ sessionId: key }).strict())
@@ -371,10 +415,10 @@ export const rowanSaveGoal = createServerFn({ method: "POST" })
       .object({
         sessionId: key,
         key,
-        id: key.optional(),
+        id: z.string().min(1).max(200).optional(),
         metric: z.enum(["books", "pages", "minutes"]),
         target: z.number().int().positive().max(10000000),
-        timeframe: z.enum(["week", "month", "year"]),
+        timeframe: goalTimeframeSchema,
       })
       .strict(),
   )
@@ -432,6 +476,7 @@ export const rowanHistory = createServerFn({ method: "POST" })
     return {
       shelfIds: (await shelfService.membership(actor, data.userBookId)).map((item) => item.shelfId),
       userBookVersion: history.userBookVersion,
+      metadata: history.metadata,
       edition: history.edition,
       margins: history.margins.map((margin) => ({
         ...margin,

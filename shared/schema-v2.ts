@@ -17,6 +17,16 @@ import type { JsonValue } from "./json.ts";
 
 // Isolated from the legacy schema and its production migration entry point.
 export const v2 = pgSchema("v2");
+// Only sync decisions live here; deleting personal data never deletes the source.
+export const accountState = v2.table("account_state", {
+  userId: integer("user_id")
+    .primaryKey()
+    .references(() => users.id, { onDelete: "restrict" }),
+  mirrorPaused: boolean("mirror_paused").notNull().default(false),
+  settingsEdited: boolean("settings_edited").notNull().default(false),
+  excludedWorkIds: jsonb("excluded_work_ids").$type<string[]>().notNull().default([]),
+  excludedGoalIds: jsonb("excluded_goal_ids").$type<string[]>().notNull().default([]),
+});
 export const works = v2.table(
   "works",
   {
@@ -254,6 +264,7 @@ export const margins = v2.table(
       .notNull()
       .references(() => userBooks.id, { onDelete: "restrict" }),
     body: text("body").notNull(),
+    kind: text("kind").$type<"note" | "quote">().notNull().default("note"),
     locator: text("locator"),
     version: integer("version").notNull().default(0),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
