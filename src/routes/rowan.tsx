@@ -3,6 +3,7 @@ import { BookEditor } from "@/components/rowan/BookEditor";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useRef, useState } from "react";
+import { BookOpen, Home, Library, Search, CalendarDays, ChartNoAxesCombined, Target, NotebookPen, Settings } from "lucide-react";
 import { useAuth } from "@/lib/auth-context";
 import { Margins } from "@/components/rowan/Margins";
 import { RowanHome } from "@/components/rowan/Home";
@@ -129,13 +130,13 @@ function Workspace({ sessionId }: { sessionId: string }) {
   }
   const busy = mutation.isPending || !!retry.current;
   return (
-    <main className="mx-auto max-w-6xl space-y-8 p-5 md:p-10">
-      <header className="flex items-center justify-between gap-4">
+    <main className="rowan-workspace mx-auto space-y-8 p-5">
+      <header className="rowan-header flex items-center justify-between gap-4">
         <div>
           <p className="text-xs uppercase tracking-widest text-muted-foreground">
             A reader’s companion
           </p>
-          <h1 className="font-display text-4xl">Rowan</h1>
+          <h1 className="font-display text-4xl text-primary">Rowan</h1>
         </div>
         <Link className={control} to="/library">
           Basgiath library
@@ -143,31 +144,33 @@ function Workspace({ sessionId }: { sessionId: string }) {
       </header>
       <nav
         aria-label="Rowan navigation"
-        className="flex flex-wrap gap-3 sticky top-0 z-10 bg-background py-3 border-b border-border"
+        className="rowan-navigation flex flex-wrap gap-3 sticky top-0 z-10 bg-background py-3 border-b border-border"
       >
+        <div className="rowan-brand hidden"><BookOpen size={24} strokeWidth={1.5} /><span className="font-display text-3xl">Rowan</span><p>Your reading companion</p></div>
+        <p className="rowan-nav-label hidden">Your workspace</p>
         <a className={control} href="#reading-home">
-          Home
+          <Home className="hidden lg:block" size={18} strokeWidth={1.5} /> Home
         </a>
         <a className={control} href="#library-heading">
-          All books
+          <Library className="hidden lg:block" size={18} strokeWidth={1.5} /> All books
         </a>
         <a className={control} href="#find-books">
-          Find books
+          <Search className="hidden lg:block" size={18} strokeWidth={1.5} /> Find books
         </a>
         <a className={control} href="#reading-history">
-          Calendar
+          <CalendarDays className="hidden lg:block" size={18} strokeWidth={1.5} /> Calendar
         </a>
         <a className={control} href="#insights">
-          Insights
+          <ChartNoAxesCombined className="hidden lg:block" size={18} strokeWidth={1.5} /> Insights
         </a>
         <a className={control} href="#goals">
-          Goals
+          <Target className="hidden lg:block" size={18} strokeWidth={1.5} /> Goals
         </a>
         <a className={control} href="#journal">
-          Margins
+          <NotebookPen className="hidden lg:block" size={18} strokeWidth={1.5} /> Margins
         </a>
         <a className={control} href="#rowan-settings">
-          Settings
+          <Settings className="hidden lg:block" size={18} strokeWidth={1.5} /> Settings
         </a>
         <button
           className={control}
@@ -195,7 +198,6 @@ function Workspace({ sessionId }: { sessionId: string }) {
           {exporting ? "Exporting…" : "Export archive"}
         </button>
       </nav>
-      <div id="reading-home" />
       <RowanHome
         sessionId={sessionId}
         openBook={(book) => setSelected({ ...book, tags: [] })}
@@ -324,7 +326,7 @@ function Workspace({ sessionId }: { sessionId: string }) {
         )}
       </section>
       <ManualBook run={run} busy={busy} />
-      <div role="status" aria-live="polite">
+      <div className="rowan-notice" role="status" aria-live="polite">
         {notice}
         {mutation.isError && retry.current && (
           <button
@@ -336,7 +338,7 @@ function Workspace({ sessionId }: { sessionId: string }) {
           </button>
         )}
       </div>
-      <section className="space-y-4" aria-labelledby="library-heading">
+      <section className="rowan-library space-y-4" aria-labelledby="library-heading">
         <div className="space-y-3">
           <h2 className="font-display text-2xl">Your shelves</h2>
           <form

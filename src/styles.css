@@ -122,3 +122,126 @@ html[data-rowan-compact="true"] #library-heading ~ div {
 html[data-rowan-compact="true"] main section {
   padding: 0.75rem;
 }
+
+/* Rowan uses Basgiath's existing palette and typography. */
+@media (min-width: 1024px) {
+  .rowan-workspace {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(280px, 340px);
+    gap: 24px;
+    max-width: 1640px;
+    min-height: 100vh;
+    padding: 32px 40px 64px 264px;
+    align-items: start;
+  }
+  .rowan-workspace > * {
+    min-width: 0;
+    margin-block: 0;
+    grid-column: 1 / -1;
+  }
+  .rowan-workspace [id] { scroll-margin-top: 24px; }
+  .rowan-workspace .rowan-navigation {
+    position: fixed;
+    inset: 0 auto 0 0;
+    width: 224px;
+    height: 100dvh;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    flex-wrap: nowrap;
+    align-items: stretch;
+    gap: 6px;
+    padding: 32px 16px 24px;
+    border-bottom: 0;
+    border-right: 1px solid var(--border);
+    background: var(--card);
+  }
+  .rowan-brand {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 10px;
+    padding: 0 12px 28px;
+    color: var(--primary);
+    border-bottom: 1px solid var(--border);
+  }
+  .rowan-brand p {
+    width: 100%;
+    font-size: 11px;
+    color: var(--muted-foreground);
+  }
+  .rowan-nav-label {
+    display: block;
+    margin: 22px 12px 8px;
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: .15em;
+    color: var(--muted-foreground);
+  }
+  .rowan-navigation a {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    border: 0;
+    background: transparent;
+    color: var(--muted-foreground);
+    padding: 11px 12px;
+  }
+  .rowan-navigation a:hover,
+  .rowan-navigation a:focus-visible {
+    background: var(--muted);
+    color: var(--primary);
+  }
+  .rowan-navigation > button {
+    margin-top: auto;
+    text-align: left;
+    background: var(--background);
+  }
+  .rowan-header {
+    padding-bottom: 24px;
+    border-bottom: 1px solid var(--border);
+  }
+  .rowan-header h1 { margin-top: 6px; }
+  .rowan-overview {
+    padding: 24px;
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-top: 3px solid var(--primary);
+    border-radius: 16px;
+  }
+  .rowan-reading-cards { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .rowan-reading-cards > :nth-child(2) {
+    grid-column: 1 / -1;
+    grid-row: 1;
+    background: color-mix(in oklch, var(--primary) 5%, var(--card));
+  }
+  .rowan-reading-cards > :nth-child(2) ul {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 20px;
+  }
+  .rowan-reading-cards > :nth-child(2) li { margin: 0; }
+  .rowan-workspace #reading-history { grid-column: 1; }
+  .rowan-workspace #find-books { grid-column: 2; }
+  .rowan-workspace > details {
+    grid-column: 2;
+    background: var(--card);
+  }
+  .rowan-notice:empty { display: none; }
+  .rowan-library {
+    padding: 24px;
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    background: var(--card);
+  }
+  .rowan-library > div:first-child {
+    padding-bottom: 20px;
+    border-bottom: 1px solid var(--border);
+  }
+  .rowan-workspace button[aria-pressed="true"] {
+    background: var(--primary);
+    color: var(--primary-foreground);
+    border-color: var(--primary);
+  }
+  .rowan-workspace progress { accent-color: var(--primary); height: 6px; }
+}

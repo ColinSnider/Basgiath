@@ -18,7 +18,7 @@ export function RowanHome({
     retry: false,
   });
   return (
-    <section aria-labelledby="reading-overview" className="space-y-4">
+    <section id="reading-home" aria-labelledby="reading-overview" className="rowan-overview space-y-4">
       <div>
         <h2 id="reading-overview" className="font-display text-3xl">
           Your reading life
@@ -37,7 +37,7 @@ export function RowanHome({
         </p>
       )}
       {home.data && (
-        <div className="grid gap-4 lg:grid-cols-[1fr_2fr_1fr]">
+        <div className="rowan-reading-cards grid gap-4 lg:grid-cols-[1fr_2fr_1fr]">
           <div className="rounded-2xl border border-border bg-card p-4 space-y-3">
             <h3 className="font-display text-xl">Last</h3>
             {home.data.last ? (
