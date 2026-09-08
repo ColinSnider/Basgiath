@@ -15,7 +15,12 @@
     "db:migrate": "drizzle-kit migrate",
     "test": "node --experimental-strip-types --test src/lib/*.test.js src/lib/*.test.ts server/*.test.ts server/catalog/*.test.ts server/v2/*.test.ts",
     "test:v2": "node --experimental-strip-types --test server/catalog/*.test.ts server/v2/*.test.ts",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "dev:rowan": "vite dev --mode rowan",
+    "build:rowan": "vite build --mode rowan",
+    "start:rowan": "ROWAN_STANDALONE=true node serve.mjs",
+    "typecheck:rowan": "tsc --noEmit -p apps/rowan/tsconfig.json",
+    "db:migrate:rowan": "node --env-file-if-exists=.env scripts/migrate-rowan.mjs"
   },
   "engines": {
     "node": ">=22.12.0"

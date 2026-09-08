@@ -24,3 +24,18 @@ test("Rowan requires explicit development activation and a distinct database", (
   assert.equal(rowanEnabled({ ...env, ROWAN_DATABASE_URL: "invalid" }), false);
   assert.equal(rowanEnabled({ ...env, OPEN_LIBRARY_USER_AGENT: " " }), false);
 });
+
+
+test("standalone Rowan activates with its own database and never requires Basgiath", () => {
+  const env = {
+    ROWAN_STANDALONE: "true",
+    ROWAN_V2_ENV: "staging",
+    ROWAN_V2_ENABLED: "true",
+    ROWAN_DATABASE_URL: "postgres://localhost/rowan",
+    OPEN_LIBRARY_USER_AGENT: "Rowan staging",
+  };
+  assert.equal(rowanEnabled(env), true);
+  assert.equal(rowanEnabled({ ...env, ROWAN_DATABASE_URL: undefined }), false);
+  assert.equal(rowanEnabled({ ...env, ROWAN_DATABASE_URL: "https://localhost/rowan" }), false);
+  assert.equal(rowanEnabled({ ...env, ROWAN_V2_ENV: "production" }), false);
+});

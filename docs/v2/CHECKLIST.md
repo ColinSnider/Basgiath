@@ -12,6 +12,7 @@ This checklist tracks architecture work before production implementation. It is 
 - [x] Provider search/lookup adapter and fixture tests
 - [x] Database-backed lifecycle and legacy-preservation tests
 - [x] Rowan Library and reading controls wired to v2 services behind a development gate
+- [x] Standalone Rowan app entry, authentication database, build, and Railway configuration
 - [ ] Production backfill and activation
 
 See [build status](BUILD_STATUS.md) for limits. The complete domain and operational checklist remains below.

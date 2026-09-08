@@ -1,0 +1,10 @@
+{
+  "extends": "../../tsconfig.json",
+  "include": [
+    "./**/*.ts",
+    "./**/*.tsx",
+    "../../src/components/rowan/**/*.tsx",
+    "../../shared/**/*.ts",
+    "../../server/**/*.ts"
+  ]
+}

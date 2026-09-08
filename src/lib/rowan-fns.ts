@@ -152,7 +152,7 @@ async function context(sessionId: string, importLibrary = true) {
   const [session] = await db.select().from(sessions).where(eq(sessions.id, sessionId));
   if (!session || session.expiresAt <= new Date())
     throw new Error("Sign in to the development account again.");
-  if (!importLibrary) return { ...runtime, actor: { userId: session.userId } };
+  if (process.env.ROWAN_STANDALONE === "true" || !importLibrary) return { ...runtime, actor: { userId: session.userId } };
   const [source] = await db
     .select({ id: users.id, username: users.username, displayName: users.displayName })
     .from(users)
@@ -254,6 +254,7 @@ export const rowanAccountMutate = createServerFn({ method: "POST" })
 export const rowanSyncStatus = createServerFn({ method: "POST" })
   .inputValidator(z.object({ sessionId: key }).strict())
   .handler(async ({ data }) => {
+    if (process.env.ROWAN_STANDALONE === "true") throw new Error("Legacy synchronization is unavailable in standalone Rowan.");
     const runtime = getRowanRuntime();
     const [session] = await db.select().from(sessions).where(eq(sessions.id, data.sessionId));
     if (!session || session.expiresAt <= new Date())
@@ -304,6 +305,7 @@ export const rowanSyncStatus = createServerFn({ method: "POST" })
 export const rowanSyncConflicts = createServerFn({ method: "POST" })
   .inputValidator(z.object({ sessionId: key }).strict())
   .handler(async ({ data }) => {
+    if (process.env.ROWAN_STANDALONE === "true") throw new Error("Legacy synchronization is unavailable in standalone Rowan.");
     const runtime = getRowanRuntime();
     const [session] = await db.select().from(sessions).where(eq(sessions.id, data.sessionId));
     if (!session || session.expiresAt <= new Date())

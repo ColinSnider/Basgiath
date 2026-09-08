@@ -7,6 +7,10 @@ export function rowanEnabled(env: Record<string, string | undefined>) {
   )
     return false;
   try {
+    const targetUrl = env.ROWAN_DATABASE_URL ?? "";
+    if (env.ROWAN_STANDALONE === "true") {
+      return ["postgres:", "postgresql:"].includes(new URL(targetUrl).protocol);
+    }
     const source = new URL(env.DATABASE_URL ?? "");
     const target = new URL(env.ROWAN_DATABASE_URL ?? "");
     const identity = (url: URL) => `${url.hostname}:${url.port || "5432"}${url.pathname}`;

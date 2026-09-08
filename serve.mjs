@@ -7,7 +7,9 @@ import { migrate } from "drizzle-orm/node-postgres/migrator";
 import pg from "pg";
 
 const __dirname = fileURLToPath(new URL(".", import.meta.url));
-const CLIENT_DIR = join(__dirname, "dist/client");
+const standalone = process.env.ROWAN_STANDALONE === "true";
+const outputDirectory = standalone ? "dist-rowan" : "dist";
+const CLIENT_DIR = join(__dirname, outputDirectory, "client");
 const RESOLVED_CLIENT_DIR = resolve(CLIENT_DIR);
 const STATIC_ROOT = `${RESOLVED_CLIENT_DIR}${sep}`;
 
@@ -41,8 +43,10 @@ async function runRowanMigrations() {
   }
 }
 
-await runMigrations();
-await runRowanMigrations();
+if (!standalone) {
+  await runMigrations();
+  await runRowanMigrations();
+}
 
 const MIME = {
   ".html": "text/html; charset=utf-8",
@@ -62,7 +66,7 @@ const MIME = {
   ".webp": "image/webp",
 };
 
-const worker = (await import("./dist/server/server.js")).default;
+const worker = (await import(`./${outputDirectory}/server/server.js`)).default;
 
 function safeStaticPath(pathname) {
   const candidate = pathname.replace(/^\/+/, "");

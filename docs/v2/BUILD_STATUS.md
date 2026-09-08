@@ -1,4 +1,12 @@
-# Basgiath v2 / Rowan — first working backend slice
+# Rowan build status
+
+## Latest: standalone application — September 8, 2026
+
+Rowan has its own application entry, root/login routes, build output, session storage key, and Railway configuration. Authentication and reading data use only its dedicated database, with no automatic Basgiath import. See [standalone setup](STANDALONE_ROWAN.md). This is a staging application build, not a production cutover.
+
+The checkpoint sections below describe earlier slices. Code now also includes insights/goals, manual books, edition controls, archive restore, account settings, and legacy synchronization for the compatibility screen. Their older “next” items are historical.
+
+## Earlier backend checkpoint
 
 Branch: `codex/rowan-v2-foundation`. Local development only.
 
