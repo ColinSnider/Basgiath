@@ -358,7 +358,11 @@ function Workspace({
             )}
             {catalog.isError && (
               <div role="alert" className="flex items-center gap-3">
-                <p>Catalog search is unavailable.</p>
+                <p>
+                  {catalog.error instanceof Error
+                    ? catalog.error.message
+                    : "Catalog search is unavailable."}
+                </p>
                 <button
                   type="button"
                   className={control}
@@ -683,15 +687,22 @@ function Workspace({
       {show("insights") && <Insights sessionId={sessionId} run={run} busy={busy} />}
       {show("goals") && <Goals sessionId={sessionId} />}
       {(show("account") || show("settings")) && (
-        <AccountSettings
-          sessionId={sessionId}
-          standalone={standalone}
-          onReplaced={() => {
-            setSelected(null);
-            setOffset(0);
-            setShelfId("");
-          }}
-        />
+        <section className="rowan-account-page space-y-6" aria-labelledby="account-heading">
+          <div className="rowan-page-intro">
+            <p className="rowan-eyebrow">Your Rowan account</p>
+            <h2 id="account-heading" className="font-display text-4xl">Account</h2>
+            <p className="text-sm text-muted-foreground">Personal preferences, backups, and library controls.</p>
+          </div>
+          <AccountSettings
+            sessionId={sessionId}
+            standalone={standalone}
+            onReplaced={() => {
+              setSelected(null);
+              setOffset(0);
+              setShelfId("");
+            }}
+          />
+        </section>
       )}
       {!standalone && <DataSyncPanel sessionId={sessionId} />}
       {show("margins") && (

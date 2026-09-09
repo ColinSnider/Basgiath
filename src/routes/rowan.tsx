@@ -1,9 +1,0 @@
-import { createFileRoute } from "@tanstack/react-router";
-import { Rowan } from "@/components/rowan/RowanApp";
-import { rowanStatus } from "@/lib/rowan-fns";
-
-export const Route = createFileRoute("/rowan")({
-  loader: () => rowanStatus(),
-  head: () => ({ meta: [{ title: "Rowan — Your library" }] }),
-  component: () => <Rowan {...Route.useLoaderData()} />,
-});

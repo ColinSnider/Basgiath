@@ -10,7 +10,6 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as SettingsRouteImport } from './routes/settings'
-import { Route as RowanRouteImport } from './routes/rowan'
 import { Route as ProfileRouteImport } from './routes/profile'
 import { Route as MarginsRouteImport } from './routes/margins'
 import { Route as LoginRouteImport } from './routes/login'
@@ -22,11 +21,6 @@ import { Route as BookIdRouteImport } from './routes/book.$id'
 const SettingsRoute = SettingsRouteImport.update({
   id: '/settings',
   path: '/settings',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const RowanRoute = RowanRouteImport.update({
-  id: '/rowan',
-  path: '/rowan',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ProfileRoute = ProfileRouteImport.update({
@@ -72,7 +66,6 @@ export interface FileRoutesByFullPath {
   '/login': typeof LoginRoute
   '/margins': typeof MarginsRoute
   '/profile': typeof ProfileRoute
-  '/rowan': typeof RowanRoute
   '/settings': typeof SettingsRoute
   '/book/$id': typeof BookIdRoute
 }
@@ -83,7 +76,6 @@ export interface FileRoutesByTo {
   '/login': typeof LoginRoute
   '/margins': typeof MarginsRoute
   '/profile': typeof ProfileRoute
-  '/rowan': typeof RowanRoute
   '/settings': typeof SettingsRoute
   '/book/$id': typeof BookIdRoute
 }
@@ -95,7 +87,6 @@ export interface FileRoutesById {
   '/login': typeof LoginRoute
   '/margins': typeof MarginsRoute
   '/profile': typeof ProfileRoute
-  '/rowan': typeof RowanRoute
   '/settings': typeof SettingsRoute
   '/book/$id': typeof BookIdRoute
 }
@@ -108,7 +99,6 @@ export interface FileRouteTypes {
     | '/login'
     | '/margins'
     | '/profile'
-    | '/rowan'
     | '/settings'
     | '/book/$id'
   fileRoutesByTo: FileRoutesByTo
@@ -119,7 +109,6 @@ export interface FileRouteTypes {
     | '/login'
     | '/margins'
     | '/profile'
-    | '/rowan'
     | '/settings'
     | '/book/$id'
   id:
@@ -130,7 +119,6 @@ export interface FileRouteTypes {
     | '/login'
     | '/margins'
     | '/profile'
-    | '/rowan'
     | '/settings'
     | '/book/$id'
   fileRoutesById: FileRoutesById
@@ -142,7 +130,6 @@ export interface RootRouteChildren {
   LoginRoute: typeof LoginRoute
   MarginsRoute: typeof MarginsRoute
   ProfileRoute: typeof ProfileRoute
-  RowanRoute: typeof RowanRoute
   SettingsRoute: typeof SettingsRoute
   BookIdRoute: typeof BookIdRoute
 }
@@ -154,13 +141,6 @@ declare module '@tanstack/react-router' {
       path: '/settings'
       fullPath: '/settings'
       preLoaderRoute: typeof SettingsRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/rowan': {
-      id: '/rowan'
-      path: '/rowan'
-      fullPath: '/rowan'
-      preLoaderRoute: typeof RowanRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/profile': {
@@ -222,7 +202,6 @@ const rootRouteChildren: RootRouteChildren = {
   LoginRoute: LoginRoute,
   MarginsRoute: MarginsRoute,
   ProfileRoute: ProfileRoute,
-  RowanRoute: RowanRoute,
   SettingsRoute: SettingsRoute,
   BookIdRoute: BookIdRoute,
 }

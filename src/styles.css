@@ -250,6 +250,9 @@ html[data-rowan-compact="true"] main section {
 /* Feature pages retain the Rowan shell while giving the active section full width. */
 .rowan-navigation a[aria-current="page"] { background: var(--muted); color: var(--primary); font-weight: 600; }
 .rowan-mobile-tabs { display: none; }
+.rowan-page-intro { padding: 8px 4px; }
+.rowan-page-intro h2 { margin-top: 6px; color: var(--primary); }
+.rowan-account-page { max-width: 920px; }
 @media (min-width: 1024px) {
   .rowan-workspace[data-standalone] #reading-history,
   .rowan-workspace[data-standalone] #find-books,
