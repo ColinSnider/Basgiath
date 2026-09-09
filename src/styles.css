@@ -1,5 +1,6 @@
 @import "tailwindcss" source(none);
 @source "../src";
+@source "../apps/rowan";
 @import "tw-animate-css";
 
 @custom-variant dark (&:is(.dark *));
@@ -244,4 +245,60 @@ html[data-rowan-compact="true"] main section {
     border-color: var(--primary);
   }
   .rowan-workspace progress { accent-color: var(--primary); height: 6px; }
+}
+
+/* Feature pages retain the Rowan shell while giving the active section full width. */
+.rowan-navigation a[aria-current="page"] { background: var(--muted); color: var(--primary); font-weight: 600; }
+@media (min-width: 1024px) {
+  .rowan-workspace[data-standalone] #reading-history,
+  .rowan-workspace[data-standalone] #find-books,
+  .rowan-workspace[data-standalone] > details { grid-column: 1 / -1; }
+}
+
+/* Warm paper, saturated ink, and gold light: Rowan's reading surfaces. */
+.rowan-workspace {
+  background: radial-gradient(ellipse at 100% 0, color-mix(in oklch, var(--gold) 12%, transparent), transparent 48%), var(--background);
+}
+.rowan-workspace .rowan-header {
+  padding: clamp(24px, 4vw, 44px);
+  border: 1px solid color-mix(in oklch, var(--gold) 40%, var(--primary));
+  border-radius: 24px;
+  background: radial-gradient(ellipse at top right, color-mix(in oklch, var(--gold) 38%, transparent), transparent 65%), linear-gradient(125deg, var(--primary), color-mix(in oklch, var(--primary) 78%, black));
+  color: var(--primary-foreground);
+  box-shadow: 0 16px 44px -30px var(--primary);
+}
+.rowan-header h1, .rowan-header p { color: inherit; }
+.rowan-header p { opacity: .82; }
+.rowan-header button, .rowan-header a { background: transparent; color: inherit; border-color: color-mix(in oklch, var(--primary-foreground) 35%, transparent); }
+.rowan-navigation { box-shadow: 8px 0 40px -32px var(--primary); }
+.rowan-navigation a[aria-current="page"] { background: linear-gradient(110deg, var(--primary), color-mix(in oklch, var(--primary) 82%, var(--gold))); color: var(--primary-foreground); border-radius: 12px; }
+.rowan-overview, .rowan-library, .rowan-workspace > section:not(.rowan-book-page) { box-shadow: 0 12px 36px -30px var(--primary); }
+.rowan-overview { background: linear-gradient(145deg, color-mix(in oklch, var(--gold) 9%, var(--card)), var(--card) 65%); }
+.rowan-workspace button, .rowan-workspace a { transition: background-color .18s, box-shadow .18s; }
+.rowan-workspace :is(button,a,input,select,summary):focus-visible { outline: 2px solid var(--ring); outline-offset: 4px; }
+.rowan-book-page { overflow: hidden; border: 1px solid var(--border); border-radius: 24px; background: var(--card); box-shadow: 0 20px 60px -42px var(--primary); }
+.rowan-book-back { display: flex; align-items: center; gap: 8px; padding: 18px 24px; color: var(--muted-foreground); font-size: .875rem; }
+.rowan-book-hero { display: grid; grid-template-columns: 180px minmax(0, 1fr); align-items: center; gap: 36px; padding: clamp(24px, 4vw, 48px); background: radial-gradient(ellipse at top right, color-mix(in oklch, var(--gold) 26%, transparent), transparent 65%), linear-gradient(135deg, var(--primary), color-mix(in oklch, var(--primary) 75%, black)); color: var(--primary-foreground); }
+.rowan-book-cover { position: relative; display: grid; place-items: center; width: 100%; aspect-ratio: 2 / 3; background: linear-gradient(140deg, var(--primary), var(--gold)); border: 1px solid color-mix(in oklch, var(--gold) 65%, transparent); border-radius: 4px 12px 12px 4px; box-shadow: 8px 16px 28px #0005, inset 5px 0 8px #0003; overflow: hidden; }
+.rowan-book-cover img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; z-index: 1; }
+.rowan-book-cover img[hidden] { display: none; }
+.rowan-eyebrow { font-size: .7rem; font-weight: 600; letter-spacing: .2em; text-transform: uppercase; opacity: .8; }
+.rowan-book-intro h2 { margin-top: 14px; font-size: clamp(2rem, 4vw, 3.5rem); line-height: 1.12; overflow-wrap: anywhere; text-wrap: balance; }
+.rowan-book-author { margin-top: 14px; font-size: 1.1rem; opacity: .85; }
+.rowan-book-badges { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 24px; }
+.rowan-book-badges span { display: inline-flex; align-items: center; gap: 6px; font-size: .75rem; padding: 7px 12px; border-radius: 999px; border: 1px solid #fff4; background: #0002; }
+.rowan-hero-progress { max-width: 420px; margin-top: 24px; }
+.rowan-hero-progress p { display: flex; justify-content: space-between; gap: 12px; font-size: .8rem; margin-bottom: 8px; }
+.rowan-workspace .rowan-hero-progress progress { width: 100%; height: 7px; accent-color: var(--gold); }
+.rowan-book-content { padding: clamp(20px, 4vw, 40px); }
+.rowan-reading-controls { padding: 24px; border: 1px solid color-mix(in oklch, var(--gold) 40%, var(--border)); border-radius: 18px; background: linear-gradient(140deg, color-mix(in oklch, var(--gold) 8%, var(--card)), var(--card)); }
+@media (max-width: 600px) {
+  .rowan-book-hero { grid-template-columns: 90px minmax(0,1fr); gap: 20px; padding: 24px 18px; align-items: start; }
+  .rowan-book-intro h2 { font-size: 1.8rem; }
+  .rowan-book-author { font-size: .9rem; }
+  .rowan-book-badges { margin-top: 16px; }
+  .rowan-reading-controls { padding: 18px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .rowan-workspace button, .rowan-workspace a { transition: none; }
 }

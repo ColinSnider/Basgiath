@@ -1,6 +1,14 @@
 # Rowan build status
 
-## Latest: standalone application — September 8, 2026
+## Latest: richer Rowan styling and book detail
+
+Restored theme-aware burgundy/gold gradients, warm surfaces, display fonts, and active navigation accents. Opening a book in standalone Rowan now focuses the content on a cover-led detail view, with author, status, personal rating, progress, and grouped reading controls. Existing edit, edition, margins, and history controls remain available. Added the Rowan app directory to Tailwind source scanning. Build and TypeScript checks passed; authenticated desktop/mobile visual review remains pending.
+
+## Dedicated Rowan pages
+
+Standalone Rowan now has Home, Library, Search, Calendar, Insights, Goals, Margins, and Settings URLs with active navigation. A persistent shell preserves pending reading mutations and open details; theme settings apply across pages. Feature queries are scoped to the visible page, and reading details are extracted into `ReadingPanel`. No schema or deployment change.
+
+## Standalone application — September 8, 2026
 
 Rowan has its own application entry, root/login routes, build output, session storage key, and Railway configuration. Authentication and reading data use only its dedicated database, with no automatic Basgiath import. See [standalone setup](STANDALONE_ROWAN.md). This is a staging application build, not a production cutover.
 

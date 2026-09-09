@@ -20,7 +20,8 @@
     "build:rowan": "vite build --mode rowan",
     "start:rowan": "ROWAN_STANDALONE=true node serve.mjs",
     "typecheck:rowan": "tsc --noEmit -p apps/rowan/tsconfig.json",
-    "db:migrate:rowan": "node --env-file-if-exists=.env scripts/migrate-rowan.mjs"
+    "db:migrate:rowan": "node --env-file-if-exists=.env scripts/migrate-rowan.mjs",
+    "test:rowan:routes": "node scripts/check-rowan-routes.mjs"
   },
   "engines": {
     "node": ">=22.12.0"

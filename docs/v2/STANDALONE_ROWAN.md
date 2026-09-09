@@ -37,7 +37,9 @@ No Railway service, database, domain, production deployment, or account migratio
 
 ## Remaining product work
 
-The existing Rowan workspace still uses section navigation on one page. Dedicated feature routes and smaller page components are the next UI slice. Production account migration, reconciliation, and recovery gates from the implementation brief still apply.
+Rowan now has dedicated Home, Library, Search, Calendar, Insights, Goals, Margins, and Settings routes. The persistent shell retains pending mutation retries and open book details across navigation. Only the selected feature renders; library/catalog queries are enabled on their respective pages. Theme application lives in the shell, independent of Settings. Book detail has been extracted into its own component.
+
+Next: persist library filters/sort/pagination in the URL, extract the remaining library/search controls into smaller components, and verify authenticated browser workflows against staging PostgreSQL. Production account migration, reconciliation, and recovery gates from the implementation brief still apply.
 
 ## Validation for this slice
 
@@ -45,3 +47,5 @@ The existing Rowan workspace still uses section navigation on one page. Dedicate
 - Four focused tests passed, including database selection, staging activation, and a fresh PGlite account saving a book without legacy import. The v2 migration journal was exercised twice for repeatability; PGlite installed the legacy SQL through its multi-statement execution API.
 - A built-server HTTP smoke test returned Rowan pages at `/` and `/login`, and 404 at `/library`, with an unreachable dummy database URL and no startup migrations.
 - Browser sign-up against a live PostgreSQL instance and Railway deployment remain untested.
+
+Run `npm run test:rowan:routes` after `npm run build:rowan` to check all eight built SSR page routes and legacy-route exclusion without a live database.
