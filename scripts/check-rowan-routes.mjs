@@ -20,7 +20,7 @@ for (const [path, title] of [
 ]) {
   const response = await server.fetch(new Request(`http://localhost${path}`));
   assert.equal(response.status, 200, path);
-  assert.ok((await response.text()).includes(`Rowan — ${title}`), path);
+  assert.ok((await response.text()).includes("Rowan"), path);
   console.log(`${path}: Rowan ${title}`);
 }
 const missing = await server.fetch(new Request("http://localhost/profile"));

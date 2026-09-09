@@ -55,7 +55,7 @@ export const bookEditSchema = z
 const archiveSchema = z
   .object({
     format: z.literal("rowan-archive"),
-    version: z.literal(2),
+    version: z.union([z.literal(2), z.literal(3)]),
     exportedAt: date,
     works: rows(
       z
@@ -133,6 +133,9 @@ const archiveSchema = z
           id,
           readingSessionId: id,
           kind: z.enum(["baseline", "observation"]),
+          supersedesId: id.nullable().default(null),
+          voided: z.boolean().default(false),
+          correctionReason: z.string().trim().min(1).max(1000).nullable().default(null),
           position: integer,
           occurredAt: date.nullable(),
           createdAt: date,
@@ -257,9 +260,32 @@ export function parseRowanArchive(raw: string): RowanArchive {
     require(!["active", "paused"].includes(s.state) ||
       !s.finishedAt, "open session has finish date.");
   }
-  for (const e of data.progressEntries)
-    require(sessions.has(e.readingSessionId) &&
-      (e.kind === "baseline" || e.occurredAt), "invalid progress entry.");
+  const entries = new Map(data.progressEntries.map((entry) => [entry.id, entry]));
+  const replaced = new Set<string>();
+  for (const e of data.progressEntries) {
+    require(sessions.has(e.readingSessionId) && (e.kind === "baseline" || e.occurredAt), "invalid progress entry.");
+    if (e.supersedesId) {
+      const original = entries.get(e.supersedesId);
+      require(original && original.readingSessionId === e.readingSessionId && original.kind === "observation" && !original.voided && e.kind === "observation" && e.correctionReason, "invalid progress correction.");
+      require(!replaced.has(e.supersedesId), "branched progress correction.");
+      replaced.add(e.supersedesId);
+    } else require(!e.voided && !e.correctionReason, "orphan progress correction.");
+  }
+  // Topological ordering validates cycles and makes FK-safe archive restore independent of row order.
+  const ordered: typeof data.progressEntries = [];
+  const visited = new Set<string>();
+  for (const entry of data.progressEntries) {
+    const path: typeof data.progressEntries = [];
+    const walking = new Set<string>();
+    let node: typeof entry | undefined = entry;
+    while (node && !visited.has(node.id)) {
+      require(!walking.has(node.id), "cyclic progress correction.");
+      walking.add(node.id); path.push(node);
+      node = node.supersedesId ? entries.get(node.supersedesId) : undefined;
+    }
+    for (const node of path.reverse()) { visited.add(node.id); ordered.push(node); }
+  }
+  data.progressEntries = ordered;
   for (const r of [...data.ratings, ...data.margins])
     require(books.has(r.userBookId), "orphan personal record.");
   for (const r of data.shelfItems)

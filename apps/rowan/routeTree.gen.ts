@@ -9,146 +9,167 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
+import { Route as SettingsRouteImport } from './routes/settings'
+import { Route as SearchRouteImport } from './routes/search'
+import { Route as MarginsRouteImport } from './routes/margins'
 import { Route as LoginRouteImport } from './routes/login'
-import { Route as AppRouteImport } from './routes/_app'
-import { Route as AppIndexRouteImport } from './routes/_app.index'
-import { Route as AppSettingsRouteImport } from './routes/_app.settings'
-import { Route as AppSearchRouteImport } from './routes/_app.search'
-import { Route as AppMarginsRouteImport } from './routes/_app.margins'
-import { Route as AppLibraryRouteImport } from './routes/_app.library'
-import { Route as AppInsightsRouteImport } from './routes/_app.insights'
-import { Route as AppGoalsRouteImport } from './routes/_app.goals'
-import { Route as AppCalendarRouteImport } from './routes/_app.calendar'
+import { Route as LibraryRouteImport } from './routes/library'
+import { Route as InsightsRouteImport } from './routes/insights'
+import { Route as GoalsRouteImport } from './routes/goals'
+import { Route as CalendarRouteImport } from './routes/calendar'
+import { Route as IndexRouteImport } from './routes/index'
 
+const SettingsRoute = SettingsRouteImport.update({
+  id: '/settings',
+  path: '/settings',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const SearchRoute = SearchRouteImport.update({
+  id: '/search',
+  path: '/search',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const MarginsRoute = MarginsRouteImport.update({
+  id: '/margins',
+  path: '/margins',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const LoginRoute = LoginRouteImport.update({
   id: '/login',
   path: '/login',
   getParentRoute: () => rootRouteImport,
 } as any)
-const AppRoute = AppRouteImport.update({
-  id: '/_app',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const AppIndexRoute = AppIndexRouteImport.update({
-  id: '/',
-  path: '/',
-  getParentRoute: () => AppRoute,
-} as any)
-const AppSettingsRoute = AppSettingsRouteImport.update({
-  id: '/settings',
-  path: '/settings',
-  getParentRoute: () => AppRoute,
-} as any)
-const AppSearchRoute = AppSearchRouteImport.update({
-  id: '/search',
-  path: '/search',
-  getParentRoute: () => AppRoute,
-} as any)
-const AppMarginsRoute = AppMarginsRouteImport.update({
-  id: '/margins',
-  path: '/margins',
-  getParentRoute: () => AppRoute,
-} as any)
-const AppLibraryRoute = AppLibraryRouteImport.update({
+const LibraryRoute = LibraryRouteImport.update({
   id: '/library',
   path: '/library',
-  getParentRoute: () => AppRoute,
+  getParentRoute: () => rootRouteImport,
 } as any)
-const AppInsightsRoute = AppInsightsRouteImport.update({
+const InsightsRoute = InsightsRouteImport.update({
   id: '/insights',
   path: '/insights',
-  getParentRoute: () => AppRoute,
+  getParentRoute: () => rootRouteImport,
 } as any)
-const AppGoalsRoute = AppGoalsRouteImport.update({
+const GoalsRoute = GoalsRouteImport.update({
   id: '/goals',
   path: '/goals',
-  getParentRoute: () => AppRoute,
+  getParentRoute: () => rootRouteImport,
 } as any)
-const AppCalendarRoute = AppCalendarRouteImport.update({
+const CalendarRoute = CalendarRouteImport.update({
   id: '/calendar',
   path: '/calendar',
-  getParentRoute: () => AppRoute,
+  getParentRoute: () => rootRouteImport,
+} as any)
+const IndexRoute = IndexRouteImport.update({
+  id: '/',
+  path: '/',
+  getParentRoute: () => rootRouteImport,
 } as any)
 
 export interface FileRoutesByFullPath {
-  '/': typeof AppIndexRoute
+  '/': typeof IndexRoute
+  '/calendar': typeof CalendarRoute
+  '/goals': typeof GoalsRoute
+  '/insights': typeof InsightsRoute
+  '/library': typeof LibraryRoute
   '/login': typeof LoginRoute
-  '/calendar': typeof AppCalendarRoute
-  '/goals': typeof AppGoalsRoute
-  '/insights': typeof AppInsightsRoute
-  '/library': typeof AppLibraryRoute
-  '/margins': typeof AppMarginsRoute
-  '/search': typeof AppSearchRoute
-  '/settings': typeof AppSettingsRoute
+  '/margins': typeof MarginsRoute
+  '/search': typeof SearchRoute
+  '/settings': typeof SettingsRoute
 }
 export interface FileRoutesByTo {
+  '/': typeof IndexRoute
+  '/calendar': typeof CalendarRoute
+  '/goals': typeof GoalsRoute
+  '/insights': typeof InsightsRoute
+  '/library': typeof LibraryRoute
   '/login': typeof LoginRoute
-  '/calendar': typeof AppCalendarRoute
-  '/goals': typeof AppGoalsRoute
-  '/insights': typeof AppInsightsRoute
-  '/library': typeof AppLibraryRoute
-  '/margins': typeof AppMarginsRoute
-  '/search': typeof AppSearchRoute
-  '/settings': typeof AppSettingsRoute
-  '/': typeof AppIndexRoute
+  '/margins': typeof MarginsRoute
+  '/search': typeof SearchRoute
+  '/settings': typeof SettingsRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
-  '/_app': typeof AppRouteWithChildren
+  '/': typeof IndexRoute
+  '/calendar': typeof CalendarRoute
+  '/goals': typeof GoalsRoute
+  '/insights': typeof InsightsRoute
+  '/library': typeof LibraryRoute
   '/login': typeof LoginRoute
-  '/_app/calendar': typeof AppCalendarRoute
-  '/_app/goals': typeof AppGoalsRoute
-  '/_app/insights': typeof AppInsightsRoute
-  '/_app/library': typeof AppLibraryRoute
-  '/_app/margins': typeof AppMarginsRoute
-  '/_app/search': typeof AppSearchRoute
-  '/_app/settings': typeof AppSettingsRoute
-  '/_app/': typeof AppIndexRoute
+  '/margins': typeof MarginsRoute
+  '/search': typeof SearchRoute
+  '/settings': typeof SettingsRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
     | '/'
-    | '/login'
     | '/calendar'
     | '/goals'
     | '/insights'
     | '/library'
+    | '/login'
     | '/margins'
     | '/search'
     | '/settings'
   fileRoutesByTo: FileRoutesByTo
   to:
-    | '/login'
+    | '/'
     | '/calendar'
     | '/goals'
     | '/insights'
     | '/library'
+    | '/login'
     | '/margins'
     | '/search'
     | '/settings'
-    | '/'
   id:
     | '__root__'
-    | '/_app'
+    | '/'
+    | '/calendar'
+    | '/goals'
+    | '/insights'
+    | '/library'
     | '/login'
-    | '/_app/calendar'
-    | '/_app/goals'
-    | '/_app/insights'
-    | '/_app/library'
-    | '/_app/margins'
-    | '/_app/search'
-    | '/_app/settings'
-    | '/_app/'
+    | '/margins'
+    | '/search'
+    | '/settings'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
-  AppRoute: typeof AppRouteWithChildren
+  IndexRoute: typeof IndexRoute
+  CalendarRoute: typeof CalendarRoute
+  GoalsRoute: typeof GoalsRoute
+  InsightsRoute: typeof InsightsRoute
+  LibraryRoute: typeof LibraryRoute
   LoginRoute: typeof LoginRoute
+  MarginsRoute: typeof MarginsRoute
+  SearchRoute: typeof SearchRoute
+  SettingsRoute: typeof SettingsRoute
 }
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
+    '/settings': {
+      id: '/settings'
+      path: '/settings'
+      fullPath: '/settings'
+      preLoaderRoute: typeof SettingsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/search': {
+      id: '/search'
+      path: '/search'
+      fullPath: '/search'
+      preLoaderRoute: typeof SearchRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/margins': {
+      id: '/margins'
+      path: '/margins'
+      fullPath: '/margins'
+      preLoaderRoute: typeof MarginsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/login': {
       id: '/login'
       path: '/login'
@@ -156,99 +177,54 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof LoginRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/_app': {
-      id: '/_app'
-      path: ''
-      fullPath: '/'
-      preLoaderRoute: typeof AppRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/_app/': {
-      id: '/_app/'
-      path: '/'
-      fullPath: '/'
-      preLoaderRoute: typeof AppIndexRouteImport
-      parentRoute: typeof AppRoute
-    }
-    '/_app/settings': {
-      id: '/_app/settings'
-      path: '/settings'
-      fullPath: '/settings'
-      preLoaderRoute: typeof AppSettingsRouteImport
-      parentRoute: typeof AppRoute
-    }
-    '/_app/search': {
-      id: '/_app/search'
-      path: '/search'
-      fullPath: '/search'
-      preLoaderRoute: typeof AppSearchRouteImport
-      parentRoute: typeof AppRoute
-    }
-    '/_app/margins': {
-      id: '/_app/margins'
-      path: '/margins'
-      fullPath: '/margins'
-      preLoaderRoute: typeof AppMarginsRouteImport
-      parentRoute: typeof AppRoute
-    }
-    '/_app/library': {
-      id: '/_app/library'
+    '/library': {
+      id: '/library'
       path: '/library'
       fullPath: '/library'
-      preLoaderRoute: typeof AppLibraryRouteImport
-      parentRoute: typeof AppRoute
+      preLoaderRoute: typeof LibraryRouteImport
+      parentRoute: typeof rootRouteImport
     }
-    '/_app/insights': {
-      id: '/_app/insights'
+    '/insights': {
+      id: '/insights'
       path: '/insights'
       fullPath: '/insights'
-      preLoaderRoute: typeof AppInsightsRouteImport
-      parentRoute: typeof AppRoute
+      preLoaderRoute: typeof InsightsRouteImport
+      parentRoute: typeof rootRouteImport
     }
-    '/_app/goals': {
-      id: '/_app/goals'
+    '/goals': {
+      id: '/goals'
       path: '/goals'
       fullPath: '/goals'
-      preLoaderRoute: typeof AppGoalsRouteImport
-      parentRoute: typeof AppRoute
+      preLoaderRoute: typeof GoalsRouteImport
+      parentRoute: typeof rootRouteImport
     }
-    '/_app/calendar': {
-      id: '/_app/calendar'
+    '/calendar': {
+      id: '/calendar'
       path: '/calendar'
       fullPath: '/calendar'
-      preLoaderRoute: typeof AppCalendarRouteImport
-      parentRoute: typeof AppRoute
+      preLoaderRoute: typeof CalendarRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/': {
+      id: '/'
+      path: '/'
+      fullPath: '/'
+      preLoaderRoute: typeof IndexRouteImport
+      parentRoute: typeof rootRouteImport
     }
   }
 }
 
-interface AppRouteChildren {
-  AppCalendarRoute: typeof AppCalendarRoute
-  AppGoalsRoute: typeof AppGoalsRoute
-  AppInsightsRoute: typeof AppInsightsRoute
-  AppLibraryRoute: typeof AppLibraryRoute
-  AppMarginsRoute: typeof AppMarginsRoute
-  AppSearchRoute: typeof AppSearchRoute
-  AppSettingsRoute: typeof AppSettingsRoute
-  AppIndexRoute: typeof AppIndexRoute
-}
-
-const AppRouteChildren: AppRouteChildren = {
-  AppCalendarRoute: AppCalendarRoute,
-  AppGoalsRoute: AppGoalsRoute,
-  AppInsightsRoute: AppInsightsRoute,
-  AppLibraryRoute: AppLibraryRoute,
-  AppMarginsRoute: AppMarginsRoute,
-  AppSearchRoute: AppSearchRoute,
-  AppSettingsRoute: AppSettingsRoute,
-  AppIndexRoute: AppIndexRoute,
-}
-
-const AppRouteWithChildren = AppRoute._addFileChildren(AppRouteChildren)
-
 const rootRouteChildren: RootRouteChildren = {
-  AppRoute: AppRouteWithChildren,
+  IndexRoute: IndexRoute,
+  CalendarRoute: CalendarRoute,
+  GoalsRoute: GoalsRoute,
+  InsightsRoute: InsightsRoute,
+  LibraryRoute: LibraryRoute,
   LoginRoute: LoginRoute,
+  MarginsRoute: MarginsRoute,
+  SearchRoute: SearchRoute,
+  SettingsRoute: SettingsRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

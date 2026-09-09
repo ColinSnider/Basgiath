@@ -250,10 +250,12 @@ export function createAccountService(database: Database) {
             startedAt: r.startedAt ? new Date(r.startedAt) : null,
             finishedAt: r.finishedAt ? new Date(r.finishedAt) : null,
           });
+        const entryIds = new Map(data.progressEntries.map((entry) => [entry.id, crypto.randomUUID()]));
         for (const r of data.progressEntries)
           await tx.insert(s.progressEntries).values({
             ...r,
-            id: crypto.randomUUID(),
+            id: entryIds.get(r.id)!,
+            supersedesId: r.supersedesId ? entryIds.get(r.supersedesId)! : null,
             readingSessionId: sessionIds.get(r.readingSessionId)!,
             occurredAt: r.occurredAt ? new Date(r.occurredAt) : null,
             createdAt: new Date(r.createdAt),

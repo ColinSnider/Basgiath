@@ -36,6 +36,20 @@
       "when": 1788800000001,
       "tag": "0004_account_state",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1788912694870,
+      "tag": "0005_progress_corrections",
+      "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1788913167430,
+      "tag": "0006_reading_organization",
+      "breakpoints": true
     }
   ]
 }

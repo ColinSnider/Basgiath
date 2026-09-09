@@ -177,11 +177,18 @@ export const progressEntries = v2.table(
       .notNull()
       .references(() => readingSessions.id, { onDelete: "restrict" }),
     kind: text("kind").$type<"baseline" | "observation">().notNull(),
+    supersedesId: uuid("supersedes_id"),
+    voided: boolean("voided").notNull().default(false),
+    correctionReason: text("correction_reason"),
     position: integer("position").notNull(),
     occurredAt: timestamp("occurred_at", { withTimezone: true }),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [
+    uniqueIndex("progress_session_id").on(t.readingSessionId, t.id),
+    uniqueIndex("progress_single_replacement").on(t.supersedesId),
+    foreignKey({ name: "progress_replacement_session", columns: [t.readingSessionId, t.supersedesId], foreignColumns: [t.readingSessionId, t.id] }),
+    check("progress_correction_shape", sql`(${t.supersedesId} is null and ${t.voided} = false and ${t.correctionReason} is null) or (${t.supersedesId} is not null and ${t.supersedesId} <> ${t.id} and ${t.kind} = 'observation' and ${t.correctionReason} is not null and length(trim(${t.correctionReason})) > 0)`),
     index("session_progress_history").on(t.readingSessionId, t.createdAt),
     check("entry_kind", sql`${t.kind} in ('baseline', 'observation')`),
     check("entry_position", sql`${t.position} >= 0`),
@@ -306,3 +313,45 @@ export const shelfItemRelations = relations(shelfItems, ({ one }) => ({
   shelf: one(shelves, { fields: [shelfItems.shelfId], references: [shelves.id] }),
   userBook: one(userBooks, { fields: [shelfItems.userBookId], references: [userBooks.id] }),
 }));
+
+// Private curation: these records never assert a globally verified series catalog.
+export const readingOrganization = v2.table("reading_organization", {
+  userId: integer("user_id").primaryKey().references(() => users.id, { onDelete: "restrict" }),
+  version: integer("version").notNull().default(0),
+});
+export const readerSeries = v2.table("reader_series", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  userId: integer("user_id").notNull().references(() => users.id, { onDelete: "restrict" }),
+  name: text("name").notNull(),
+  completionState: text("completion_state").$type<"unknown" | "open" | "complete">().notNull().default("unknown"),
+  sourceNote: text("source_note").notNull(),
+}, t => [
+  uniqueIndex("reader_series_owner").on(t.userId, t.id),
+  uniqueIndex("reader_series_name").on(t.userId, t.name),
+  check("series_completion_state", sql`${t.completionState} in ('unknown', 'open', 'complete')`),
+  check("series_curation_text", sql`length(trim(${t.name})) between 1 and 120 and length(trim(${t.sourceNote})) between 1 and 1000`),
+]);
+export const readerSeriesItems = v2.table("reader_series_items", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  userId: integer("user_id").notNull(),
+  seriesId: uuid("series_id").notNull(),
+  userBookId: uuid("user_book_id").notNull(),
+  sequenceLabel: text("sequence_label").notNull().default(""),
+  sortOrder: integer("sort_order").notNull(),
+  optional: boolean("optional").notNull().default(false),
+}, t => [
+  uniqueIndex("reader_series_book").on(t.seriesId, t.userBookId),
+  foreignKey({ columns: [t.userId, t.seriesId], foreignColumns: [readerSeries.userId, readerSeries.id] }).onDelete("cascade"),
+  foreignKey({ columns: [t.userId, t.userBookId], foreignColumns: [userBooks.userId, userBooks.id] }).onDelete("cascade"),
+  check("series_item_order", sql`${t.sortOrder} >= 0 and length(${t.sequenceLabel}) <= 40`),
+]);
+export const readingQueue = v2.table("reading_queue", {
+  userBookId: uuid("user_book_id").primaryKey(),
+  userId: integer("user_id").notNull(),
+  sortOrder: integer("sort_order").notNull(),
+  pinned: boolean("pinned").notNull().default(false),
+}, t => [
+  foreignKey({ columns: [t.userId, t.userBookId], foreignColumns: [userBooks.userId, userBooks.id] }).onDelete("cascade"),
+  uniqueIndex("one_pinned_next_book").on(t.userId).where(sql`${t.pinned} = true`),
+  check("queue_order", sql`${t.sortOrder} >= 0`),
+]);

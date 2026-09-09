@@ -37,7 +37,7 @@ No Railway service, database, domain, production deployment, or account migratio
 
 ## Remaining product work
 
-Rowan now has dedicated Home, Library, Search, Calendar, Insights, Goals, Margins, and Settings routes. The persistent shell retains pending mutation retries and open book details across navigation. Only the selected feature renders; library/catalog queries are enabled on their respective pages. Theme application lives in the shell, independent of Settings. Book detail has been extracted into its own component.
+Rowan now has dedicated Home, Library, Search, Calendar, Insights, Goals, Margins, and Settings routes. These are real top-level routes, not a `/_app` layout or anchor-driven one-page view. Each URL mounts the Rowan page directly; the visible feature is the only feature rendered. Library and catalog queries are enabled only on their respective pages. Theme application lives in the shell, independent of Settings. Book detail has been extracted into its own component.
 
 Next: persist library filters/sort/pagination in the URL, extract the remaining library/search controls into smaller components, and verify authenticated browser workflows against staging PostgreSQL. Production account migration, reconciliation, and recovery gates from the implementation brief still apply.
 

@@ -1,3 +1,4 @@
+import { effectiveProgress, loggedProgress } from "../../shared/reading-progress.ts";
 import { goalTimeframeSchema } from "../../shared/rowan-archive.ts";
 import { createHash } from "node:crypto";
 import { and, eq, sql, ilike, or, desc } from "drizzle-orm";
@@ -82,6 +83,18 @@ const progressSchema = z
     occurredAt: instant,
   })
   .strict();
+const correctionSchema = z.object({
+  key: id,
+  sessionId: id,
+  entryId: id,
+  expectedVersion: version,
+  action: z.enum(["correct", "remove"]),
+  position: z.number().int().nonnegative(),
+  occurredAt: instant,
+  reason: z.string().trim().min(1).max(1000),
+}).strict();
+// Correlated predicate: only the current end of each correction chain is visible.
+const effectiveEntry = sql`${progressEntries.voided} = false and not exists (select 1 from v2.progress_entries replacement where replacement.supersedes_id = ${progressEntries.id})`;
 const transitionSchema = z
   .object({
     key: id,
@@ -254,7 +267,7 @@ export function createLibraryService(database: Database, provider: CatalogProvid
           return JSON.stringify(
             {
               format: "rowan-archive",
-              version: 2,
+              version: 3,
               exportedAt: new Date().toISOString(),
               userBooks: await tx
                 .select()
@@ -697,7 +710,7 @@ export function createLibraryService(database: Database, provider: CatalogProvid
           .innerJoin(userBooks, eq(userBooks.id, readingSessions.userBookId))
           .innerJoin(works, eq(works.id, userBooks.workId))
           .leftJoin(ratings, eq(ratings.userBookId, userBooks.id))
-          .where(and(inRange(progressEntries.occurredAt), eq(progressEntries.kind, "observation")))
+          .where(and(inRange(progressEntries.occurredAt), eq(progressEntries.kind, "observation"), effectiveEntry))
           .orderBy(progressEntries.occurredAt, progressEntries.id)
           .limit(1001),
         database
@@ -1105,13 +1118,13 @@ export function createLibraryService(database: Database, provider: CatalogProvid
         const [latest] = await tx
           .select()
           .from(progressEntries)
-          .where(eq(progressEntries.readingSessionId, session.id))
-          .orderBy(sql`${progressEntries.occurredAt} desc nulls last`)
+          .where(and(eq(progressEntries.readingSessionId, session.id), effectiveEntry))
+          .orderBy(sql`${progressEntries.occurredAt} desc nulls last`, desc(progressEntries.createdAt), desc(progressEntries.id))
           .limit(1);
         if (latest?.occurredAt && new Date(data.occurredAt) < latest.occurredAt)
           throw new DomainError(
             "INVALID_TRANSITION",
-            "Backdated corrections require the later history editor.",
+            "Use the history editor to correct the date of an existing entry.",
           );
         if (
           data.position < session.position ||
@@ -1140,6 +1153,39 @@ export function createLibraryService(database: Database, provider: CatalogProvid
       });
     },
 
+    async correctProgress(actor: Actor, input: z.input<typeof correctionSchema>) {
+      const data = correctionSchema.parse(input);
+      return mutate(actor, data.key, fingerprint("correctProgress", data), async (tx) => {
+        const { session, book } = await ownedSession(tx, actor, data.sessionId);
+        expectVersion(session.version, data.expectedVersion);
+        const entries = await tx.select().from(progressEntries).where(eq(progressEntries.readingSessionId, session.id));
+        const current = effectiveProgress(entries);
+        const target = current.find((entry) => entry.id === data.entryId);
+        if (!target || target.kind !== "observation")
+          throw new DomainError("INVALID_TRANSITION", "Choose a current progress observation. Baselines and replaced entries cannot be edited.");
+        const replacement = {
+          id: crypto.randomUUID(), readingSessionId: session.id,
+          supersedesId: target.id, kind: "observation" as const,
+          voided: data.action === "remove", correctionReason: data.reason,
+          position: data.action === "remove" ? target.position : data.position,
+          occurredAt: data.action === "remove" ? target.occurredAt : new Date(data.occurredAt),
+          createdAt: new Date(),
+        };
+        const resolved = effectiveProgress([...entries, replacement]);
+        let previous = 0;
+        for (const entry of resolved) {
+          if ((session.total !== null && entry.position > session.total) || entry.position < previous)
+            throw new DomainError("INVALID_TRANSITION", "The corrected positions must stay in reading order and within the book length. Correct the adjacent entry first.");
+          if (entry.occurredAt && ((session.startedAt && entry.occurredAt < session.startedAt) || (session.finishedAt && entry.occurredAt > session.finishedAt)))
+            throw new DomainError("INVALID_TRANSITION", "Progress must fall between this attempt's start and finish dates.");
+          previous = entry.position;
+        }
+        await tx.insert(progressEntries).values(replacement);
+        await tx.update(readingSessions).set({ position: resolved.at(-1)?.position ?? 0, version: session.version + 1 }).where(eq(readingSessions.id, session.id));
+        return { workId: book.workId, userBookId: book.id, sessionId: session.id, version: session.version + 1 };
+      });
+    },
+
     async transitionReading(actor: Actor, input: z.input<typeof transitionSchema>) {
       const data = transitionSchema.parse(input);
       return mutate(actor, data.key, fingerprint("transition", data), async (tx) => {
@@ -1158,8 +1204,8 @@ export function createLibraryService(database: Database, provider: CatalogProvid
         const [latest] = await tx
           .select()
           .from(progressEntries)
-          .where(eq(progressEntries.readingSessionId, session.id))
-          .orderBy(sql`${progressEntries.occurredAt} desc nulls last`)
+          .where(and(eq(progressEntries.readingSessionId, session.id), effectiveEntry))
+          .orderBy(sql`${progressEntries.occurredAt} desc nulls last`, desc(progressEntries.createdAt), desc(progressEntries.id))
           .limit(1);
         if (
           finishedAt &&
@@ -1254,7 +1300,7 @@ export function createLibraryService(database: Database, provider: CatalogProvid
           tags: Array.isArray(book.legacyMetadata?.tags)
             ? book.legacyMetadata.tags.filter((tag): tag is string => typeof tag === "string")
             : [],
-          sessions,
+          sessions: sessions.map((session) => ({ ...session, loggedProgress: loggedProgress(entries.filter(({ entry }) => entry.readingSessionId === session.id).map(({ entry }) => entry)) })),
           entries: entries.map(({ entry }) => entry),
         };
       });

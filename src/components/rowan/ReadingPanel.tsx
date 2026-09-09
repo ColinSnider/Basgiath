@@ -1,3 +1,4 @@
+import { HistoryEditor } from "./HistoryEditor";
 import { ArrowLeft, BookOpen, Heart, Star } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
@@ -311,34 +312,7 @@ export function ReadingPanel({
                   </button>
                 </div>
               )}
-              <h3 className="font-medium">Reading history</h3>
-              {!history.data.sessions.length && (
-                <p className="text-sm text-muted-foreground">No reading sessions yet.</p>
-              )}
-              <ul className="space-y-3">
-                {history.data.sessions.map((s) => (
-                  <li key={s.id} className="border-t border-border pt-3 text-sm">
-                    <p>
-                      {s.state} ·{" "}
-                      {s.startedAt ? new Date(s.startedAt).toLocaleDateString() : "Unknown start"}
-                      {s.finishedAt ? ` — ${new Date(s.finishedAt).toLocaleDateString()}` : ""}
-                    </p>
-                    <ul className="mt-1 text-muted-foreground">
-                      {history.data.entries
-                        .filter((e) => e.sessionId === s.id)
-                        .map((e) => (
-                          <li key={e.id}>
-                            {e.kind === "baseline" ? "Started at" : "Progress"}: {e.position}{" "}
-                            {s.unit} ·{" "}
-                            {e.occurredAt
-                              ? new Date(e.occurredAt).toLocaleString()
-                              : "Unknown date"}
-                          </li>
-                        ))}
-                    </ul>
-                  </li>
-                ))}
-              </ul>
+              <HistoryEditor history={history.data} busy={busy} run={run} />
             </section>
             <BookEditor
               key={`edit:${history.data.userBookVersion}`}

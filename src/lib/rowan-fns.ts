@@ -22,6 +22,10 @@ import { createHash } from "node:crypto";
 const key = z.string().uuid();
 const moment = z.string().datetime({ offset: true });
 const command = z.discriminatedUnion("type", [
+  z.object({ type: z.literal("correctProgress"), key, sessionId: key, entryId: key,
+    expectedVersion: z.number().int().nonnegative(), action: z.enum(["correct", "remove"]),
+    position: z.number().int().nonnegative(), occurredAt: moment, reason: z.string().trim().min(1).max(1000),
+  }).strict(),
   z
     .object({
       type: z.literal("edition"),
@@ -494,6 +498,7 @@ export const rowanHistory = createServerFn({ method: "POST" })
         unit: s.unit,
         total: s.total,
         position: s.position,
+        loggedProgress: s.loggedProgress,
         version: s.version,
         startedAt: s.startedAt?.toISOString() ?? null,
         finishedAt: s.finishedAt?.toISOString() ?? null,
@@ -502,6 +507,10 @@ export const rowanHistory = createServerFn({ method: "POST" })
         id: e.id,
         sessionId: e.readingSessionId,
         kind: e.kind,
+        supersedesId: e.supersedesId,
+        voided: e.voided,
+        correctionReason: e.correctionReason,
+        createdAt: e.createdAt.toISOString(),
         position: e.position,
         occurredAt: e.occurredAt?.toISOString() ?? null,
       })),
@@ -514,6 +523,11 @@ export const rowanMutate = createServerFn({ method: "POST" })
     try {
       // Narrow the discriminated union before passing validated commands to the domain.
       switch (data.command.type) {
+        case "correctProgress": {
+          const { type, ...value } = data.command;
+          await library.correctProgress(actor, value);
+          break;
+        }
         case "edition": {
           const { type, ...value } = data.command;
           await library.setEdition(actor, value);
