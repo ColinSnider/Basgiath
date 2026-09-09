@@ -12,6 +12,7 @@ const outputDirectory = standalone ? "dist-rowan" : "dist";
 const CLIENT_DIR = join(__dirname, outputDirectory, "client");
 const RESOLVED_CLIENT_DIR = resolve(CLIENT_DIR);
 const STATIC_ROOT = `${RESOLVED_CLIENT_DIR}${sep}`;
+const ROWAN_STATIC_PAGE = join(__dirname, "rowan-static.html");
 
 // Run pending Drizzle migrations before accepting any traffic.
 async function runMigrations() {
@@ -107,6 +108,22 @@ const server = createServer(async (req, res) => {
           uptimeSeconds: Math.floor(process.uptime()),
         }),
       );
+      return;
+    }
+
+    // Rowan is intentionally served as a dependency-free HTML contract while its
+    // data and page structure are rebuilt. This keeps the endpoint usable even
+    // when the client bundle is unavailable or unhealthy.
+    if (
+      standalone &&
+      req.method === "GET" &&
+      !pathname.startsWith("/api/") &&
+      !pathname.startsWith("/assets/") &&
+      !extname(pathname)
+    ) {
+      const html = await readFile(ROWAN_STATIC_PAGE);
+      res.writeHead(200, { "Content-Type": "text/html; charset=utf-8" });
+      res.end(html);
       return;
     }
 

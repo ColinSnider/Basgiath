@@ -1,0 +1,87 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Rowan</title>
+  </head>
+  <body>
+    <header>
+      <h1>Rowan</h1>
+      <p>A personal reading system.</p>
+      <nav aria-label="Primary navigation">
+        <a href="/">Home</a> |
+        <a href="/library">Library</a> |
+        <a href="/search">Search</a> |
+        <a href="/calendar">History</a> |
+        <a href="/account">Account</a>
+      </nav>
+    </header>
+
+    <main>
+      <section id="home">
+        <h2>Home</h2>
+        <p>Current reading, next up, recent activity, and daily reading goal.</p>
+        <dl>
+          <dt>Current book</dt><dd data-point="current-book">Not selected</dd>
+          <dt>Progress</dt><dd data-point="current-progress">0%</dd>
+          <dt>Books finished this year</dt><dd data-point="finished-this-year">0</dd>
+          <dt>Reading streak</dt><dd data-point="reading-streak">0 days</dd>
+        </dl>
+      </section>
+
+      <section id="library">
+        <h2>Library</h2>
+        <p>The complete owned and tracked collection.</p>
+        <ul>
+          <li>Currently reading</li>
+          <li>Want to read</li>
+          <li>Paused</li>
+          <li>Finished</li>
+          <li>Did not finish</li>
+        </ul>
+      </section>
+
+      <section id="search">
+        <h2>Search</h2>
+        <form action="/search" method="get">
+          <label for="query">Find a book or author</label>
+          <input id="query" name="query" type="search">
+          <button type="submit">Search</button>
+        </form>
+        <p>Search results will become the path into the catalog and add-to-library flow.</p>
+      </section>
+
+      <section id="history">
+        <h2>History</h2>
+        <p>Reading sessions, progress corrections, finished dates, and notes.</p>
+        <ol data-point="reading-history"><li>No reading history yet.</li></ol>
+      </section>
+
+      <section id="account">
+        <h2>Account</h2>
+        <p>Profile, preferences, data export, backup, and account controls.</p>
+        <dl>
+          <dt>Signed in as</dt><dd data-point="account-email">Guest</dd>
+          <dt>Theme</dt><dd data-point="theme">System default</dd>
+          <dt>Data status</dt><dd data-point="data-status">No data loaded</dd>
+        </dl>
+      </section>
+
+      <section id="datapoints">
+        <h2>Rowan datapoints</h2>
+        <p>This is the initial visible contract for the application.</p>
+        <ul>
+          <li>Book: title, author, series, format, ISBN, cover, source</li>
+          <li>Library item: status, owned, shelf, rating, tags, added date</li>
+          <li>Progress: current page, total pages, percent, started, finished</li>
+          <li>Session: date, pages read, minutes, note</li>
+          <li>Series: name, order, books, completion state</li>
+          <li>Queue: position, reason, priority, target date</li>
+          <li>Goal: target, period, progress, streak</li>
+          <li>Account: identity, preferences, export, backup, deletion</li>
+        </ul>
+      </section>
+    </main>
+  </body>
+</html>
