@@ -14,6 +14,7 @@ import {
   Target,
   NotebookPen,
   Settings,
+  UserRound,
 } from "lucide-react";
 import { useAuth } from "@/lib/auth-context";
 import { RowanHome } from "@/components/rowan/Home";
@@ -217,7 +218,7 @@ function Workspace({
           ["insights", "/insights", "#insights", "Insights", ChartNoAxesCombined],
           ["goals", "/goals", "#goals", "Goals", Target],
           ["margins", "/margins", "#journal", "Margins", NotebookPen],
-          ["settings", "/settings", "#rowan-settings", "Settings", Settings],
+          ["account", "/account", "#rowan-settings", "Account", UserRound],
         ].map(([name, path, anchor, label, Icon]) => (
           <a
             key={String(name)}
@@ -270,6 +271,20 @@ function Workspace({
         >
           {exporting ? "Exporting…" : "Export archive"}
         </button>
+      </nav>
+      <nav className="rowan-mobile-tabs" aria-label="Primary Rowan navigation">
+        {[
+          ["home", "/", "Home", Home],
+          ["library", "/library", "Library", Library],
+          ["search", "/search", "Search", Search],
+          ["calendar", "/calendar", "History", CalendarDays],
+          ["account", "/account", "Account", UserRound],
+        ].map(([name, path, label, Icon]) => (
+          <a key={String(name)} href={String(path)} aria-current={page === name ? "page" : undefined}>
+            {typeof Icon !== "string" && <Icon size={20} strokeWidth={1.8} />}
+            <span>{String(label)}</span>
+          </a>
+        ))}
       </nav>
       {show("home") && (
         <RowanHome
@@ -667,9 +682,10 @@ function Workspace({
       )}
       {show("insights") && <Insights sessionId={sessionId} run={run} busy={busy} />}
       {show("goals") && <Goals sessionId={sessionId} />}
-      {show("settings") && (
+      {(show("account") || show("settings")) && (
         <AccountSettings
           sessionId={sessionId}
+          standalone={standalone}
           onReplaced={() => {
             setSelected(null);
             setOffset(0);

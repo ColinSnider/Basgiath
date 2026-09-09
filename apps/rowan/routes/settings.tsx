@@ -1,4 +1,2 @@
-import { createFileRoute } from "@tanstack/react-router";
-import { Rowan } from "@/components/rowan/RowanApp";
-import { rowanStatus } from "@/lib/rowan-fns";
-export const Route = createFileRoute("/settings")({ loader: () => rowanStatus(), component: () => <Rowan {...Route.useLoaderData()} standalone /> });
+import { createFileRoute, Navigate } from "@tanstack/react-router";
+export const Route = createFileRoute("/settings")({ component: () => <Navigate to="/account" /> });

@@ -6,7 +6,7 @@ Restored theme-aware burgundy/gold gradients, warm surfaces, display fonts, and 
 
 ## Dedicated Rowan pages
 
-Standalone Rowan now has real top-level Home, Library, Search, Calendar, Insights, Goals, Margins, and Settings routes. The former `/_app` route indirection and one-page scroll behavior are removed. A persistent shell preserves pending reading mutations and open details; theme settings apply across pages. Feature queries are scoped to the visible page, and reading details are extracted into `ReadingPanel`.
+Standalone Rowan now has real top-level Home, Library, Search, Calendar, Insights, Goals, Margins, and Account routes. The former `/_app` route indirection and one-page scroll behavior are removed. Settings are part of Account, with `/settings` retained only as a compatibility redirect. On small screens Rowan uses a four-tab bottom bar (Home, Library, Search, Account); desktop keeps the expanded navigation. A persistent shell preserves pending reading mutations and open details; theme settings apply across pages. Feature queries are scoped to the visible page, and reading details are extracted into `ReadingPanel`.
 
 The reading history editor now supports reasoned corrections and removals. Corrections append retained audit entries, preserve idempotent retries, recalculate effective progress, move calendar observations, and round-trip through archives. Progress uses explicit baseline/observation semantics for both pages and audio seconds. This adds `migrations-v2/0005_progress_corrections.sql`.
 

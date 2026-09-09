@@ -10,9 +10,11 @@ const control =
 export function AccountSettings({
   sessionId,
   onReplaced,
+  standalone = false,
 }: {
   sessionId: string;
   onReplaced: () => void;
+  standalone?: boolean;
 }) {
   const query = useQuery({
     queryKey: ["rowan", sessionId, "settings"],
@@ -101,11 +103,11 @@ export function AccountSettings({
           Retry settings save
         </button>
       )}
-      <p className="text-sm">
+      {!standalone && <p className="text-sm">
         {query.data?.mirrorPaused
           ? "Automatic legacy import is paused for this Rowan library after clear or restore."
           : "Your legacy library is imported automatically. Personal Rowan changes are retained."}
-      </p>
+      </p>}
       <button
         className={control}
         disabled={busy}

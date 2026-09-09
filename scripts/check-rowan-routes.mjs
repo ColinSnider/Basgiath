@@ -16,7 +16,7 @@ for (const [path, title] of [
   ["/insights", "Insights"],
   ["/goals", "Goals"],
   ["/margins", "Margins"],
-  ["/settings", "Settings"],
+  ["/account", "Account"],
 ]) {
   const response = await server.fetch(new Request(`http://localhost${path}`));
   assert.equal(response.status, 200, path);
@@ -26,3 +26,6 @@ for (const [path, title] of [
 const missing = await server.fetch(new Request("http://localhost/profile"));
 assert.equal(missing.status, 404);
 console.log("/profile: 404 (legacy route absent)");
+const settings = await server.fetch(new Request("http://localhost/settings"));
+assert.equal(settings.status, 200);
+console.log("/settings: compatibility redirect renders through /account");
