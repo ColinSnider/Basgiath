@@ -5,6 +5,7 @@ import { useQuery } from "@tanstack/react-query";
 import { BookEditor } from "./BookEditor";
 import { EditionForm } from "./EditionForm";
 import { Margins } from "./Margins";
+import { ReadingProgressBar } from "./ReadingProgressBar";
 import {
   rowanHistory,
   type rowanLibrary,
@@ -94,21 +95,7 @@ export function ReadingPanel({
             )}
           </div>
           {active && (
-            <div className="rowan-hero-progress">
-              <p>
-                {active.position}
-                {active.total ? ` of ${active.total}` : ""}{" "}
-                {active.unit === "page" ? "pages" : active.unit === "second" ? "seconds" : "%"}
-                {active.total ? (
-                  <strong>
-                    {Math.min(100, Math.round((active.position / active.total) * 100))}%
-                  </strong>
-                ) : null}
-              </p>
-              {active.total ? (
-                <progress aria-label="Book progress" value={active.position} max={active.total} />
-              ) : null}
-            </div>
+            <ReadingProgressBar progress={active} />
           )}
         </div>
       </header>
@@ -196,19 +183,7 @@ export function ReadingPanel({
               <h3 className="font-display text-2xl">Your reading journey</h3>
               {active ? (
                 <>
-                  <p>
-                    {active.state === "paused" ? "Paused" : "Currently reading"} · {active.position}
-                    {active.total ? ` / ${active.total}` : ""}{" "}
-                    {active.unit === "second" ? "seconds" : active.unit === "page" ? "pages" : "%"}
-                  </p>
-                  {active.total && (
-                    <progress
-                      className="w-full"
-                      aria-label="Reading progress"
-                      value={active.position}
-                      max={active.total}
-                    />
-                  )}
+                  <ReadingProgressBar progress={active} />
                   <form
                     className="flex flex-wrap gap-2"
                     onSubmit={(e) => {

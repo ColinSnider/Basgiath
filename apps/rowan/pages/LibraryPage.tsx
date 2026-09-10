@@ -2,7 +2,38 @@ import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { ArrowRight, FolderHeart, LibraryBig, Plus } from "lucide-react";
 import { rowanLibrary, rowanShelves, type RowanCommand } from "@/lib/rowan-fns";
+import { ReadingProgressBar } from "@/components/rowan/ReadingProgressBar";
 import { control, statuses, useReader, useReadingCommands } from "../components/reader";
+
+type LibraryBook = Awaited<ReturnType<typeof rowanLibrary>>["items"][number];
+
+function BookSpine({ book }: { book: LibraryBook }) {
+  const width = Math.max(46, Math.min(110, Math.round((book.total ?? 260) / 8)));
+  const initials = book.authors
+    .join(" ")
+    .split(" ")
+    .filter(Boolean)
+    .slice(0, 3)
+    .map((part) => part[0]?.toUpperCase() ?? "")
+    .join("");
+  const completed = book.status === "read" || book.status === "reading";
+  return (
+    <div
+      className={`reader-book-spine reader-book-spine-${book.status}`}
+      style={{ width }}
+      aria-label={`${book.title} spine`}
+    >
+      <span className="reader-book-spine-sheen" aria-hidden="true" />
+      {completed && <span className="reader-book-spine-band" aria-hidden="true" />}
+      <span className="reader-book-spine-author">{initials || "R"}</span>
+      <span className="reader-book-spine-title">{book.title}</span>
+      <span className="reader-book-spine-meta">
+        {book.total ? `${book.total}${book.progress?.unit === "second" ? "s" : "p"}` : ""}
+      </span>
+    </div>
+  );
+}
+
 export function LibraryPage() {
   const { sessionId, openBook } = useReader();
   const { run, busy, feedback } = useReadingCommands();
@@ -238,20 +269,26 @@ export function LibraryPage() {
             view === "grid"
               ? "grid grid-cols-2 gap-4 lg:grid-cols-4"
               : view === "bookshelf"
-                ? "grid grid-cols-3 gap-x-3 gap-y-6 md:grid-cols-6"
+                ? "reader-bookshelf-list"
                 : "space-y-3"
           }
         >
           {library.data?.items.map((book) => (
             <li
               key={book.id}
-              className={view === "bookshelf" ? "border-b-8 border-primary/30 pb-2" : undefined}
+              className={view === "bookshelf" ? "reader-bookshelf-item" : undefined}
             >
               <button
-                className={`w-full rounded-xl border border-border bg-card p-4 text-left hover:border-primary ${view === "list" ? "flex items-center gap-4" : "h-full"}`}
-                onClick={() => openBook(book)}
-              >
-                {book.coverUrl ? (
+              className={
+                view === "bookshelf"
+                  ? "reader-book-spine-button"
+                  : `w-full rounded-xl border border-border bg-card p-4 text-left hover:border-primary ${view === "list" ? "flex items-center gap-4" : "h-full"}`
+              }
+              onClick={() => openBook(book)}
+            >
+                {view === "bookshelf" ? (
+                  <BookSpine book={book} />
+                ) : book.coverUrl ? (
                   <img
                     src={book.coverUrl}
                     alt=""
@@ -296,6 +333,7 @@ export function LibraryPage() {
                   )}
                 </div>
               </button>
+              <ReadingProgressBar progress={book.progress} compact={view === "bookshelf"} />
             </li>
           ))}
         </ul>

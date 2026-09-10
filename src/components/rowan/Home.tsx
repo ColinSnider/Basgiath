@@ -1,7 +1,8 @@
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
-import { ArrowRight, BookOpen, Bookmark, CircleCheck, Library, Pause } from "lucide-react";
+import { ArrowRight, BookOpen, Bookmark, CircleCheck, Library } from "lucide-react";
 import { rowanHome } from "@/lib/rowan-fns";
+import { ReadingProgressBar } from "./ReadingProgressBar";
 
 type HomeData = Awaited<ReturnType<typeof rowanHome>>;
 type Book = HomeData["next"][number];
@@ -54,40 +55,10 @@ export function RowanHome({
         {data.current.length ? (
           <ul className="reader-current-list">
             {data.current.map((item) => {
-              const total = item.unit === "percent" ? 100 : item.total;
-              const percent =
-                total && total > 0
-                  ? Math.min(100, Math.round((item.position / total) * 100))
-                  : null;
               return (
                 <li key={item.book.id}>
                   <BookCard book={item.book} openBook={openBook} />
-                  <div className="reader-current-progress">
-                    <div className="reader-progress-label">
-                      <span>
-                        {item.state === "paused" && (
-                          <span className="reader-paused">
-                            <Pause size={12} />
-                            Paused ·{" "}
-                          </span>
-                        )}
-                        {positionLabel(item.position, item.unit)}
-                        {item.unit !== "percent" && total !== null
-                          ? ` of ${positionLabel(total, item.unit)}`
-                          : ""}
-                      </span>
-                      {percent !== null && <strong>{percent}%</strong>}
-                    </div>
-                    {percent !== null ? (
-                      <progress
-                        value={item.position}
-                        max={total!}
-                        aria-label={`Progress for ${item.book.title}`}
-                      />
-                    ) : (
-                      <p className="reader-caption">Book length not set</p>
-                    )}
-                  </div>
+                  <ReadingProgressBar progress={item} />
                   <button className="reader-text-link" onClick={() => openBook(item.book)}>
                     {item.state === "paused" ? "Open paused read" : "Continue reading"}
                     <ArrowRight size={15} />
@@ -208,13 +179,4 @@ function BookCard({ book, openBook }: { book: Book; openBook: (book: Book) => vo
       </span>
     </button>
   );
-}
-
-function positionLabel(position: number, unit: string) {
-  if (unit === "second") {
-    const hours = Math.floor(position / 3600);
-    const minutes = Math.floor((position % 3600) / 60);
-    return `${hours ? `${hours}h ` : ""}${minutes}m`;
-  }
-  return unit === "percent" ? `${position}%` : `${position} pages`;
 }

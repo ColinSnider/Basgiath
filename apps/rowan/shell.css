@@ -97,6 +97,119 @@
   line-height: 1.8;
   opacity: 0.8;
 }
+.reader-hero-dashboard {
+  grid-template-columns: minmax(0, 1.05fr) minmax(280px, 0.95fr);
+  align-items: stretch;
+  background:
+    radial-gradient(ellipse at 12% 95%, color-mix(in oklch, var(--gold) 38%, transparent), transparent 58%),
+    linear-gradient(130deg, color-mix(in oklch, var(--primary) 88%, black), var(--primary));
+}
+.reader-hero-dashboard h2 {
+  max-width: 620px;
+}
+.reader-hero-dashboard h2 strong {
+  color: var(--gold);
+  font-weight: 500;
+}
+.reader-hero-stat-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 8px;
+  max-width: 580px;
+  margin-top: 26px;
+}
+.reader-hero-stat {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  align-items: center;
+  gap: 5px 7px;
+  min-width: 0;
+  padding: 10px;
+  border: 1px solid #ffffff2b;
+  border-radius: 10px;
+  background: #0000001c;
+}
+.reader-hero-stat svg {
+  grid-row: span 2;
+  color: var(--gold);
+}
+.reader-hero-stat span {
+  overflow: hidden;
+  color: #ffffffb8;
+  font-size: 0.65rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.reader-hero-stat strong {
+  color: var(--primary-foreground);
+  font: 1.25rem/1 var(--font-display);
+}
+.reader-hero-breakdown {
+  display: grid;
+  align-content: end;
+  min-height: 235px;
+  padding: 18px;
+  border: 1px solid #ffffff2b;
+  border-radius: 16px;
+  background: #0000001c;
+}
+.reader-hero-breakdown-heading,
+.reader-hero-breakdown-footer {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  color: #ffffffb8;
+  font-size: 0.68rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+.reader-hero-breakdown-heading strong,
+.reader-hero-breakdown-footer strong {
+  color: var(--gold);
+  font-size: 0.72rem;
+  letter-spacing: 0;
+  text-transform: none;
+}
+.reader-month-bars {
+  display: flex;
+  align-items: end;
+  gap: 7px;
+  height: 142px;
+  margin: 18px 0 14px;
+  padding-top: 8px;
+  border-bottom: 1px solid #ffffff38;
+}
+.reader-month-bar {
+  display: grid;
+  grid-template-rows: 1fr auto;
+  align-items: end;
+  flex: 1;
+  height: 100%;
+  min-width: 0;
+  text-align: center;
+}
+.reader-month-bar > div {
+  display: flex;
+  align-items: start;
+  justify-content: center;
+  width: 100%;
+  min-height: 8px;
+  border-radius: 4px 4px 1px 1px;
+  background: linear-gradient(180deg, var(--gold), color-mix(in oklch, var(--gold) 55%, var(--primary)));
+  box-shadow: 0 5px 14px -8px var(--gold);
+}
+.reader-month-bar > div span {
+  margin-top: -17px;
+  color: #ffffffcc;
+  font-size: 0.62rem;
+}
+.reader-month-bar small {
+  padding-top: 7px;
+  color: #ffffff94;
+  font-size: 0.62rem;
+  text-transform: uppercase;
+}
 .reader-hero-actions {
   display: flex;
   flex-wrap: wrap;
@@ -307,6 +420,7 @@
   color: var(--primary);
   font-size: 0.72rem;
 }
+.reader-progress,
 .reader-current-progress {
   margin: 18px 0 12px;
 }
@@ -327,6 +441,7 @@
   gap: 3px;
   align-items: center;
 }
+.reader-progress progress,
 .reader-current-progress progress {
   appearance: none;
   height: 6px;
@@ -337,9 +452,11 @@
   border-radius: 10px;
   background: var(--muted);
 }
+.reader-progress progress::-webkit-progress-bar,
 .reader-current-progress progress::-webkit-progress-bar {
   background: var(--muted);
 }
+.reader-progress progress::-webkit-progress-value,
 .reader-current-progress progress::-webkit-progress-value {
   background: linear-gradient(
     90deg,
@@ -348,9 +465,20 @@
   );
   border-radius: 10px;
 }
+.reader-progress progress::-moz-progress-bar,
 .reader-current-progress progress::-moz-progress-bar {
   background: var(--primary);
   border-radius: 10px;
+}
+.reader-progress-compact {
+  margin: 10px 0 0;
+}
+.reader-progress-compact .reader-progress-label {
+  margin-bottom: 5px;
+  font-size: 0.66rem;
+}
+.reader-progress-compact progress {
+  height: 4px;
 }
 .reader-text-link {
   display: inline-flex;
@@ -406,6 +534,104 @@
     color-mix(in oklch, var(--primary) 82%, var(--gold))
   );
   box-shadow: 0 4px 12px -8px var(--primary);
+}
+.reader-book-spine-button {
+  display: block;
+  width: fit-content;
+  min-width: 0;
+  padding: 0;
+  text-align: left;
+}
+.reader-book-spine {
+  position: relative;
+  display: flex;
+  height: 144px;
+  flex: none;
+  flex-direction: column;
+  align-items: center;
+  justify-content: space-between;
+  overflow: hidden;
+  padding: 6px 5px;
+  border: 1px solid color-mix(in oklch, var(--foreground) 24%, transparent);
+  border-radius: 3px 3px 1px 1px;
+  background: linear-gradient(90deg, #ffffffb8, transparent 23%, transparent 76%, #0000001c), var(--muted);
+  box-shadow: 2px 0 5px #0000001a;
+  color: var(--foreground);
+  transition: transform 160ms ease, box-shadow 160ms ease;
+}
+.reader-book-spine-button:hover .reader-book-spine {
+  transform: translateY(-3px);
+  box-shadow: 4px 5px 10px #00000026;
+}
+.reader-book-spine-reading {
+  border-color: var(--primary);
+  background: linear-gradient(90deg, #ffffffb8, transparent 23%, transparent 76%, #0000001c), color-mix(in oklch, var(--primary) 18%, var(--card));
+  box-shadow: 3px 0 8px #00000029;
+}
+.reader-book-spine-read {
+  background: linear-gradient(90deg, #ffffffb8, transparent 23%, transparent 76%, #0000001c), color-mix(in oklch, var(--gold) 15%, var(--card));
+}
+.reader-book-spine-dnf {
+  opacity: 0.72;
+}
+.reader-book-spine-sheen {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: linear-gradient(90deg, #fff9, transparent 24%, transparent 76%, #0002);
+}
+.reader-book-spine-band {
+  position: absolute;
+  top: 27px;
+  right: 3px;
+  left: 3px;
+  height: 2px;
+  background: linear-gradient(90deg, var(--primary), var(--gold), var(--primary));
+}
+.reader-book-spine-author,
+.reader-book-spine-meta {
+  position: relative;
+  color: color-mix(in oklch, var(--foreground) 58%, transparent);
+  font-size: 0.52rem;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+.reader-book-spine-title {
+  position: relative;
+  max-height: 82px;
+  overflow: hidden;
+  font: clamp(0.62rem, 1vw, 0.82rem)/1.1 var(--font-display);
+  letter-spacing: 0.04em;
+  text-align: center;
+  text-shadow: 0 1px #ffffff80;
+  writing-mode: vertical-rl;
+}
+.reader-book-spine-meta {
+  letter-spacing: 0;
+  text-transform: none;
+}
+.reader-book-spine-button + .reader-progress {
+  width: 100%;
+  max-width: 110px;
+}
+.reader-bookshelf-list {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: end;
+  gap: 18px 4px;
+  padding: 18px 14px 24px;
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  background: linear-gradient(180deg, color-mix(in oklch, var(--card) 86%, var(--gold)), var(--muted));
+}
+.reader-bookshelf-list > li {
+  display: grid;
+  align-content: end;
+  justify-items: center;
+  min-width: 46px;
+  padding-bottom: 8px;
+  border-bottom: 4px solid color-mix(in oklch, var(--foreground) 35%, transparent);
+  box-shadow: 0 5px 0 -2px color-mix(in oklch, var(--foreground) 20%, transparent);
 }
 .reader-shelves-view {
   padding-top: 8px;
@@ -850,6 +1076,17 @@
   }
   .reader-hero h2 {
     font-size: 2.25rem;
+  }
+  .reader-hero-stat-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .reader-hero-breakdown {
+    min-height: 205px;
+    padding: 14px;
+  }
+  .reader-month-bars {
+    height: 118px;
+    gap: 4px;
   }
   .reader-hero-actions {
     align-items: stretch;

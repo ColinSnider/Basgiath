@@ -787,7 +787,7 @@ export function createLibraryService(database: Database, provider: CatalogProvid
         halfStars: ratings.halfStars,
       };
       // Select from the whole account, independent of Library pagination and filters.
-      const [last, current, next] = await Promise.all([
+      const [last, current, next, statusRows, finishedRows] = await Promise.all([
         database
           .select({ book, finishedAt: readingSessions.finishedAt })
           .from(readingSessions)
@@ -829,7 +829,26 @@ export function createLibraryService(database: Database, provider: CatalogProvid
           .where(and(eq(userBooks.userId, actor.userId), eq(userBooks.status, "want_to_read")))
           .orderBy(sql`${userBooks.addedAt} desc`, userBooks.id)
           .limit(3),
+        database
+          .select({ status: userBooks.status })
+          .from(userBooks)
+          .where(eq(userBooks.userId, actor.userId)),
+        database
+          .select({ finishedAt: readingSessions.finishedAt })
+          .from(readingSessions)
+          .innerJoin(userBooks, eq(userBooks.id, readingSessions.userBookId))
+          .where(
+            and(eq(userBooks.userId, actor.userId), eq(readingSessions.state, "completed")),
+          ),
       ]);
+      const year = new Date().getUTCFullYear();
+      const monthlyReads = Array.from({ length: 12 }, () => 0);
+      for (const read of finishedRows) {
+        if (!read.finishedAt) continue;
+        const readYear = read.finishedAt.getUTCFullYear();
+        if (readYear === year) monthlyReads[read.finishedAt.getUTCMonth()]++;
+      }
+      const statusCount = (status: string) => statusRows.filter((row) => row.status === status).length;
       return {
         last: last[0]
           ? { book: last[0].book, finishedAt: last[0].finishedAt?.toISOString() ?? null }
@@ -837,6 +856,17 @@ export function createLibraryService(database: Database, provider: CatalogProvid
         current: current.slice(0, 6),
         hasMoreCurrent: current.length > 6,
         next,
+        metrics: {
+          year,
+          finishedThisYear: monthlyReads.reduce((sum, count) => sum + count, 0),
+          lifetimeReads: finishedRows.length,
+          libraryCount: statusRows.length,
+          currentReads: statusCount("reading") + statusCount("paused"),
+          finishedBooks: statusCount("read"),
+          tbr: statusCount("want_to_read"),
+          dnf: statusCount("dnf"),
+          monthlyReads,
+        },
       };
     },
 
@@ -880,6 +910,32 @@ export function createLibraryService(database: Database, provider: CatalogProvid
           tags: sql<
             string[]
           >`(select coalesce(jsonb_agg(value), '[]'::jsonb) from jsonb_array_elements(case when jsonb_typeof(${userBooks.legacyMetadata}->'tags') = 'array' then ${userBooks.legacyMetadata}->'tags' else '[]'::jsonb end) where jsonb_typeof(value) = 'string')`,
+          total: sql<number | null>`(
+            select case when e.format = 'audiobook' then e.duration_seconds else e.page_count end
+            from v2.editions e where e.id = ${userBooks.selectedEditionId}
+          )`,
+          progress: {
+            position: sql<number | null>`(
+              select rs.position from v2.reading_sessions rs
+              where rs.user_book_id = ${userBooks.id} and rs.state in ('active', 'paused')
+              order by rs.started_at desc nulls last, rs.id desc limit 1
+            )`,
+            total: sql<number | null>`(
+              select rs.total from v2.reading_sessions rs
+              where rs.user_book_id = ${userBooks.id} and rs.state in ('active', 'paused')
+              order by rs.started_at desc nulls last, rs.id desc limit 1
+            )`,
+            unit: sql<string | null>`(
+              select rs.unit from v2.reading_sessions rs
+              where rs.user_book_id = ${userBooks.id} and rs.state in ('active', 'paused')
+              order by rs.started_at desc nulls last, rs.id desc limit 1
+            )`,
+            state: sql<string | null>`(
+              select rs.state from v2.reading_sessions rs
+              where rs.user_book_id = ${userBooks.id} and rs.state in ('active', 'paused')
+              order by rs.started_at desc nulls last, rs.id desc limit 1
+            )`,
+          },
         })
         .from(userBooks)
         .innerJoin(works, eq(works.id, userBooks.workId))
@@ -914,7 +970,21 @@ export function createLibraryService(database: Database, provider: CatalogProvid
         )
         .limit(25)
         .offset(data.offset);
-      return { items: rows.slice(0, 24), nextOffset: rows.length > 24 ? data.offset + 24 : null };
+      return {
+        items: rows.slice(0, 24).map((row) => ({
+          ...row,
+          progress:
+            row.progress.position === null || row.progress.unit === null
+              ? null
+              : {
+                  position: row.progress.position,
+                  total: row.progress.total,
+                  unit: row.progress.unit,
+                  state: row.progress.state ?? "active",
+                },
+        })),
+        nextOffset: rows.length > 24 ? data.offset + 24 : null,
+      };
     },
 
     async changeMargin(
