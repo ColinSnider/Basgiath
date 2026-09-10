@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
+import { ArrowRight, FolderHeart, LibraryBig, Plus } from "lucide-react";
 import { rowanLibrary, rowanShelves, type RowanCommand } from "@/lib/rowan-fns";
 import { control, statuses, useReader, useReadingCommands } from "../components/reader";
 export function LibraryPage() {
@@ -18,6 +19,7 @@ export function LibraryPage() {
   const [offset, setOffset] = useState(0);
   const [view, setView] = useState<"grid" | "list" | "bookshelf">("grid");
   const [sort, setSort] = useState<"newest" | "oldest" | "title" | "rating">("newest");
+  const [section, setSection] = useState<"library" | "shelves">("library");
   const library = useQuery({
     queryKey: ["rowan", sessionId, "library", query, status, offset, favoritesOnly, shelfId, sort],
     queryFn: () =>
@@ -37,9 +39,48 @@ export function LibraryPage() {
 
   return (
     <>
-      {feedback}{" "}
-      <section className="rowan-library space-y-4" aria-labelledby="library-heading">
-        <div className="space-y-3">
+      {feedback}
+      <div className="reader-library-switch" role="tablist" aria-label="Library sections">
+        <button
+          role="tab"
+          aria-selected={section === "library"}
+          className={section === "library" ? "is-selected" : ""}
+          onClick={() => setSection("library")}
+        >
+          <LibraryBig size={18} /> Library <span>{library.data?.items.length ?? "—"}</span>
+        </button>
+        <button
+          role="tab"
+          aria-selected={section === "shelves"}
+          className={section === "shelves" ? "is-selected" : ""}
+          onClick={() => setSection("shelves")}
+        >
+          <FolderHeart size={18} /> Shelves <span>{shelves.data?.length ?? "—"}</span>
+        </button>
+      </div>
+      {section === "shelves" && (
+        <ShelvesView
+          shelves={shelves.data ?? []}
+          loading={shelves.isPending}
+          error={shelves.isError}
+          shelfName={shelfName}
+          setShelfName={setShelfName}
+          busy={busy}
+          run={run}
+          onRetry={() => void shelves.refetch()}
+          onOpen={(id) => {
+            setShelfId(id);
+            setSection("library");
+            setOffset(0);
+          }}
+        />
+      )}
+      <section
+        className={`rowan-library space-y-4 ${section === "shelves" ? "hidden" : ""}`}
+        aria-labelledby="library-heading"
+        hidden={section === "shelves"}
+      >
+        <div className="space-y-3" hidden>
           <h2 className="font-display text-2xl">Your shelves</h2>
           <form
             className="flex flex-wrap gap-2"
@@ -282,6 +323,109 @@ export function LibraryPage() {
     </>
   );
 }
+
+function ShelvesView({
+  shelves,
+  loading,
+  error,
+  shelfName,
+  setShelfName,
+  busy,
+  run,
+  onRetry,
+  onOpen,
+}: {
+  shelves: Array<{ id: string; name: string; version: number; itemCount: number }>;
+  loading: boolean;
+  error: boolean;
+  shelfName: string;
+  setShelfName: (name: string) => void;
+  busy: boolean;
+  run: (command: RowanCommand) => void;
+  onRetry: () => void;
+  onOpen: (id: string) => void;
+}) {
+  return (
+    <section className="reader-shelves-view space-y-5" aria-labelledby="shelves-heading">
+      <div className="flex flex-wrap items-end justify-between gap-4">
+        <div>
+          <p className="reader-eyebrow">Organize by feeling</p>
+          <h2 id="shelves-heading" className="font-display text-3xl">
+            Your shelves
+          </h2>
+          <p className="reader-muted">
+            Keep your collections close and your next read easy to find.
+          </p>
+        </div>
+        <form
+          className="reader-shelf-create"
+          onSubmit={(event) => {
+            event.preventDefault();
+            if (shelfName.trim())
+              run({ type: "shelfCreate", key: crypto.randomUUID(), name: shelfName.trim() });
+          }}
+        >
+          <input
+            aria-label="New shelf name"
+            placeholder="New shelf name"
+            value={shelfName}
+            maxLength={120}
+            required
+            onChange={(event) => setShelfName(event.target.value)}
+          />
+          <button className="reader-button" disabled={busy || !shelfName.trim()}>
+            <Plus size={16} /> Create shelf
+          </button>
+        </form>
+      </div>
+      {loading && (
+        <p role="status" className="reader-state">
+          Loading your shelves…
+        </p>
+      )}
+      {error && (
+        <p role="alert" className="reader-state">
+          Shelves could not load. <button onClick={onRetry}>Try again</button>
+        </p>
+      )}
+      {!loading && !error && shelves.length === 0 && (
+        <div className="reader-empty reader-card">
+          <FolderHeart size={34} strokeWidth={1.2} />
+          <h3>Your shelves are waiting</h3>
+          <p>
+            Create one for a mood, a series, or the books you want to carry into the next season.
+          </p>
+        </div>
+      )}
+      {!!shelves.length && (
+        <div className="reader-shelf-grid">
+          {shelves.map((shelf) => (
+            <article className="reader-shelf-card" key={shelf.id}>
+              <button
+                className="reader-shelf-open"
+                onClick={() => onOpen(shelf.id)}
+                aria-label={`Open ${shelf.name}`}
+              >
+                <span className="reader-shelf-mark">
+                  <FolderHeart size={28} />
+                </span>
+                <span className="reader-shelf-name">{shelf.name}</span>
+                <span className="reader-muted">
+                  {shelf.itemCount} {shelf.itemCount === 1 ? "book" : "books"}
+                </span>
+                <span className="reader-shelf-arrow">
+                  <ArrowRight size={18} />
+                </span>
+              </button>
+              <RenameShelf shelf={shelf} busy={busy} run={run} />
+            </article>
+          ))}
+        </div>
+      )}
+    </section>
+  );
+}
+
 function RenameShelf({
   shelf,
   busy,

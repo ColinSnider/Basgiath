@@ -27,10 +27,10 @@ export function HomeHero() {
             <BookOpen size={18} aria-hidden="true" />
             Open my library
           </Link>
-          <Link to="/search">
+          <a href="/search">
             Find your next read
             <ArrowUpRight size={18} aria-hidden="true" />
-          </Link>
+          </a>
         </div>
       </div>
       <div className="reader-hero-art" aria-hidden="true">

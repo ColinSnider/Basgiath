@@ -173,10 +173,10 @@ export function RowanHome({
               </p>
             )}
           </div>
-          <Link to="/search" className="reader-card-footer">
+          <a href="/search" className="reader-card-footer">
             Discover a book
             <ArrowRight size={16} />
-          </Link>
+          </a>
         </section>
       </div>
     </section>

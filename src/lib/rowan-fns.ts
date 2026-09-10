@@ -1,5 +1,7 @@
 import { createAccountService } from "../../server/v2/account-service";
 import { bookEditSchema, settingsSchema, goalTimeframeSchema } from "../../shared/rowan-archive";
+import { importDataSchema } from "./import-contract";
+import { createUserDataService } from "../../server/user-data-service";
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { eq } from "drizzle-orm";
@@ -14,6 +16,7 @@ import {
   userBooks as v2Books,
   margins as v2Margins,
   shelves as v2Shelves,
+  shelfItems as v2ShelfItems,
   legacySyncSnapshots,
 } from "../../shared/schema-v2";
 import { count } from "drizzle-orm";
@@ -22,10 +25,19 @@ import { createHash } from "node:crypto";
 const key = z.string().uuid();
 const moment = z.string().datetime({ offset: true });
 const command = z.discriminatedUnion("type", [
-  z.object({ type: z.literal("correctProgress"), key, sessionId: key, entryId: key,
-    expectedVersion: z.number().int().nonnegative(), action: z.enum(["correct", "remove"]),
-    position: z.number().int().nonnegative(), occurredAt: moment, reason: z.string().trim().min(1).max(1000),
-  }).strict(),
+  z
+    .object({
+      type: z.literal("correctProgress"),
+      key,
+      sessionId: key,
+      entryId: key,
+      expectedVersion: z.number().int().nonnegative(),
+      action: z.enum(["correct", "remove"]),
+      position: z.number().int().nonnegative(),
+      occurredAt: moment,
+      reason: z.string().trim().min(1).max(1000),
+    })
+    .strict(),
   z
     .object({
       type: z.literal("edition"),
@@ -156,7 +168,8 @@ async function context(sessionId: string, importLibrary = true) {
   const [session] = await db.select().from(sessions).where(eq(sessions.id, sessionId));
   if (!session || session.expiresAt <= new Date())
     throw new Error("Sign in to the development account again.");
-  if (process.env.ROWAN_STANDALONE === "true" || !importLibrary) return { ...runtime, actor: { userId: session.userId } };
+  if (process.env.ROWAN_STANDALONE === "true" || !importLibrary)
+    return { ...runtime, actor: { userId: session.userId } };
   const [source] = await db
     .select({ id: users.id, username: users.username, displayName: users.displayName })
     .from(users)
@@ -255,10 +268,35 @@ export const rowanAccountMutate = createServerFn({ method: "POST" })
       throw new Error("The result could not be confirmed. Retry the same request.");
     }
   });
+export const rowanImportLegacy = createServerFn({ method: "POST" })
+  .inputValidator(
+    z
+      .object({ sessionId: key, data: importDataSchema })
+      .strict(),
+  )
+  .handler(async ({ data }) => {
+    const { database, actor } = await context(data.sessionId, false);
+    const userData = createUserDataService(db);
+    await userData.importUserData(actor.userId, data.data);
+    const [source] = await db
+      .select({ id: users.id, username: users.username, displayName: users.displayName })
+      .from(users)
+      .where(eq(users.id, actor.userId));
+    if (!source) throw new Error("The signed-in Rowan account could not be found.");
+    const [books, margins, goals, settings] = await Promise.all([
+      db.select().from(legacyBooks).where(eq(legacyBooks.userId, actor.userId)),
+      db.select().from(legacyMargins).where(eq(legacyMargins.userId, actor.userId)),
+      db.select().from(legacyGoals).where(eq(legacyGoals.userId, actor.userId)),
+      db.select().from(userSettings).where(eq(userSettings.userId, actor.userId)),
+    ]);
+    await importLegacyLibrary(database, source, books, margins, goals, settings[0]);
+    return { ok: true as const, books: data.data.books.length, margins: data.data.margins.length, goals: data.data.goals.length };
+  });
 export const rowanSyncStatus = createServerFn({ method: "POST" })
   .inputValidator(z.object({ sessionId: key }).strict())
   .handler(async ({ data }) => {
-    if (process.env.ROWAN_STANDALONE === "true") throw new Error("Legacy synchronization is unavailable in standalone Rowan.");
+    if (process.env.ROWAN_STANDALONE === "true")
+      throw new Error("Legacy synchronization is unavailable in standalone Rowan.");
     const runtime = getRowanRuntime();
     const [session] = await db.select().from(sessions).where(eq(sessions.id, data.sessionId));
     if (!session || session.expiresAt <= new Date())
@@ -309,7 +347,8 @@ export const rowanSyncStatus = createServerFn({ method: "POST" })
 export const rowanSyncConflicts = createServerFn({ method: "POST" })
   .inputValidator(z.object({ sessionId: key }).strict())
   .handler(async ({ data }) => {
-    if (process.env.ROWAN_STANDALONE === "true") throw new Error("Legacy synchronization is unavailable in standalone Rowan.");
+    if (process.env.ROWAN_STANDALONE === "true")
+      throw new Error("Legacy synchronization is unavailable in standalone Rowan.");
     const runtime = getRowanRuntime();
     const [session] = await db.select().from(sessions).where(eq(sessions.id, data.sessionId));
     if (!session || session.expiresAt <= new Date())
@@ -463,12 +502,22 @@ export const rowanJournal = createServerFn({ method: "POST" })
 export const rowanShelves = createServerFn({ method: "POST" })
   .inputValidator(z.object({ sessionId: key }).strict())
   .handler(async ({ data }) => {
-    const { shelfService, actor } = await context(data.sessionId);
-    return (await shelfService.list(actor)).map((shelf) => ({
-      id: shelf.id,
-      name: shelf.name,
-      version: shelf.version,
-    }));
+    const { database, shelfService, actor } = await context(data.sessionId);
+    const shelves = await shelfService.list(actor);
+    return Promise.all(
+      shelves.map(async (shelf) => {
+        const [items] = await database
+          .select({ count: count() })
+          .from(v2ShelfItems)
+          .where(eq(v2ShelfItems.shelfId, shelf.id));
+        return {
+          id: shelf.id,
+          name: shelf.name,
+          version: shelf.version,
+          itemCount: items?.count ?? 0,
+        };
+      }),
+    );
   });
 export const rowanHome = createServerFn({ method: "POST" })
   .inputValidator(z.object({ sessionId: key }).strict())

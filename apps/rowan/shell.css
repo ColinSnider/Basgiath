@@ -373,6 +373,129 @@
 .reader-card-footer svg:last-child {
   margin-left: auto;
 }
+.reader-library-switch {
+  display: inline-flex;
+  gap: 4px;
+  padding: 4px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--muted);
+}
+.reader-library-switch button {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 38px;
+  padding: 8px 16px;
+  border-radius: 9px;
+  color: var(--muted-foreground);
+  font-size: 0.8rem;
+  font-weight: 600;
+}
+.reader-library-switch button span {
+  min-width: 20px;
+  text-align: center;
+  opacity: 0.7;
+  font-size: 0.7rem;
+}
+.reader-library-switch button.is-selected {
+  color: var(--primary-foreground);
+  background: linear-gradient(
+    115deg,
+    var(--primary),
+    color-mix(in oklch, var(--primary) 82%, var(--gold))
+  );
+  box-shadow: 0 4px 12px -8px var(--primary);
+}
+.reader-shelves-view {
+  padding-top: 8px;
+}
+.reader-shelf-create {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+.reader-shelf-create input {
+  width: 170px;
+  border: 1px solid var(--input);
+  background: var(--background);
+  border-radius: 8px;
+  padding: 10px 12px;
+  color: var(--foreground);
+  font-size: 0.8rem;
+}
+.reader-shelf-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 16px;
+}
+.reader-shelf-card {
+  display: grid;
+  gap: 10px;
+  padding: 18px;
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  background: linear-gradient(
+    145deg,
+    color-mix(in oklch, var(--gold) 8%, var(--card)),
+    var(--card) 55%
+  );
+  box-shadow: 0 8px 22px -20px var(--primary);
+}
+.reader-shelf-open {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 12px;
+  text-align: left;
+}
+.reader-shelf-mark {
+  display: grid;
+  place-items: center;
+  width: 46px;
+  height: 46px;
+  border-radius: 13px;
+  color: var(--primary);
+  background: linear-gradient(
+    140deg,
+    color-mix(in oklch, var(--primary) 13%, var(--card)),
+    color-mix(in oklch, var(--gold) 18%, var(--card))
+  );
+}
+.reader-shelf-name {
+  grid-column: 2;
+  font: 1.15rem var(--font-display);
+  overflow-wrap: anywhere;
+}
+.reader-shelf-open > .reader-muted {
+  grid-column: 2;
+  margin-top: -7px;
+  font-size: 0.72rem;
+}
+.reader-shelf-arrow {
+  grid-column: 3;
+  grid-row: 1 / span 2;
+  color: var(--primary);
+}
+.reader-shelf-card > form {
+  display: flex;
+  gap: 8px;
+  border-top: 1px solid var(--border);
+  padding-top: 12px;
+}
+.reader-shelf-card > form input {
+  flex: 1;
+  min-width: 0;
+  border: 1px solid var(--input);
+  background: var(--background);
+  border-radius: 7px;
+  padding: 8px 9px;
+  color: var(--foreground);
+  font-size: 0.72rem;
+}
+.reader-shelf-card > form button {
+  font-size: 0.7rem;
+}
 .reader-next-list > li + li {
   margin-top: 18px;
   padding-top: 18px;
@@ -753,6 +876,24 @@
   }
   .reader-field-action input {
     flex-basis: 100%;
+  }
+  .reader-library-switch {
+    width: 100%;
+  }
+  .reader-library-switch button {
+    flex: 1;
+    justify-content: center;
+    padding-inline: 8px;
+  }
+  .reader-shelf-create {
+    width: 100%;
+  }
+  .reader-shelf-create input {
+    flex: 1;
+    width: auto;
+  }
+  .reader-shelf-grid {
+    grid-template-columns: 1fr;
   }
   .reader-theme-options {
     gap: 14px 4px;
