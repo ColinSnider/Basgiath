@@ -1,6 +1,7 @@
 import { HistoryEditor } from "./HistoryEditor";
 import { ArrowLeft, BookOpen, Heart, Star } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
+import type { CSSProperties } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { BookEditor } from "./BookEditor";
 import { EditionForm } from "./EditionForm";
@@ -15,6 +16,61 @@ import {
 const control =
   "rounded-lg border border-border bg-background px-3 py-2 text-sm disabled:opacity-50";
 type Item = Awaited<ReturnType<typeof rowanLibrary>>["items"][number];
+
+type CoverPalette = { accent: string; deep: string; glow: string };
+const defaultPalette: CoverPalette = {
+  accent: "#5a1a25",
+  deep: "#241016",
+  glow: "rgba(183, 110, 121, .6)",
+};
+
+function useCoverPalette(coverUrl: string | null) {
+  const [palette, setPalette] = useState(defaultPalette);
+  useEffect(() => {
+    if (!coverUrl || typeof window === "undefined") {
+      setPalette(defaultPalette);
+      return;
+    }
+    const image = new Image();
+    image.crossOrigin = "anonymous";
+    image.src = coverUrl;
+    image.onload = () => {
+      try {
+        const canvas = document.createElement("canvas");
+        canvas.width = 12;
+        canvas.height = 12;
+        const context = canvas.getContext("2d");
+        if (!context) return;
+        context.drawImage(image, 0, 0, 12, 12);
+        const pixels = context.getImageData(0, 0, 12, 12).data;
+        let r = 0;
+        let g = 0;
+        let b = 0;
+        let count = 0;
+        for (let index = 0; index < pixels.length; index += 4) {
+          if (pixels[index + 3] < 180) continue;
+          r += pixels[index];
+          g += pixels[index + 1];
+          b += pixels[index + 2];
+          count++;
+        }
+        if (!count) return;
+        r = Math.round(r / count);
+        g = Math.round(g / count);
+        b = Math.round(b / count);
+        setPalette({
+          accent: `rgb(${r}, ${g}, ${b})`,
+          deep: `rgb(${Math.round(r * 0.38)}, ${Math.round(g * 0.38)}, ${Math.round(b * 0.38)})`,
+          glow: `rgba(${r}, ${g}, ${b}, .72)`,
+        });
+      } catch {
+        // Cover hosts may block canvas reads; the Rowan palette remains usable.
+      }
+    };
+  }, [coverUrl]);
+  return palette;
+}
+
 export function ReadingPanel({
   book,
   sessionId,
@@ -43,6 +99,7 @@ export function ReadingPanel({
     retry: false,
   });
   const active = history.data?.sessions.find((s) => s.state === "active" || s.state === "paused");
+  const palette = useCoverPalette(book.coverUrl);
   const value = Number(position);
   return (
     <section
@@ -54,7 +111,27 @@ export function ReadingPanel({
       <button className="rowan-book-back" onClick={close}>
         <ArrowLeft size={17} /> Back to your reading life
       </button>
-      <header className="rowan-book-hero">
+      <header
+        className="rowan-book-hero"
+        style={
+          {
+            "--book-accent": palette.accent,
+            "--book-deep": palette.deep,
+            "--book-glow": palette.glow,
+          } as CSSProperties
+        }
+      >
+        {book.coverUrl && (
+          <img
+            className="rowan-book-backdrop"
+            src={book.coverUrl}
+            alt=""
+            aria-hidden="true"
+            onError={(event) => {
+              event.currentTarget.hidden = true;
+            }}
+          />
+        )}
         <div className="rowan-book-cover">
           {book.coverUrl ? (
             <img
