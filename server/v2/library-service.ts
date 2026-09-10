@@ -844,6 +844,7 @@ export function createLibraryService(database: Database, provider: CatalogProvid
       actor: Actor,
       input: {
         offset?: number;
+        userBookId?: string;
         query?: string;
         status?: string;
         favoritesOnly?: boolean;
@@ -855,6 +856,7 @@ export function createLibraryService(database: Database, provider: CatalogProvid
       const data = z
         .object({
           offset: z.number().int().min(0).max(100000).default(0),
+          userBookId: id.optional(),
           query: z.string().trim().max(200).default(""),
           favoritesOnly: z.boolean().default(false),
           shelfId: id.optional(),
@@ -885,6 +887,7 @@ export function createLibraryService(database: Database, provider: CatalogProvid
         .where(
           and(
             eq(userBooks.userId, actor.userId),
+            data.userBookId ? eq(userBooks.id, data.userBookId) : undefined,
             data.favoritesOnly ? eq(userBooks.isFavorite, true) : undefined,
             data.shelfId
               ? sql`exists (select 1 from ${shelfItems} join ${shelves} on ${shelves.id} = ${shelfItems.shelfId} where ${shelfItems.userBookId} = ${userBooks.id} and ${shelves.id} = ${data.shelfId} and ${shelves.userId} = ${actor.userId})`

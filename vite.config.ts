@@ -6,7 +6,7 @@ import { defineConfig } from "vite";
 import tsConfigPaths from "vite-tsconfig-paths";
 
 export default defineConfig(({ mode }) => {
-  const standalone = mode === "rowan";
+  const standalone = mode !== "legacy";
   // The dev server also passes process.env to database/gate configuration.
   if (standalone) process.env.ROWAN_STANDALONE = "true";
   return {

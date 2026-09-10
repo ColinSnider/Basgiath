@@ -1,2 +1,6 @@
-import { createFileRoute, Navigate } from "@tanstack/react-router";
-export const Route = createFileRoute("/settings")({ component: () => <Navigate to="/account" /> });
+import { createFileRoute, redirect } from "@tanstack/react-router";
+export const Route = createFileRoute("/settings")({
+  beforeLoad: () => {
+    throw redirect({ to: "/account" });
+  },
+});

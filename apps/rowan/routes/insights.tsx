@@ -1,4 +1,23 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { Rowan } from "@/components/rowan/RowanApp";
-import { rowanStatus } from "@/lib/rowan-fns";
-export const Route = createFileRoute("/insights")({ loader: () => rowanStatus(), component: () => <Rowan {...Route.useLoaderData()} standalone /> });
+import { ReaderPage, useReader, useReadingCommands } from "../components/reader";
+import { Insights } from "@/components/rowan/Insights";
+
+export const Route = createFileRoute("/insights")({
+  head: () => ({ meta: [{ title: "Insights — Rowan" }] }),
+  component: () => (
+    <ReaderPage>
+      <Page />
+    </ReaderPage>
+  ),
+});
+
+function Page() {
+  const { sessionId } = useReader();
+  const { run, busy, feedback } = useReadingCommands();
+  return (
+    <>
+      {feedback}
+      <Insights sessionId={sessionId} run={run} busy={busy} />
+    </>
+  );
+}

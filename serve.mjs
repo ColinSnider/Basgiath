@@ -7,12 +7,12 @@ import { migrate } from "drizzle-orm/node-postgres/migrator";
 import pg from "pg";
 
 const __dirname = fileURLToPath(new URL(".", import.meta.url));
-const standalone = process.env.ROWAN_STANDALONE === "true";
+const standalone = process.env.ROWAN_STANDALONE !== "false";
+process.env.ROWAN_STANDALONE = String(standalone);
 const outputDirectory = standalone ? "dist-rowan" : "dist";
 const CLIENT_DIR = join(__dirname, outputDirectory, "client");
 const RESOLVED_CLIENT_DIR = resolve(CLIENT_DIR);
 const STATIC_ROOT = `${RESOLVED_CLIENT_DIR}${sep}`;
-const ROWAN_STATIC_PAGE = join(__dirname, "rowan-static.html");
 
 // Run pending Drizzle migrations before accepting any traffic.
 async function runMigrations() {
@@ -111,22 +111,6 @@ const server = createServer(async (req, res) => {
       return;
     }
 
-    // Rowan is intentionally served as a dependency-free HTML contract while its
-    // data and page structure are rebuilt. This keeps the endpoint usable even
-    // when the client bundle is unavailable or unhealthy.
-    if (
-      standalone &&
-      req.method === "GET" &&
-      !pathname.startsWith("/api/") &&
-      !pathname.startsWith("/assets/") &&
-      !extname(pathname)
-    ) {
-      const html = await readFile(ROWAN_STATIC_PAGE);
-      res.writeHead(200, { "Content-Type": "text/html; charset=utf-8" });
-      res.end(html);
-      return;
-    }
-
     // Serve static assets directly before forwarding to the app worker.
     if (pathname.startsWith("/assets/") || extname(pathname)) {
       const file = await tryStatic(pathname);
@@ -186,5 +170,5 @@ const server = createServer(async (req, res) => {
 const parsedPort = Number.parseInt(process.env.PORT ?? "", 10);
 const port = Number.isFinite(parsedPort) && parsedPort > 0 ? parsedPort : 5000;
 server.listen(port, "0.0.0.0", () => {
-  console.log(`Basgiath running on http://0.0.0.0:${port}`);
+  console.log(`${standalone ? "Rowan" : "Basgiath"} running on http://0.0.0.0:${port}`);
 });

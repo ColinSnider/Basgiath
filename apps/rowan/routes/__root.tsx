@@ -1,5 +1,7 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { createRootRouteWithContext, HeadContent, Outlet, Scripts } from "@tanstack/react-router";
+import { createRootRouteWithContext, HeadContent, Scripts } from "@tanstack/react-router";
+import { AppShell } from "../components/AppShell";
+import shellCss from "../shell.css?url";
 import { AuthProvider } from "@/lib/auth-context";
 import appCss from "../../../src/styles.css?url";
 
@@ -13,6 +15,7 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
     ],
     links: [
       { rel: "stylesheet", href: appCss },
+      { rel: "stylesheet", href: shellCss },
       { rel: "preconnect", href: "https://fonts.googleapis.com" },
       { rel: "preconnect", href: "https://fonts.gstatic.com", crossOrigin: "anonymous" },
       {
@@ -52,7 +55,7 @@ function Root() {
   return (
     <QueryClientProvider client={queryClient}>
       <AuthProvider sessionKey="rowan:session">
-        <Outlet />
+        <AppShell />
       </AuthProvider>
     </QueryClientProvider>
   );

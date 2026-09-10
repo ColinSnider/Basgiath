@@ -384,6 +384,14 @@ export const rowanLibrary = createServerFn({ method: "POST" })
     const { library, actor } = await context(sessionId);
     return library.libraryPage(actor, input);
   });
+export const rowanBook = createServerFn({ method: "POST" })
+  .inputValidator(z.object({ sessionId: key, userBookId: key }).strict())
+  .handler(async ({ data }) => {
+    const { library, actor } = await context(data.sessionId);
+    const page = await library.libraryPage(actor, { userBookId: data.userBookId });
+    return page.items[0] ?? null;
+  });
+
 export const rowanSearch = createServerFn({ method: "POST" })
   .inputValidator(
     z

@@ -1,0 +1,191 @@
+.reader-app {
+  min-height: 100dvh;
+  color: var(--foreground);
+  background: var(--background);
+}
+.reader-sidebar {
+  width: 232px;
+  position: fixed;
+  inset: 0 auto 0 0;
+  padding: 36px 24px;
+  border-right: 1px solid var(--border);
+  background: var(--card);
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+.reader-brand {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font: 2rem var(--font-display);
+  color: var(--primary);
+}
+.reader-caption {
+  font-size: 0.68rem;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--muted-foreground);
+}
+.reader-sidebar nav {
+  display: grid;
+  gap: 6px;
+}
+.reader-sidebar nav a {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 11px 12px;
+  border-radius: 8px;
+  font-size: 0.9rem;
+}
+.reader-sidebar nav a:hover {
+  background: var(--muted);
+}
+.reader-sidebar nav a[aria-current="page"] {
+  background: var(--primary);
+  color: var(--primary-foreground);
+}
+.reader-tools {
+  border-top: 1px solid var(--border);
+  padding-top: 20px;
+}
+.reader-sidebar-note {
+  margin-top: auto;
+  font: italic 1.15rem/1.6 var(--font-display);
+  color: var(--muted-foreground);
+}
+.reader-main {
+  margin-left: 232px;
+}
+.reader-topbar {
+  min-height: 72px;
+  padding: 18px 40px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border-bottom: 1px solid var(--border);
+  font-size: 0.85rem;
+}
+.reader-wordmark {
+  font: 1.3rem var(--font-display);
+  color: var(--primary);
+}
+.reader-page {
+  max-width: 1200px;
+  margin: auto;
+  padding: 40px;
+  min-width: 0;
+}
+.reader-page-heading {
+  margin-bottom: 28px;
+}
+.reader-page-heading h1 {
+  font: 2.6rem/1.2 var(--font-display);
+  color: var(--primary);
+  margin: 8px 0 12px;
+}
+.reader-page-heading > p:last-child {
+  color: var(--muted-foreground);
+}
+.reader-mobile-nav,
+.reader-mobile-tools {
+  display: none;
+}
+.reader-app button,
+.reader-app a {
+  touch-action: manipulation;
+}
+.reader-app :focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: 4px;
+}
+.reader-page img {
+  max-width: 100%;
+}
+.reader-skip {
+  position: fixed;
+  top: -100px;
+  left: 16px;
+  padding: 12px;
+  background: var(--card);
+  z-index: 100;
+}
+.reader-skip:focus {
+  top: 12px;
+}
+@media (max-width: 900px) {
+  .reader-sidebar {
+    display: none;
+  }
+  .reader-main {
+    margin-left: 0;
+    padding-bottom: calc(110px + env(safe-area-inset-bottom));
+  }
+  .reader-topbar {
+    min-height: 60px;
+    padding: 16px 20px;
+  }
+  .reader-page {
+    padding: 28px 20px;
+  }
+  .reader-page-heading h1 {
+    font-size: 2.2rem;
+  }
+  .reader-mobile-nav {
+    display: grid;
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+    position: fixed;
+    inset: auto 12px max(12px, env(safe-area-inset-bottom));
+    max-width: 520px;
+    margin-inline: auto;
+    padding: 7px;
+    gap: 3px;
+    border: 1px solid color-mix(in oklch, var(--gold) 35%, var(--border));
+    border-radius: 24px;
+    background: var(--card);
+    box-shadow: 0 12px 35px -18px color-mix(in oklch, var(--primary) 65%, black);
+    z-index: 30;
+  }
+  .reader-mobile-nav a {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    min-height: 56px;
+    gap: 5px;
+    padding: 7px 2px;
+    border-radius: 17px;
+    font-size: 0.65rem;
+    font-weight: 600;
+    color: var(--muted-foreground);
+    -webkit-tap-highlight-color: transparent;
+    transition: background-color 120ms ease, color 120ms ease;
+  }
+  .reader-mobile-nav a[aria-current="page"] {
+    color: var(--primary);
+    background: color-mix(in oklch, var(--primary) 10%, var(--card));
+  }
+  .reader-mobile-nav a[aria-current="page"] svg {
+    stroke-width: 2.3;
+  }
+  @supports (backdrop-filter: blur(12px)) {
+    .reader-mobile-nav {
+      background: color-mix(in oklch, var(--card) 92%, transparent);
+      backdrop-filter: blur(12px);
+    }
+  }
+  .reader-mobile-tools {
+    display: flex;
+    justify-content: center;
+    gap: 24px;
+    padding: 20px;
+    font-size: 0.85rem;
+    color: var(--muted-foreground);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .reader-mobile-nav a {
+    transition: none;
+  }
+}

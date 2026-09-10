@@ -84,6 +84,9 @@ test("v2 catalog and reading lifecycle work against isolated PostgreSQL", async 
   await t.test("library page is bounded, owner scoped, and filters literal text", async () => {
     assert.equal((await service.libraryPage(actor, { query: "One Author" })).items.length, 1);
     assert.equal((await service.libraryPage(other, {})).items.length, 0);
+    assert.equal((await service.libraryPage(actor, { userBookId: saved.userBookId })).items[0]?.id, saved.userBookId);
+    assert.equal((await service.libraryPage(other, { userBookId: saved.userBookId })).items.length, 0);
+    assert.equal((await service.libraryPage(actor, { userBookId: key() })).items.length, 0);
     assert.equal((await service.libraryPage(actor, { status: "reading" })).items.length, 0);
     assert.equal((await service.libraryPage(actor, { query: "%" })).items.length, 0);
     assert.equal((await service.libraryPage(actor, {})).nextOffset, null);

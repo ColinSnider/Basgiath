@@ -95,7 +95,7 @@ export function RowanHome({
             <p className="text-xs text-muted-foreground">Recently saved for later</p>
             {!home.data.next.length && (
               <p className="text-sm text-muted-foreground">
-                Save a book from the search below to keep it here.
+                Save a book from the Search page to keep it here.
               </p>
             )}
             <ul className="space-y-3">

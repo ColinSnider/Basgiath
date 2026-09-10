@@ -1,4 +1,16 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { Rowan } from "@/components/rowan/RowanApp";
-import { rowanStatus } from "@/lib/rowan-fns";
-export const Route = createFileRoute("/search")({ loader: () => rowanStatus(), component: () => <Rowan {...Route.useLoaderData()} standalone /> });
+import { ReaderPage } from "../components/reader";
+import { SearchPage } from "../pages/SearchPage";
+
+export const Route = createFileRoute("/search")({
+  head: () => ({ meta: [{ title: "Search — Rowan" }] }),
+  component: () => (
+    <ReaderPage>
+      <Page />
+    </ReaderPage>
+  ),
+});
+
+function Page() {
+  return <SearchPage />;
+}

@@ -1,6 +1,6 @@
 # Standalone Rowan
 
-Rowan now has a separate TanStack application in `apps/rowan`. Its `/` opens Rowan, `/login` owns sign-in and registration, and other Basgiath routes are absent. It shares the implemented Rowan components and services with the compatibility `/rowan` screen; it does not mount Basgiath's root, navigation, or library store.
+Rowan is the default application in `apps/rowan`. Its `/` opens Home, `/login` owns sign-in and registration, and every feature has its own route component. The persistent shell renders an Outlet; Library, Search, and book details load independently. There is no static HTML interception or compatibility `/rowan` screen.
 
 ## Run locally
 
@@ -17,7 +17,7 @@ npm run dev:rowan
 
 Open the displayed local URL and create a Rowan account. Google Books remains optional through `GOOGLE_BOOKS_ENABLED` and `GOOGLE_BOOKS_API_KEY`.
 
-`npm run build:rowan` produces `dist-rowan/`; `npm run start:rowan` serves it. `npm run typecheck:rowan` checks this application's route types separately. Existing Basgiath build/start commands and `dist/` remain available.
+`npm run dev`, `npm run build`, and `npm start` now select Rowan. The explicit `:rowan` commands are equivalent. Builds produce `dist-rowan/`. `npm run typecheck:rowan` checks the application's route types. The old app is available only through `dev:legacy`, `build:legacy`, and `start:legacy`.
 
 ## Independence and compatibility
 
@@ -31,21 +31,22 @@ Open the displayed local URL and create a Rowan account. Google Books remains op
 
 ## Railway
 
-Create a separate Rowan service from this repository and select `/railway.rowan.json` as its configuration file. Attach a dedicated database through `ROWAN_DATABASE_URL` and set the staging/provider variables above. Run the explicit bootstrap once before serving accounts. The configuration builds and starts the standalone artifact and uses `/healthz` for process health; that endpoint does not verify database readiness.
+Both `railway.json` and `railway.rowan.json` build and serve Rowan at the domain root. Attach a dedicated database through `ROWAN_DATABASE_URL` and set the staging/provider variables above. Run the explicit bootstrap once before serving accounts. The configuration uses `/healthz` for process health; that endpoint does not verify database readiness.
 
 No Railway service, database, domain, production deployment, or account migration was changed by this implementation. Existing Rowan/Basgiath records are not automatically transferred. A reviewed archive transfer or migration remains separate work.
 
 ## Remaining product work
 
-Rowan now has dedicated Home, Library, Search, Calendar, Insights, Goals, Margins, and Account routes. These are real top-level routes, not a `/_app` layout or anchor-driven one-page view. Each URL mounts the Rowan page directly; the visible feature is the only feature rendered. Library and catalog queries are enabled only on their respective pages. Settings are part of Account; `/settings` remains a compatibility redirect to `/account`. Theme application lives in the shell, independent of Account. Book detail has been extracted into its own component.
+Rowan has dedicated Home, Library, Search, History, Insights, Goals, Margins, and Account routes. Each URL mounts its own component inside the shared shell. Library and catalog queries only exist on their respective pages. Settings are part of Account; `/settings` sends an HTTP redirect to `/account`. Theme application lives in the shell. Books open at `/books/$bookId`, loading the owned record directly rather than depending on a previous page's selection state. Mobile navigation has five tabs: Home, Library, Search, History, and Account.
 
-Next: persist library filters/sort/pagination in the URL, extract the remaining library/search controls into smaller components, and verify authenticated browser workflows against staging PostgreSQL. Production account migration, reconciliation, and recovery gates from the implementation brief still apply.
+Next: persist library filters/sort/pagination in the URL and verify authenticated browser workflows against staging PostgreSQL. Production account migration, reconciliation, and recovery gates from the implementation brief still apply.
 
 ## Validation for this slice
 
-- Both application builds and both TypeScript checks passed.
-- Four focused tests passed, including database selection, staging activation, and a fresh PGlite account saving a book without legacy import. The v2 migration journal was exercised twice for repeatability; PGlite installed the legacy SQL through its multi-statement execution API.
-- A built-server HTTP smoke test returned Rowan pages at `/` and `/login`, and 404 at `/library`, with an unreachable dummy database URL and no startup migrations.
-- Browser sign-up against a live PostgreSQL instance and Railway deployment remain untested.
+- Default production build and Rowan TypeScript check passed.
+- All 20 reading-service tests passed with isolated PGlite, including owner-only direct book lookup and missing-book handling.
+- Built SSR checks verify nine distinct page headings and titles, `/profile` returning 404, and `/settings` redirecting to `/account`.
+- Local browser checks verified the signed-out desktop shell, five mobile tabs at 390px, navigation, Account reload, and browser Back. No console errors were captured during these checks.
+- Authenticated browser workflows and Railway deployment remain untested. The local shell preview uses an unreachable dummy database; it does not prove account or provider connectivity.
 
-Run `npm run test:rowan:routes` after `npm run build:rowan` to check all eight built SSR page routes and legacy-route exclusion without a live database.
+Run `npm run test:rowan:routes` after `npm run build` to check the built SSR routes without a live database.
