@@ -1,12 +1,12 @@
-import { PRESET_THEMES } from "@/lib/user-preferences";
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
+import { Download, FileCheck, FolderArchive, ShieldCheck, Trash2, Upload } from "lucide-react";
 import { rowanSettings, rowanArchive } from "@/lib/rowan-fns";
 import { parseRowanArchive } from "../../../shared/rowan-archive";
 import { useAccountMutation } from "./useAccountMutation";
+import { ProfileSettings } from "./ProfileSettings";
+import { AppearanceSettings } from "./AppearanceSettings";
 
-const control =
-  "rounded-lg border border-border bg-background px-3 py-2 text-sm disabled:opacity-50";
 export function AccountSettings({
   sessionId,
   onReplaced,
@@ -21,12 +21,6 @@ export function AccountSettings({
     queryFn: () => rowanSettings({ data: { sessionId } }),
     retry: false,
   });
-  const save = useAccountMutation(sessionId);
-  const replace = useAccountMutation(sessionId, () => {
-    setFile(null);
-    setConfirmation("");
-    onReplaced();
-  });
   const [file, setFile] = useState<{
     raw: string;
     name: string;
@@ -34,189 +28,276 @@ export function AccountSettings({
     sessions: number;
     margins: number;
   } | null>(null);
-  const [confirmation, setConfirmation] = useState("");
+  const [restoreConfirmation, setRestoreConfirmation] = useState("");
+  const [clearConfirmation, setClearConfirmation] = useState("");
   const [error, setError] = useState("");
+  const [exportNotice, setExportNotice] = useState("");
   const [exporting, setExporting] = useState(false);
+  const [readingFile, setReadingFile] = useState(false);
+  const fileInput = useRef<HTMLInputElement>(null);
+  const selection = useRef(0);
+  const save = useAccountMutation(sessionId);
+  const replace = useAccountMutation(sessionId, () => {
+    setFile(null);
+    setRestoreConfirmation("");
+    setClearConfirmation("");
+    if (fileInput.current) fileInput.current.value = "";
+    onReplaced();
+  });
   const settings = query.data?.settings;
-  const busy = save.busy || replace.busy || exporting;
+  const busy = save.busy || replace.busy || exporting || readingFile;
+  function cancelRestore() {
+    selection.current++;
+    setReadingFile(false);
+    setFile(null);
+    setRestoreConfirmation("");
+    setError("");
+    if (fileInput.current) fileInput.current.value = "";
+  }
   return (
-    <section id="rowan-settings" className="rounded-2xl border border-border bg-card p-5 space-y-4">
-      <h2 className="font-display text-2xl">Settings and backups</h2>
-      {query.isPending && <p>Loading settings…</p>}
-      {query.isError && (
-        <p role="alert">
-          Settings could not load. <button onClick={() => void query.refetch()}>Retry</button>
-        </p>
-      )}
-      {settings && (
-        <form
-          key={JSON.stringify(settings)}
-          className="flex flex-wrap items-end gap-4"
-          onSubmit={(event) => {
-            event.preventDefault();
-            const data = new FormData(event.currentTarget);
-            save.run({
-              type: "settings",
-              key: crypto.randomUUID(),
-              settings: {
-                darkMode: data.has("dark"),
-                compactMode: data.has("compact"),
-                accentColor: String(data.get("accent")),
-                fontScale: data.get("scale") as "sm" | "md" | "lg",
-              },
-            });
-          }}
-        >
-          <label>
-            <input name="dark" type="checkbox" defaultChecked={settings.darkMode} /> Dark mode
-          </label>
-          <label>
-            <input name="compact" type="checkbox" defaultChecked={settings.compactMode} /> Compact
-            layout
-          </label>
-          <label className="grid gap-1">
-            Accent
-            <select className={control} name="accent" defaultValue={settings.accentColor}>
-              {PRESET_THEMES.map((t) => (
-                <option key={t.id} value={t.id}>
-                  {t.label}
-                </option>
-              ))}
-            </select>
-          </label>
-          <label className="grid gap-1">
-            Text size
-            <select className={control} name="scale" defaultValue={settings.fontScale}>
-              <option value="sm">Small</option>
-              <option value="md">Medium</option>
-              <option value="lg">Large</option>
-            </select>
-          </label>
-          <button className={control} disabled={busy}>
-            Save settings
-          </button>
-        </form>
-      )}
-      <p role="status">{save.message}</p>
-      {save.uncertain && (
-        <button className={control} onClick={save.retry}>
-          Retry settings save
-        </button>
-      )}
-      {!standalone && <p className="text-sm">
-        {query.data?.mirrorPaused
-          ? "Automatic legacy import is paused for this Rowan library after clear or restore."
-          : "Your legacy library is imported automatically. Personal Rowan changes are retained."}
-      </p>}
-      <button
-        className={control}
-        disabled={busy}
-        onClick={async () => {
-          setExporting(true);
-          setError("");
-          try {
-            const raw = await rowanArchive({ data: { sessionId } });
-            const url = URL.createObjectURL(new Blob([raw], { type: "application/json" }));
-            const link = document.createElement("a");
-            link.href = url;
-            link.download = `rowan-archive-${new Date().toISOString().slice(0, 10)}.json`;
-            link.click();
-            setTimeout(() => URL.revokeObjectURL(url), 1000);
-          } catch {
-            setError("Backup could not be downloaded. Try again.");
-          } finally {
-            setExporting(false);
-          }
-        }}
-      >
-        Download backup
-      </button>
-      <label className="grid gap-2">
-        Restore a Rowan archive
-        <input
-          type="file"
-          accept=".json,application/json"
-          disabled={busy}
-          onChange={async (event) => {
-            const selected = event.target.files?.[0];
-            setFile(null);
-            setError("");
-            setConfirmation("");
-            if (!selected) return;
-            try {
-              if (selected.size > 20 * 1024 * 1024) throw new Error("Archive exceeds 20 MB.");
-              const raw = await selected.text();
-              const data = parseRowanArchive(raw);
-              setFile({
-                raw,
-                name: selected.name,
-                books: data.userBooks.length,
-                sessions: data.readingSessions.length,
-                margins: data.margins.length,
-              });
-            } catch {
-              setError(
-                "This file is not a valid Rowan v2 archive. No data was changed. Legacy exports still use the Basgiath importer.",
-              );
-            }
-          }}
-        />
-      </label>
-      {file && (
-        <p>
-          {file.name}: {file.books} books, {file.sessions} reading sessions, {file.margins} margins.
-        </p>
-      )}
-      <p className="text-sm text-muted-foreground">
-        Restore replaces this Rowan library, goals, shelves, and settings. Clear removes them. Both
-        pause automatic legacy import; the legacy database is preserved. Download a backup first.
-      </p>
-      <label className="grid gap-1">
-        Type {file ? "RESTORE" : "CLEAR"} to confirm
-        <input
-          className={control}
-          value={confirmation}
-          onChange={(e) => setConfirmation(e.target.value)}
-          autoComplete="off"
-          disabled={busy}
-        />
-      </label>
-      <button
-        className={`${control} text-destructive`}
-        disabled={busy || confirmation !== (file ? "RESTORE" : "CLEAR")}
-        onClick={() => {
-          replace.run(
-            file
-              ? {
-                  type: "restore",
-                  key: crypto.randomUUID(),
-                  raw: file.raw,
-                  confirmation: "RESTORE",
+    <div className="reader-settings">
+      <div className="reader-settings-columns">
+        <div className="space-y-6">
+          <ProfileSettings sessionId={sessionId} />
+        </div>
+        <div>
+          {query.isPending && (
+            <p role="status" className="reader-state">
+              Loading your preferences…
+            </p>
+          )}
+          {query.isError && (
+            <p role="alert" className="reader-state">
+              Preferences could not load.{" "}
+              <button onClick={() => void query.refetch()}>Try again</button>
+            </p>
+          )}
+          {settings && (
+            <AppearanceSettings
+              key={JSON.stringify(settings)}
+              settings={settings}
+              save={save}
+              disabled={busy}
+            />
+          )}
+        </div>
+      </div>
+
+      <section className="reader-card" aria-labelledby="backup-heading">
+        <header className="reader-card-heading">
+          <div className="reader-section-title">
+            <span className="reader-icon reader-icon-gold">
+              <FolderArchive size={20} />
+            </span>
+            <div>
+              <h2 id="backup-heading">Your library, in your hands</h2>
+              <p>Take a copy with you, or bring a backup home.</p>
+            </div>
+          </div>
+        </header>
+        <div className="reader-backup-grid reader-card-body">
+          <div className="space-y-4">
+            <Download size={24} className="text-primary" aria-hidden="true" />
+            <h3>Download a backup</h3>
+            <p className="reader-muted">
+              Keep your books, reading history, shelves, margins, goals, and preferences in a Rowan
+              archive.
+            </p>
+            <button
+              className="reader-button"
+              disabled={busy}
+              onClick={async () => {
+                setExporting(true);
+                setExportNotice("");
+                try {
+                  const raw = await rowanArchive({ data: { sessionId } });
+                  const url = URL.createObjectURL(new Blob([raw], { type: "application/json" }));
+                  const link = document.createElement("a");
+                  link.href = url;
+                  link.download = `rowan-archive-${new Date().toISOString().slice(0, 10)}.json`;
+                  link.click();
+                  setTimeout(() => URL.revokeObjectURL(url), 1000);
+                  setExportNotice("Backup download started.");
+                } catch {
+                  setExportNotice("Backup could not be downloaded. Please try again.");
+                } finally {
+                  setExporting(false);
                 }
-              : { type: "clear", key: crypto.randomUUID(), confirmation: "CLEAR" },
-          );
-        }}
-      >
-        {file ? "Replace library from archive" : "Clear Rowan data"}
-      </button>
-      {file && (
-        <button
-          className={control}
-          disabled={busy}
-          onClick={() => {
-            setFile(null);
-            setConfirmation("");
-          }}
-        >
-          Cancel restore
-        </button>
+              }}
+            >
+              <Download size={16} />
+              {exporting ? "Preparing backup…" : "Download backup"}
+            </button>
+            <p role="status" className="reader-muted">
+              {exportNotice}
+            </p>
+            <p className="reader-backup-note">
+              <ShieldCheck size={16} />
+              Account passwords are not included.
+            </p>
+          </div>
+          <div className="space-y-4">
+            <Upload size={24} className="text-primary" aria-hidden="true" />
+            <h3>Restore from an archive</h3>
+            <p className="reader-muted">
+              Choose a Rowan JSON backup to check its contents. Nothing changes until you confirm
+              the restore.
+            </p>
+            <label className="reader-file-label">
+              Choose archive (JSON, up to 20 MB)
+              <input
+                ref={fileInput}
+                type="file"
+                accept=".json,application/json"
+                disabled={busy}
+                onChange={async (event) => {
+                  const selected = event.target.files?.[0];
+                  const request = ++selection.current;
+                  setFile(null);
+                  setError("");
+                  setRestoreConfirmation("");
+                  if (!selected) return;
+                  setReadingFile(true);
+                  try {
+                    if (selected.size > 20 * 1024 * 1024) throw new Error("Archive exceeds 20 MB.");
+                    const raw = await selected.text();
+                    const data = parseRowanArchive(raw);
+                    if (request === selection.current)
+                      setFile({
+                        raw,
+                        name: selected.name,
+                        books: data.userBooks.length,
+                        sessions: data.readingSessions.length,
+                        margins: data.margins.length,
+                      });
+                  } catch {
+                    if (request === selection.current)
+                      setError(
+                        "Choose a valid Rowan archive no larger than 20 MB. No data was changed.",
+                      );
+                  } finally {
+                    if (request === selection.current) setReadingFile(false);
+                  }
+                }}
+              />
+            </label>
+            {readingFile && <p role="status">Checking archive…</p>}
+            {error && (
+              <p role="alert" className="text-destructive">
+                {error}
+              </p>
+            )}
+            {file && (
+              <form
+                className="reader-restore-review space-y-4"
+                onSubmit={(event) => {
+                  event.preventDefault();
+                  if (!busy && restoreConfirmation === "RESTORE")
+                    replace.run({
+                      type: "restore",
+                      key: crypto.randomUUID(),
+                      raw: file.raw,
+                      confirmation: "RESTORE",
+                    });
+                }}
+              >
+                <p className="flex items-center gap-2">
+                  <FileCheck size={18} />
+                  <strong className="break-all">{file.name}</strong>
+                </p>
+                <p>
+                  {file.books} books · {file.sessions} reading sessions · {file.margins} margins
+                </p>
+                <p className="reader-muted">
+                  This replaces your current library, goals, shelves, and preferences. Download a
+                  backup before continuing.
+                </p>
+                <label className="reader-setting-form">
+                  Type RESTORE to replace your data
+                  <input
+                    value={restoreConfirmation}
+                    onChange={(event) => setRestoreConfirmation(event.target.value)}
+                    autoComplete="off"
+                    disabled={busy}
+                  />
+                </label>
+                <div className="reader-field-action">
+                  <button
+                    className="reader-button"
+                    disabled={busy || restoreConfirmation !== "RESTORE"}
+                  >
+                    Restore this archive
+                  </button>
+                  <button
+                    type="button"
+                    className="reader-button reader-button-quiet"
+                    onClick={cancelRestore}
+                    disabled={replace.busy}
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </form>
+            )}
+          </div>
+        </div>
+      </section>
+      {!standalone && (
+        <p className="reader-muted">
+          {query.data?.mirrorPaused
+            ? "Automatic legacy import is paused for this Rowan library."
+            : "Your legacy library is imported automatically. Personal Rowan changes are retained."}
+        </p>
       )}
-      <p role="status">{error || replace.message}</p>
+      <section className="reader-card reader-danger" aria-labelledby="clear-heading">
+        <details className="reader-card-body reader-disclosure">
+          <summary id="clear-heading">
+            <Trash2 size={18} />
+            Clear library data
+          </summary>
+          <div className="space-y-4 mt-4">
+            <p>
+              This removes your Rowan library, reading history, margins, shelves, goals, and saved
+              preferences. Your sign-in account remains.
+            </p>
+            <p className="reader-muted">
+              This cannot be undone without a backup. Download an archive above before clearing your
+              library.
+            </p>
+            <form
+              className="reader-setting-form"
+              onSubmit={(event) => {
+                event.preventDefault();
+                if (!busy && clearConfirmation === "CLEAR")
+                  replace.run({ type: "clear", key: crypto.randomUUID(), confirmation: "CLEAR" });
+              }}
+            >
+              <label htmlFor="clear-confirmation">Type CLEAR to confirm</label>
+              <div className="reader-field-action">
+                <input
+                  id="clear-confirmation"
+                  autoComplete="off"
+                  value={clearConfirmation}
+                  onChange={(event) => setClearConfirmation(event.target.value)}
+                  disabled={busy}
+                />
+                <button
+                  className="reader-button reader-button-danger"
+                  disabled={busy || clearConfirmation !== "CLEAR"}
+                >
+                  Clear library data
+                </button>
+              </div>
+            </form>
+          </div>
+        </details>
+      </section>
+      <p role="status">{replace.message}</p>
       {replace.uncertain && (
-        <button className={control} onClick={replace.retry}>
+        <button className="reader-button" onClick={replace.retry}>
           Retry the same request
         </button>
       )}
-    </section>
+    </div>
   );
 }

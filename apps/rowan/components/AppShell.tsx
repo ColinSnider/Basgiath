@@ -112,7 +112,7 @@ export function AppShell() {
           )}
         </header>
         <main id="page-content" className="reader-page" tabIndex={-1}>
-          <header className="reader-page-heading">
+          <header className={pathname === "/" ? "sr-only" : "reader-page-heading"}>
             <p className="reader-caption">Your reading companion</p>
             <h1>
               {page?.label ?? (pathname.startsWith("/books/") ? "Book details" : "Page not found")}

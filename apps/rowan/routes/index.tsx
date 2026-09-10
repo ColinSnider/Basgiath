@@ -1,13 +1,17 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { ReaderPage, useReader } from "../components/reader";
 import { RowanHome } from "@/components/rowan/Home";
+import { HomeHero } from "@/components/rowan/HomeHero";
 
 export const Route = createFileRoute("/")({
   head: () => ({ meta: [{ title: "Home — Rowan" }] }),
   component: () => (
-    <ReaderPage>
-      <Page />
-    </ReaderPage>
+    <>
+      <HomeHero />
+      <ReaderPage>
+        <Page />
+      </ReaderPage>
+    </>
   ),
 });
 

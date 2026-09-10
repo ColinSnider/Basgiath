@@ -1,8 +1,11 @@
 import { useQuery } from "@tanstack/react-query";
+import { Link } from "@tanstack/react-router";
+import { ArrowRight, BookOpen, Bookmark, CircleCheck, Library, Pause } from "lucide-react";
 import { rowanHome } from "@/lib/rowan-fns";
 
 type HomeData = Awaited<ReturnType<typeof rowanHome>>;
 type Book = HomeData["next"][number];
+
 export function RowanHome({
   sessionId,
   openBook,
@@ -17,97 +20,165 @@ export function RowanHome({
     queryFn: () => rowanHome({ data: { sessionId } }),
     retry: false,
   });
-  return (
-    <section id="reading-home" aria-labelledby="reading-overview" className="rowan-overview space-y-4">
-      <div>
-        <h2 id="reading-overview" className="font-display text-3xl">
-          Your reading life
-        </h2>
-        <p className="text-sm text-muted-foreground">
-          Where you’ve been. Where you are. What’s next.
-        </p>
+  if (home.isPending)
+    return (
+      <p role="status" className="reader-state">
+        Getting your bookmark ready…
+      </p>
+    );
+  if (home.isError)
+    return (
+      <div role="alert" className="reader-state">
+        Your books could not load. <button onClick={() => void home.refetch()}>Try again</button>
       </div>
-      {home.isPending && <p role="status">Loading your reading overview…</p>}
-      {home.isError && (
-        <p role="alert">
-          Your overview could not load.{" "}
-          <button className="underline" onClick={() => void home.refetch()}>
-            Try again
+    );
+  const data = home.data;
+  return (
+    <section aria-label="Your reading overview" className="reader-reading-layout">
+      <section className="reader-card reader-current" aria-labelledby="current-heading">
+        <header className="reader-card-heading">
+          <div className="reader-section-title">
+            <span className="reader-icon">
+              <BookOpen size={20} />
+            </span>
+            <div>
+              <h2 id="current-heading">On your nightstand</h2>
+              <p>Pick up where you left off.</p>
+            </div>
+          </div>
+          <span className="reader-count">
+            {data.current.length}
+            {data.hasMoreCurrent ? "+" : ""}
+          </span>
+        </header>
+        {data.current.length ? (
+          <ul className="reader-current-list">
+            {data.current.map((item) => {
+              const total = item.unit === "percent" ? 100 : item.total;
+              const percent =
+                total && total > 0
+                  ? Math.min(100, Math.round((item.position / total) * 100))
+                  : null;
+              return (
+                <li key={item.book.id}>
+                  <BookCard book={item.book} openBook={openBook} />
+                  <div className="reader-current-progress">
+                    <div className="reader-progress-label">
+                      <span>
+                        {item.state === "paused" && (
+                          <span className="reader-paused">
+                            <Pause size={12} />
+                            Paused ·{" "}
+                          </span>
+                        )}
+                        {positionLabel(item.position, item.unit)}
+                        {item.unit !== "percent" && total !== null
+                          ? ` of ${positionLabel(total, item.unit)}`
+                          : ""}
+                      </span>
+                      {percent !== null && <strong>{percent}%</strong>}
+                    </div>
+                    {percent !== null ? (
+                      <progress
+                        value={item.position}
+                        max={total!}
+                        aria-label={`Progress for ${item.book.title}`}
+                      />
+                    ) : (
+                      <p className="reader-caption">Book length not set</p>
+                    )}
+                  </div>
+                  <button className="reader-text-link" onClick={() => openBook(item.book)}>
+                    {item.state === "paused" ? "Open paused read" : "Continue reading"}
+                    <ArrowRight size={15} />
+                  </button>
+                </li>
+              );
+            })}
+          </ul>
+        ) : (
+          <div className="reader-empty">
+            <BookOpen size={34} strokeWidth={1.2} aria-hidden="true" />
+            <h3>A bookmark waiting for a story</h3>
+            <p>
+              Open a book from your library to start reading. Your progress will be here when you
+              return.
+            </p>
+            <button className="reader-button" onClick={showLibrary}>
+              Choose a book
+              <ArrowRight size={16} />
+            </button>
+          </div>
+        )}
+        {!!data.current.length && (
+          <button className="reader-card-footer" onClick={showLibrary}>
+            <Library size={16} />
+            View your library
+            <ArrowRight size={16} />
           </button>
-        </p>
-      )}
-      {home.data && (
-        <div className="rowan-reading-cards grid gap-4 lg:grid-cols-[1fr_2fr_1fr]">
-          <div className="rounded-2xl border border-border bg-card p-4 space-y-3">
-            <h3 className="font-display text-xl">Last</h3>
-            {home.data.last ? (
+        )}
+      </section>
+      <div className="reader-reading-aside">
+        <section className="reader-card" aria-labelledby="finished-heading">
+          <header className="reader-card-heading">
+            <div className="reader-section-title">
+              <span className="reader-icon reader-icon-gold">
+                <CircleCheck size={20} />
+              </span>
+              <div>
+                <h2 id="finished-heading">Last chapter closed</h2>
+                <p>Your most recent finish.</p>
+              </div>
+            </div>
+          </header>
+          <div className="reader-card-body">
+            {data.last ? (
               <>
-                <BookCard book={home.data.last.book} openBook={openBook} />
-                <p className="text-xs text-muted-foreground">
-                  {home.data.last.finishedAt
-                    ? `Finished ${new Date(home.data.last.finishedAt).toLocaleDateString()}`
+                <BookCard book={data.last.book} openBook={openBook} />
+                <p className="reader-finish-date">
+                  {data.last.finishedAt
+                    ? `Finished ${new Date(data.last.finishedAt).toLocaleDateString()}`
                     : "Finish date not recorded"}
                 </p>
               </>
             ) : (
-              <p className="text-sm text-muted-foreground">
-                Your most recently finished book will appear here.
+              <p className="reader-muted">Your next finished book deserves a spot here.</p>
+            )}
+          </div>
+        </section>
+        <section className="reader-card" aria-labelledby="next-heading">
+          <header className="reader-card-heading">
+            <div className="reader-section-title">
+              <span className="reader-icon">
+                <Bookmark size={20} />
+              </span>
+              <div>
+                <h2 id="next-heading">Waiting in the wings</h2>
+                <p>Recently saved for later.</p>
+              </div>
+            </div>
+          </header>
+          <div className="reader-card-body">
+            {data.next.length ? (
+              <ul className="reader-next-list">
+                {data.next.map((book) => (
+                  <li key={book.id}>
+                    <BookCard book={book} openBook={openBook} />
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <p className="reader-muted">
+                Found something you want to read? Save it from Search and keep it close.
               </p>
             )}
           </div>
-          <div className="rounded-2xl border border-border bg-card p-4 space-y-3">
-            <h3 className="font-display text-xl">Current</h3>
-            {!home.data.current.length && (
-              <p className="text-sm text-muted-foreground">
-                Ready for a new chapter? Open a saved book to start reading.
-              </p>
-            )}
-            <ul className="space-y-4">
-              {home.data.current.map((item) => (
-                <li key={item.book.id} className="space-y-2">
-                  <BookCard book={item.book} openBook={openBook} />
-                  <p className="text-sm text-muted-foreground">
-                    {item.state === "paused" ? "Paused · " : ""}
-                    {positionLabel(item.position, item.unit)}
-                    {item.total === null
-                      ? " · Length unknown"
-                      : ` of ${positionLabel(item.total, item.unit)}`}
-                  </p>
-                  {item.total !== null && (
-                    <progress
-                      className="w-full"
-                      value={item.position}
-                      max={item.total}
-                      aria-label={`Progress for ${item.book.title}`}
-                    />
-                  )}
-                </li>
-              ))}
-            </ul>
-            <button className="text-sm underline" onClick={showLibrary}>
-              {home.data.hasMoreCurrent
-                ? "See all your books and current reads"
-                : "Open your library"}
-            </button>
-          </div>
-          <div className="rounded-2xl border border-border bg-card p-4 space-y-3">
-            <h3 className="font-display text-xl">Next</h3>
-            <p className="text-xs text-muted-foreground">Recently saved for later</p>
-            {!home.data.next.length && (
-              <p className="text-sm text-muted-foreground">
-                Save a book from the Search page to keep it here.
-              </p>
-            )}
-            <ul className="space-y-3">
-              {home.data.next.map((book) => (
-                <li key={book.id}>
-                  <BookCard book={book} openBook={openBook} />
-                </li>
-              ))}
-            </ul>
-          </div>
-        </div>
-      )}
+          <Link to="/search" className="reader-card-footer">
+            Discover a book
+            <ArrowRight size={16} />
+          </Link>
+        </section>
+      </div>
     </section>
   );
 }
@@ -115,31 +186,25 @@ export function RowanHome({
 function BookCard({ book, openBook }: { book: Book; openBook: (book: Book) => void }) {
   return (
     <button
-      className="flex w-full gap-3 rounded-lg p-1 text-left hover:bg-muted focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary"
+      className="reader-book-row"
       onClick={() => openBook(book)}
       aria-label={`Open ${book.title}`}
     >
       {book.coverUrl ? (
-        <img
-          className="h-20 w-14 shrink-0 rounded object-contain"
-          src={book.coverUrl}
-          alt=""
-          loading="lazy"
-        />
+        <img src={book.coverUrl} alt="" loading="lazy" />
       ) : (
-        <span
-          className="grid h-20 w-14 shrink-0 place-items-center rounded bg-muted font-display text-2xl"
-          aria-hidden="true"
-        >
-          R
+        <span className="reader-cover-placeholder" aria-hidden="true">
+          <BookOpen size={25} strokeWidth={1} />
         </span>
       )}
-      <span className="min-w-0">
-        <span className="block font-medium">{book.title}</span>
-        <span className="block text-xs text-muted-foreground">
-          {book.authors.join(", ") || "Unknown author"}
-        </span>
-        <span className="mt-2 block text-xs text-primary">Open book</span>
+      <span className="reader-book-copy">
+        <span className="reader-book-title">{book.title}</span>
+        <span className="reader-muted">{book.authors.join(", ") || "Unknown author"}</span>
+        {book.halfStars !== null && (
+          <span className="reader-book-rating" aria-label={`Rated ${book.halfStars / 2} out of 5`}>
+            ★ {book.halfStars / 2} / 5
+          </span>
+        )}
       </span>
     </button>
   );
@@ -149,8 +214,7 @@ function positionLabel(position: number, unit: string) {
   if (unit === "second") {
     const hours = Math.floor(position / 3600);
     const minutes = Math.floor((position % 3600) / 60);
-    const seconds = position % 60;
-    return `${hours ? `${hours}h ` : ""}${minutes}m ${seconds}s`;
+    return `${hours ? `${hours}h ` : ""}${minutes}m`;
   }
   return unit === "percent" ? `${position}%` : `${position} pages`;
 }
