@@ -24,7 +24,7 @@ export function LibraryPage() {
     retry: false,
   });
   const [offset, setOffset] = useState(0);
-  const [view, setView] = useState<"grid" | "list" | "bookshelf">("grid");
+  const [view, setView] = useState<"grid" | "list" | "bookshelf">("bookshelf");
   const [sort, setSort] = useState<"newest" | "oldest" | "title" | "rating">("newest");
   const [section, setSection] = useState<"library" | "shelves" | "series">("library");
   const library = useQuery({
@@ -52,9 +52,12 @@ export function LibraryPage() {
           role="tab"
           aria-selected={section === "library"}
           className={section === "library" ? "is-selected" : ""}
-          onClick={() => setSection("library")}
+          onClick={() => {
+            setSection("library");
+            setView("bookshelf");
+          }}
         >
-          <LibraryBig size={18} /> Library <span>{library.data?.items.length ?? "—"}</span>
+          <LibraryBig size={18} /> Shelves <span>{library.data?.items.length ?? "—"}</span>
         </button>
         <button
           role="tab"
@@ -62,7 +65,7 @@ export function LibraryPage() {
           className={section === "shelves" ? "is-selected" : ""}
           onClick={() => setSection("shelves")}
         >
-          <FolderHeart size={18} /> Shelves <span>{shelves.data?.length ?? "—"}</span>
+          <FolderHeart size={18} /> Collections <span>{shelves.data?.length ?? "—"}</span>
         </button>
         <button
           role="tab"
