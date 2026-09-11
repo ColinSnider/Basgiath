@@ -1,4 +1,6 @@
-/** Standalone Rowan never falls back to the Basgiath database. */
+/** Existing-account mode keeps the original login/session store during the Rowan rollout. */
 export function accountDatabaseUrl(env: Record<string, string | undefined>) {
-  return env.ROWAN_STANDALONE === "true" ? env.ROWAN_DATABASE_URL : env.DATABASE_URL;
+  if (env.ROWAN_STANDALONE !== "true" || env.ROWAN_EXISTING_ACCOUNTS === "true")
+    return env.DATABASE_URL;
+  return env.ROWAN_DATABASE_URL;
 }

@@ -1,3 +1,4 @@
+import { ReadingOrganization } from "@/components/rowan/ReadingOrganization";
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { ArrowRight, FolderHeart, LibraryBig, Plus } from "lucide-react";
@@ -50,7 +51,7 @@ export function LibraryPage() {
   const [offset, setOffset] = useState(0);
   const [view, setView] = useState<"grid" | "list" | "bookshelf">("grid");
   const [sort, setSort] = useState<"newest" | "oldest" | "title" | "rating">("newest");
-  const [section, setSection] = useState<"library" | "shelves">("library");
+  const [section, setSection] = useState<"library" | "shelves" | "series">("library");
   const library = useQuery({
     queryKey: ["rowan", sessionId, "library", query, status, offset, favoritesOnly, shelfId, sort],
     queryFn: () =>
@@ -88,7 +89,16 @@ export function LibraryPage() {
         >
           <FolderHeart size={18} /> Shelves <span>{shelves.data?.length ?? "—"}</span>
         </button>
+        <button
+          role="tab"
+          aria-selected={section === "series"}
+          className={section === "series" ? "is-selected" : ""}
+          onClick={() => setSection("series")}
+        >
+          Series & queue
+        </button>
       </div>
+      {section === "series" && <ReadingOrganization sessionId={sessionId} openBook={openBook} />}
       {section === "shelves" && (
         <ShelvesView
           shelves={shelves.data ?? []}
@@ -107,9 +117,9 @@ export function LibraryPage() {
         />
       )}
       <section
-        className={`rowan-library space-y-4 ${section === "shelves" ? "hidden" : ""}`}
+        className={`rowan-library space-y-4 ${section !== "library" ? "hidden" : ""}`}
         aria-labelledby="library-heading"
-        hidden={section === "shelves"}
+        hidden={section !== "library"}
       >
         <div className="space-y-3" hidden>
           <h2 className="font-display text-2xl">Your shelves</h2>
@@ -279,13 +289,13 @@ export function LibraryPage() {
               className={view === "bookshelf" ? "reader-bookshelf-item" : undefined}
             >
               <button
-              className={
-                view === "bookshelf"
-                  ? "reader-book-spine-button"
-                  : `w-full rounded-xl border border-border bg-card p-4 text-left hover:border-primary ${view === "list" ? "flex items-center gap-4" : "h-full"}`
-              }
-              onClick={() => openBook(book)}
-            >
+                className={
+                  view === "bookshelf"
+                    ? "reader-book-spine-button"
+                    : `w-full rounded-xl border border-border bg-card p-4 text-left hover:border-primary ${view === "list" ? "flex items-center gap-4" : "h-full"}`
+                }
+                onClick={() => openBook(book)}
+              >
                 {view === "bookshelf" ? (
                   <BookSpine book={book} />
                 ) : book.coverUrl ? (

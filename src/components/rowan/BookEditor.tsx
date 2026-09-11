@@ -31,6 +31,7 @@ export function BookEditor({
           const fields = new FormData(event.currentTarget);
           try {
             const metadata = metadataSchema.parse(JSON.parse(String(fields.get("metadata"))));
+            metadata.description = String(fields.get("description")).trim();
             edit.run({
               type: "editBook",
               key: crypto.randomUUID(),
@@ -70,6 +71,19 @@ export function BookEditor({
             name="coverUrl"
             type="url"
             defaultValue={book.coverUrl ?? ""}
+          />
+        </label>
+        <label className="grid gap-1">
+          About this book
+          <textarea
+            className={control}
+            name="description"
+            rows={5}
+            maxLength={10000}
+            defaultValue={
+              typeof history.metadata.description === "string" ? history.metadata.description : ""
+            }
+            placeholder="Synopsis or your own description"
           />
         </label>
         <details>

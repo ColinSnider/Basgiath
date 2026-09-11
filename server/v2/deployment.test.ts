@@ -11,3 +11,14 @@ test("standalone authentication never uses a configured legacy database", () => 
     undefined,
   );
 });
+
+test("existing-account rollout retains original logins without guessing account identities", () => {
+  const env = {
+    ROWAN_STANDALONE: "true",
+    ROWAN_EXISTING_ACCOUNTS: "true",
+    DATABASE_URL: "postgres://original/app",
+    ROWAN_DATABASE_URL: "postgres://rowan/app",
+  };
+  assert.equal(accountDatabaseUrl(env), env.DATABASE_URL);
+  assert.equal(accountDatabaseUrl({ ...env, DATABASE_URL: undefined }), undefined);
+});

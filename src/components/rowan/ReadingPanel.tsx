@@ -31,9 +31,9 @@ function useCoverPalette(coverUrl: string | null) {
       setPalette(defaultPalette);
       return;
     }
+    setPalette(defaultPalette);
     const image = new Image();
     image.crossOrigin = "anonymous";
-    image.src = coverUrl;
     image.onload = () => {
       try {
         const canvas = document.createElement("canvas");
@@ -67,6 +67,11 @@ function useCoverPalette(coverUrl: string | null) {
         // Cover hosts may block canvas reads; the Rowan palette remains usable.
       }
     };
+    image.src = coverUrl;
+    return () => {
+      image.onload = null;
+      image.onerror = null;
+    };
   }, [coverUrl]);
   return palette;
 }
@@ -78,7 +83,9 @@ export function ReadingPanel({
   run,
   close,
   shelves,
+  organization,
 }: {
+  organization?: React.ReactNode;
   book: Item;
   sessionId: string;
   busy: boolean;
@@ -171,12 +178,62 @@ export function ReadingPanel({
               </span>
             )}
           </div>
-          {active && (
-            <ReadingProgressBar progress={active} />
+          {history.data && (
+            <dl className="rowan-book-facts">
+              <div>
+                <dt>Edition</dt>
+                <dd>
+                  {
+                    (
+                      {
+                        book: "Print",
+                        ebook: "Ebook",
+                        audiobook: "Audio",
+                        unknown: "Unspecified",
+                      } as Record<string, string>
+                    )[history.data.edition?.format ?? "unknown"]
+                  }
+                </dd>
+              </div>
+              {history.data.edition?.pageCount && (
+                <div>
+                  <dt>Length</dt>
+                  <dd>{history.data.edition.pageCount} pages</dd>
+                </div>
+              )}
+              {history.data.edition?.durationSeconds && (
+                <div>
+                  <dt>Listening time</dt>
+                  <dd>
+                    {Math.floor(history.data.edition.durationSeconds / 3600)}h{" "}
+                    {Math.round((history.data.edition.durationSeconds % 3600) / 60)}m
+                  </dd>
+                </div>
+              )}
+              <div>
+                <dt>Completed reads</dt>
+                <dd>{history.data.sessions.filter((s) => s.state === "completed").length}</dd>
+              </div>
+              <div>
+                <dt>Margins</dt>
+                <dd>{history.data.margins.length}</dd>
+              </div>
+            </dl>
           )}
+          {active && <ReadingProgressBar progress={active} />}
         </div>
       </header>
       <div className="rowan-book-content space-y-5">
+        {history.data &&
+          typeof history.data.metadata.description === "string" &&
+          history.data.metadata.description.trim() && (
+            <section className="space-y-2">
+              <h3 className="font-display text-xl">About this book</h3>
+              <p className="whitespace-pre-line text-muted-foreground">
+                {history.data.metadata.description}
+              </p>
+            </section>
+          )}
         {history.isPending && <p>Loading reading history…</p>}
         {history.isError && (
           <p role="alert">
@@ -366,6 +423,7 @@ export function ReadingPanel({
               )}
               <HistoryEditor history={history.data} busy={busy} run={run} />
             </section>
+            {organization}
             <BookEditor
               key={`edit:${history.data.userBookVersion}`}
               sessionId={sessionId}

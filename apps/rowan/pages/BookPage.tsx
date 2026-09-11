@@ -1,3 +1,4 @@
+import { ReadingOrganization } from "@/components/rowan/ReadingOrganization";
 import { useQuery } from "@tanstack/react-query";
 import { useParams } from "@tanstack/react-router";
 import { rowanBook, rowanShelves } from "@/lib/rowan-fns";
@@ -6,7 +7,7 @@ import { useReader, useReadingCommands } from "../components/reader";
 
 export function BookPage() {
   const { bookId } = useParams({ from: "/books/$bookId" });
-  const { sessionId, goLibrary } = useReader();
+  const { sessionId, goLibrary, openBook } = useReader();
   const { run, busy, feedback } = useReadingCommands();
   const book = useQuery({
     queryKey: ["rowan", sessionId, "book", bookId],
@@ -42,6 +43,9 @@ export function BookPage() {
         busy={busy}
         run={run}
         close={goLibrary}
+        organization={
+          <ReadingOrganization sessionId={sessionId} bookId={bookId} openBook={openBook} />
+        }
       />
     </>
   );

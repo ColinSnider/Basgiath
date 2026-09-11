@@ -55,7 +55,7 @@ export const bookEditSchema = z
 const archiveSchema = z
   .object({
     format: z.literal("rowan-archive"),
-    version: z.union([z.literal(2), z.literal(3)]),
+    version: z.union([z.literal(2), z.literal(3), z.literal(4)]),
     exportedAt: date,
     works: rows(
       z
@@ -178,6 +178,33 @@ const archiveSchema = z
     shelfItems: rows(
       z.object({ id, shelfId: id, userId: owner, userBookId: id, addedAt: date }).strict(),
     ),
+    series: rows(
+      z
+        .object({
+          id,
+          userId: owner,
+          name: z.string().trim().min(1).max(120),
+          completionState: z.enum(["unknown", "open", "complete"]),
+          sourceNote: z.string().trim().min(1).max(1000),
+        })
+        .strict(),
+    ).default([]),
+    seriesItems: rows(
+      z
+        .object({
+          id,
+          userId: owner,
+          seriesId: id,
+          userBookId: id,
+          sequenceLabel: z.string().max(40),
+          sortOrder: integer,
+          optional: z.boolean(),
+        })
+        .strict(),
+    ).default([]),
+    readingQueue: rows(
+      z.object({ userId: owner, userBookId: id, sortOrder: integer, pinned: z.boolean() }).strict(),
+    ).default([]),
     goals: rows(
       z
         .object({
@@ -217,22 +244,39 @@ export function parseRowanArchive(raw: string): RowanArchive {
     data.shelves,
     data.shelfItems,
     data.goals,
+    data.series,
+    data.seriesItems,
   ])
     unique(list as { id: string }[], (r) => r.id);
+  unique(data.series, (r) => r.name);
+  unique(data.seriesItems, (r) => `${r.seriesId}:${r.userBookId}`);
+  unique(data.readingQueue, (r) => r.userBookId);
+  require(data.readingQueue.filter((r) => r.pinned).length <= 1, "multiple pinned books.");
   unique(data.userBooks, (r) => r.workId);
   unique(data.ratings, (r) => r.userBookId);
   unique(data.shelves, (r) => r.name);
   unique(data.shelfItems, (r) => `${r.shelfId}:${r.userBookId}`);
   unique(data.externalMappings, (r) => `${r.provider}:${r.entityKind}:${r.externalId}`);
   const owners = new Set(
-    [...data.userBooks, ...data.shelves, ...data.shelfItems, ...data.goals, ...data.settings].map(
-      (r) => r.userId,
-    ),
+    [
+      ...data.userBooks,
+      ...data.shelves,
+      ...data.shelfItems,
+      ...data.goals,
+      ...data.settings,
+      ...data.series,
+      ...data.seriesItems,
+      ...data.readingQueue,
+    ].map((r) => r.userId),
   );
   require(owners.size <= 1, "multiple owners.");
   const works = new Set(data.works.map((r) => r.id));
   const editions = new Map(data.editions.map((r) => [r.id, r]));
   const books = new Map(data.userBooks.map((r) => [r.id, r]));
+  const series = new Set(data.series.map((r) => r.id));
+  for (const item of data.seriesItems)
+    require(series.has(item.seriesId) && books.has(item.userBookId), "orphan series book.");
+  for (const item of data.readingQueue) require(books.has(item.userBookId), "orphan queued book.");
   const sessions = new Map(data.readingSessions.map((r) => [r.id, r]));
   const shelves = new Set(data.shelves.map((r) => r.id));
   const matches = (edition: string | null, work: string) =>
@@ -263,10 +307,16 @@ export function parseRowanArchive(raw: string): RowanArchive {
   const entries = new Map(data.progressEntries.map((entry) => [entry.id, entry]));
   const replaced = new Set<string>();
   for (const e of data.progressEntries) {
-    require(sessions.has(e.readingSessionId) && (e.kind === "baseline" || e.occurredAt), "invalid progress entry.");
+    require(sessions.has(e.readingSessionId) &&
+      (e.kind === "baseline" || e.occurredAt), "invalid progress entry.");
     if (e.supersedesId) {
       const original = entries.get(e.supersedesId);
-      require(original && original.readingSessionId === e.readingSessionId && original.kind === "observation" && !original.voided && e.kind === "observation" && e.correctionReason, "invalid progress correction.");
+      require(original &&
+        original.readingSessionId === e.readingSessionId &&
+        original.kind === "observation" &&
+        !original.voided &&
+        e.kind === "observation" &&
+        e.correctionReason, "invalid progress correction.");
       require(!replaced.has(e.supersedesId), "branched progress correction.");
       replaced.add(e.supersedesId);
     } else require(!e.voided && !e.correctionReason, "orphan progress correction.");
@@ -280,10 +330,14 @@ export function parseRowanArchive(raw: string): RowanArchive {
     let node: typeof entry | undefined = entry;
     while (node && !visited.has(node.id)) {
       require(!walking.has(node.id), "cyclic progress correction.");
-      walking.add(node.id); path.push(node);
+      walking.add(node.id);
+      path.push(node);
       node = node.supersedesId ? entries.get(node.supersedesId) : undefined;
     }
-    for (const node of path.reverse()) { visited.add(node.id); ordered.push(node); }
+    for (const node of path.reverse()) {
+      visited.add(node.id);
+      ordered.push(node);
+    }
   }
   data.progressEntries = ordered;
   for (const r of [...data.ratings, ...data.margins])

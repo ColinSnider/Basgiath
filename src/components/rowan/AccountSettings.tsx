@@ -125,7 +125,7 @@ export function AccountSettings({
             <Download size={24} className="text-primary" aria-hidden="true" />
             <h3>Download a backup</h3>
             <p className="reader-muted">
-              Keep your books, reading history, shelves, margins, goals, and preferences in a Rowan
+              Keep your books, reading history, shelves, series, reading queue, margins, goals, and preferences in a Rowan
               archive.
             </p>
             <button
@@ -270,7 +270,7 @@ export function AccountSettings({
                 <p className="reader-muted">
                   {file.kind === "basgiath"
                     ? "This imports your Basgiath books, reading history, margins, goals, and preferences into Rowan. Your existing Rowan data stays until the import completes."
-                    : "This replaces your current library, goals, shelves, and preferences. Download a backup before continuing."}
+                    : "This replaces your current library, goals, shelves, series, reading queue, and preferences. Download a backup before continuing."}
                 </p>
                 <label className="reader-setting-form">
                   Type RESTORE to {file.kind === "basgiath" ? "import this data" : "replace your data"}
@@ -317,7 +317,7 @@ export function AccountSettings({
           </summary>
           <div className="space-y-4 mt-4">
             <p>
-              This removes your Rowan library, reading history, margins, shelves, goals, and saved
+              This removes your Rowan library, reading history, margins, shelves, series, reading queue, goals, and saved
               preferences. Your sign-in account remains.
             </p>
             <p className="reader-muted">

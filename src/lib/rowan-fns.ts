@@ -1,3 +1,5 @@
+import { createOrganizationService } from "../../server/v2/organization-service";
+import { organizationCommand } from "../../shared/reading-organization";
 import { createAccountService } from "../../server/v2/account-service";
 import { bookEditSchema, settingsSchema, goalTimeframeSchema } from "../../shared/rowan-archive";
 import { importDataSchema } from "./import-contract";
@@ -18,6 +20,7 @@ import {
   shelves as v2Shelves,
   shelfItems as v2ShelfItems,
   legacySyncSnapshots,
+  accountState,
 } from "../../shared/schema-v2";
 import { count } from "drizzle-orm";
 import { createHash } from "node:crypto";
@@ -168,8 +171,14 @@ async function context(sessionId: string, importLibrary = true) {
   const [session] = await db.select().from(sessions).where(eq(sessions.id, sessionId));
   if (!session || session.expiresAt <= new Date())
     throw new Error("Sign in to the development account again.");
-  if (process.env.ROWAN_STANDALONE === "true" || !importLibrary)
-    return { ...runtime, actor: { userId: session.userId } };
+  if (!importLibrary) return { ...runtime, actor: { userId: session.userId } };
+  if (process.env.ROWAN_STANDALONE === "true") {
+    const [state] = await runtime.database
+      .select()
+      .from(accountState)
+      .where(eq(accountState.userId, session.userId));
+    if (state?.mirrorPaused) return { ...runtime, actor: { userId: session.userId } };
+  }
   const [source] = await db
     .select({ id: users.id, username: users.username, displayName: users.displayName })
     .from(users)
@@ -191,6 +200,7 @@ async function context(sessionId: string, importLibrary = true) {
     legacyMarginRows,
     legacyGoalRows,
     legacySettingRows[0],
+    process.env.ROWAN_STANDALONE === "true",
   );
   return { ...runtime, actor: { userId: session.userId } };
 }
@@ -269,11 +279,7 @@ export const rowanAccountMutate = createServerFn({ method: "POST" })
     }
   });
 export const rowanImportLegacy = createServerFn({ method: "POST" })
-  .inputValidator(
-    z
-      .object({ sessionId: key, data: importDataSchema })
-      .strict(),
-  )
+  .inputValidator(z.object({ sessionId: key, data: importDataSchema }).strict())
   .handler(async ({ data }) => {
     const { database, actor } = await context(data.sessionId, false);
     const userData = createUserDataService(db);
@@ -289,8 +295,13 @@ export const rowanImportLegacy = createServerFn({ method: "POST" })
       db.select().from(legacyGoals).where(eq(legacyGoals.userId, actor.userId)),
       db.select().from(userSettings).where(eq(userSettings.userId, actor.userId)),
     ]);
-    await importLegacyLibrary(database, source, books, margins, goals, settings[0]);
-    return { ok: true as const, books: data.data.books.length, margins: data.data.margins.length, goals: data.data.goals.length };
+    await importLegacyLibrary(database, source, books, margins, goals, settings[0], true, true);
+    return {
+      ok: true as const,
+      books: data.data.books.length,
+      margins: data.data.margins.length,
+      goals: data.data.goals.length,
+    };
   });
 export const rowanSyncStatus = createServerFn({ method: "POST" })
   .inputValidator(z.object({ sessionId: key }).strict())
@@ -651,5 +662,24 @@ export const rowanMutate = createServerFn({ method: "POST" })
       if (error instanceof DomainError)
         return { ok: false as const, code: error.code, message: error.message };
       throw new Error("Rowan could not save this change. Retry the same request.");
+    }
+  });
+
+export const rowanOrganization = createServerFn({ method: "POST" })
+  .inputValidator(z.object({ sessionId: key }).strict())
+  .handler(async ({ data }) => {
+    const { actor, database } = await context(data.sessionId);
+    return createOrganizationService(database).read(actor);
+  });
+export const rowanOrganizationMutate = createServerFn({ method: "POST" })
+  .inputValidator(z.object({ sessionId: key, command: organizationCommand }).strict())
+  .handler(async ({ data }) => {
+    const { actor, database } = await context(data.sessionId);
+    try {
+      await createOrganizationService(database).change(actor, data.command);
+      return { ok: true as const };
+    } catch (error) {
+      if (error instanceof DomainError) return { ok: false as const, message: error.message };
+      throw error;
     }
   });

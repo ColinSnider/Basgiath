@@ -18,6 +18,10 @@ import {
   shelfItems,
   margins,
   accountState,
+  readerSeries,
+  readerSeriesItems,
+  readingQueue,
+  readingOrganization,
 } from "../../shared/schema-v2.ts";
 
 export type Actor = { userId: number };
@@ -83,16 +87,18 @@ const progressSchema = z
     occurredAt: instant,
   })
   .strict();
-const correctionSchema = z.object({
-  key: id,
-  sessionId: id,
-  entryId: id,
-  expectedVersion: version,
-  action: z.enum(["correct", "remove"]),
-  position: z.number().int().nonnegative(),
-  occurredAt: instant,
-  reason: z.string().trim().min(1).max(1000),
-}).strict();
+const correctionSchema = z
+  .object({
+    key: id,
+    sessionId: id,
+    entryId: id,
+    expectedVersion: version,
+    action: z.enum(["correct", "remove"]),
+    position: z.number().int().nonnegative(),
+    occurredAt: instant,
+    reason: z.string().trim().min(1).max(1000),
+  })
+  .strict();
 // Correlated predicate: only the current end of each correction chain is visible.
 const effectiveEntry = sql`${progressEntries.voided} = false and not exists (select 1 from v2.progress_entries replacement where replacement.supersedes_id = ${progressEntries.id})`;
 const transitionSchema = z
@@ -267,7 +273,7 @@ export function createLibraryService(database: Database, provider: CatalogProvid
           return JSON.stringify(
             {
               format: "rowan-archive",
-              version: 3,
+              version: 4,
               exportedAt: new Date().toISOString(),
               userBooks: await tx
                 .select()
@@ -306,6 +312,18 @@ export function createLibraryService(database: Database, provider: CatalogProvid
                 .select()
                 .from(shelfItems)
                 .where(eq(shelfItems.userId, actor.userId)),
+              series: await tx
+                .select()
+                .from(readerSeries)
+                .where(eq(readerSeries.userId, actor.userId)),
+              seriesItems: await tx
+                .select()
+                .from(readerSeriesItems)
+                .where(eq(readerSeriesItems.userId, actor.userId)),
+              readingQueue: await tx
+                .select()
+                .from(readingQueue)
+                .where(eq(readingQueue.userId, actor.userId)),
               goals: await tx.select().from(goals).where(eq(goals.userId, actor.userId)),
               settings: await tx
                 .select()
@@ -710,7 +728,13 @@ export function createLibraryService(database: Database, provider: CatalogProvid
           .innerJoin(userBooks, eq(userBooks.id, readingSessions.userBookId))
           .innerJoin(works, eq(works.id, userBooks.workId))
           .leftJoin(ratings, eq(ratings.userBookId, userBooks.id))
-          .where(and(inRange(progressEntries.occurredAt), eq(progressEntries.kind, "observation"), effectiveEntry))
+          .where(
+            and(
+              inRange(progressEntries.occurredAt),
+              eq(progressEntries.kind, "observation"),
+              effectiveEntry,
+            ),
+          )
           .orderBy(progressEntries.occurredAt, progressEntries.id)
           .limit(1001),
         database
@@ -826,8 +850,19 @@ export function createLibraryService(database: Database, provider: CatalogProvid
           .from(userBooks)
           .innerJoin(works, eq(works.id, userBooks.workId))
           .leftJoin(ratings, eq(ratings.userBookId, userBooks.id))
-          .where(and(eq(userBooks.userId, actor.userId), eq(userBooks.status, "want_to_read")))
-          .orderBy(sql`${userBooks.addedAt} desc`, userBooks.id)
+          .leftJoin(readingQueue, eq(readingQueue.userBookId, userBooks.id))
+          .where(
+            and(
+              eq(userBooks.userId, actor.userId),
+              sql`(${userBooks.status} = 'want_to_read' or (${userBooks.status} = 'read' and ${readingQueue.userBookId} is not null))`,
+            ),
+          )
+          .orderBy(
+            sql`${readingQueue.pinned} desc nulls last`,
+            sql`${readingQueue.sortOrder} asc nulls last`,
+            sql`${userBooks.addedAt} desc`,
+            userBooks.id,
+          )
           .limit(3),
         database
           .select({ status: userBooks.status })
@@ -837,9 +872,7 @@ export function createLibraryService(database: Database, provider: CatalogProvid
           .select({ finishedAt: readingSessions.finishedAt })
           .from(readingSessions)
           .innerJoin(userBooks, eq(userBooks.id, readingSessions.userBookId))
-          .where(
-            and(eq(userBooks.userId, actor.userId), eq(readingSessions.state, "completed")),
-          ),
+          .where(and(eq(userBooks.userId, actor.userId), eq(readingSessions.state, "completed"))),
       ]);
       const year = new Date().getUTCFullYear();
       const monthlyReads = Array.from({ length: 12 }, () => 0);
@@ -848,7 +881,8 @@ export function createLibraryService(database: Database, provider: CatalogProvid
         const readYear = read.finishedAt.getUTCFullYear();
         if (readYear === year) monthlyReads[read.finishedAt.getUTCMonth()]++;
       }
-      const statusCount = (status: string) => statusRows.filter((row) => row.status === status).length;
+      const statusCount = (status: string) =>
+        statusRows.filter((row) => row.status === status).length;
       return {
         last: last[0]
           ? { book: last[0].book, finishedAt: last[0].finishedAt?.toISOString() ?? null }
@@ -1162,6 +1196,15 @@ export function createLibraryService(database: Database, provider: CatalogProvid
             position: data.position,
           })
           .returning();
+        const removed = await tx
+          .delete(readingQueue)
+          .where(eq(readingQueue.userBookId, book.id))
+          .returning();
+        if (removed.length)
+          await tx
+            .update(readingOrganization)
+            .set({ version: sql`${readingOrganization.version} + 1` })
+            .where(eq(readingOrganization.userId, actor.userId));
         await tx.insert(progressEntries).values({
           readingSessionId: session.id,
           kind: "baseline",
@@ -1192,7 +1235,11 @@ export function createLibraryService(database: Database, provider: CatalogProvid
           .select()
           .from(progressEntries)
           .where(and(eq(progressEntries.readingSessionId, session.id), effectiveEntry))
-          .orderBy(sql`${progressEntries.occurredAt} desc nulls last`, desc(progressEntries.createdAt), desc(progressEntries.id))
+          .orderBy(
+            sql`${progressEntries.occurredAt} desc nulls last`,
+            desc(progressEntries.createdAt),
+            desc(progressEntries.id),
+          )
           .limit(1);
         if (latest?.occurredAt && new Date(data.occurredAt) < latest.occurredAt)
           throw new DomainError(
@@ -1231,15 +1278,24 @@ export function createLibraryService(database: Database, provider: CatalogProvid
       return mutate(actor, data.key, fingerprint("correctProgress", data), async (tx) => {
         const { session, book } = await ownedSession(tx, actor, data.sessionId);
         expectVersion(session.version, data.expectedVersion);
-        const entries = await tx.select().from(progressEntries).where(eq(progressEntries.readingSessionId, session.id));
+        const entries = await tx
+          .select()
+          .from(progressEntries)
+          .where(eq(progressEntries.readingSessionId, session.id));
         const current = effectiveProgress(entries);
         const target = current.find((entry) => entry.id === data.entryId);
         if (!target || target.kind !== "observation")
-          throw new DomainError("INVALID_TRANSITION", "Choose a current progress observation. Baselines and replaced entries cannot be edited.");
+          throw new DomainError(
+            "INVALID_TRANSITION",
+            "Choose a current progress observation. Baselines and replaced entries cannot be edited.",
+          );
         const replacement = {
-          id: crypto.randomUUID(), readingSessionId: session.id,
-          supersedesId: target.id, kind: "observation" as const,
-          voided: data.action === "remove", correctionReason: data.reason,
+          id: crypto.randomUUID(),
+          readingSessionId: session.id,
+          supersedesId: target.id,
+          kind: "observation" as const,
+          voided: data.action === "remove",
+          correctionReason: data.reason,
           position: data.action === "remove" ? target.position : data.position,
           occurredAt: data.action === "remove" ? target.occurredAt : new Date(data.occurredAt),
           createdAt: new Date(),
@@ -1247,15 +1303,36 @@ export function createLibraryService(database: Database, provider: CatalogProvid
         const resolved = effectiveProgress([...entries, replacement]);
         let previous = 0;
         for (const entry of resolved) {
-          if ((session.total !== null && entry.position > session.total) || entry.position < previous)
-            throw new DomainError("INVALID_TRANSITION", "The corrected positions must stay in reading order and within the book length. Correct the adjacent entry first.");
-          if (entry.occurredAt && ((session.startedAt && entry.occurredAt < session.startedAt) || (session.finishedAt && entry.occurredAt > session.finishedAt)))
-            throw new DomainError("INVALID_TRANSITION", "Progress must fall between this attempt's start and finish dates.");
+          if (
+            (session.total !== null && entry.position > session.total) ||
+            entry.position < previous
+          )
+            throw new DomainError(
+              "INVALID_TRANSITION",
+              "The corrected positions must stay in reading order and within the book length. Correct the adjacent entry first.",
+            );
+          if (
+            entry.occurredAt &&
+            ((session.startedAt && entry.occurredAt < session.startedAt) ||
+              (session.finishedAt && entry.occurredAt > session.finishedAt))
+          )
+            throw new DomainError(
+              "INVALID_TRANSITION",
+              "Progress must fall between this attempt's start and finish dates.",
+            );
           previous = entry.position;
         }
         await tx.insert(progressEntries).values(replacement);
-        await tx.update(readingSessions).set({ position: resolved.at(-1)?.position ?? 0, version: session.version + 1 }).where(eq(readingSessions.id, session.id));
-        return { workId: book.workId, userBookId: book.id, sessionId: session.id, version: session.version + 1 };
+        await tx
+          .update(readingSessions)
+          .set({ position: resolved.at(-1)?.position ?? 0, version: session.version + 1 })
+          .where(eq(readingSessions.id, session.id));
+        return {
+          workId: book.workId,
+          userBookId: book.id,
+          sessionId: session.id,
+          version: session.version + 1,
+        };
       });
     },
 
@@ -1278,7 +1355,11 @@ export function createLibraryService(database: Database, provider: CatalogProvid
           .select()
           .from(progressEntries)
           .where(and(eq(progressEntries.readingSessionId, session.id), effectiveEntry))
-          .orderBy(sql`${progressEntries.occurredAt} desc nulls last`, desc(progressEntries.createdAt), desc(progressEntries.id))
+          .orderBy(
+            sql`${progressEntries.occurredAt} desc nulls last`,
+            desc(progressEntries.createdAt),
+            desc(progressEntries.id),
+          )
           .limit(1);
         if (
           finishedAt &&
@@ -1313,6 +1394,17 @@ export function createLibraryService(database: Database, provider: CatalogProvid
           .update(userBooks)
           .set({ status, version: book.version + 1 })
           .where(eq(userBooks.id, book.id));
+        if (terminal) {
+          const removed = await tx
+            .delete(readingQueue)
+            .where(eq(readingQueue.userBookId, book.id))
+            .returning();
+          if (removed.length)
+            await tx
+              .update(readingOrganization)
+              .set({ version: sql`${readingOrganization.version} + 1` })
+              .where(eq(readingOrganization.userId, actor.userId));
+        }
         // Finishing does not fabricate an observed last-day page/audio delta.
         return {
           workId: book.workId,
@@ -1373,7 +1465,14 @@ export function createLibraryService(database: Database, provider: CatalogProvid
           tags: Array.isArray(book.legacyMetadata?.tags)
             ? book.legacyMetadata.tags.filter((tag): tag is string => typeof tag === "string")
             : [],
-          sessions: sessions.map((session) => ({ ...session, loggedProgress: loggedProgress(entries.filter(({ entry }) => entry.readingSessionId === session.id).map(({ entry }) => entry)) })),
+          sessions: sessions.map((session) => ({
+            ...session,
+            loggedProgress: loggedProgress(
+              entries
+                .filter(({ entry }) => entry.readingSessionId === session.id)
+                .map(({ entry }) => entry),
+            ),
+          })),
           entries: entries.map(({ entry }) => entry),
         };
       });

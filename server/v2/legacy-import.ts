@@ -32,6 +32,8 @@ export async function importLegacyLibrary(
   sourceMargins: legacySchema.MarginRow[] = [],
   sourceGoals: legacySchema.GoalRow[] = [],
   sourceSettings?: legacySchema.UserSettingsRow,
+  finalize = false,
+  explicitImport = false,
 ) {
   // Provenance is auxiliary. Older staging databases may not have received
   // the audit-table migration yet, so never let that table prevent the core
@@ -52,7 +54,7 @@ export async function importLegacyLibrary(
       throw new Error("Staging account identity mismatch.");
     if (!target) await tx.insert(legacySchema.users).values(source);
     const [state] = await tx.select().from(accountState).where(eq(accountState.userId, source.id));
-    if (state?.mirrorPaused) return;
+    if (state?.mirrorPaused && !explicitImport) return;
     for (const legacy of rows) {
       if (legacy.userId !== source.id) throw new Error("Legacy book owner mismatch.");
       const [known] = await tx
@@ -354,5 +356,11 @@ export async function importLegacyLibrary(
           });
       }
     }
+    // The standalone UI becomes authoritative after its first successful translation.
+    if (finalize)
+      await tx
+        .insert(accountState)
+        .values({ userId: source.id, mirrorPaused: true })
+        .onConflictDoUpdate({ target: accountState.userId, set: { mirrorPaused: true } });
   });
 }

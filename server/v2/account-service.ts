@@ -53,6 +53,13 @@ export function createAccountService(database: Database) {
     return { ok: true as const };
   }
   async function removeBooks(tx: Tx, actor: Actor, bookId?: string) {
+    await tx
+      .insert(s.readingOrganization)
+      .values({ userId: actor.userId, version: 1 })
+      .onConflictDoUpdate({
+        target: s.readingOrganization.userId,
+        set: { version: sql`${s.readingOrganization.version} + 1` },
+      });
     const owned = sql`select ${s.userBooks.id} from ${s.userBooks} where ${s.userBooks.userId} = ${actor.userId} ${bookId ? sql`and ${s.userBooks.id} = ${bookId}` : sql``}`;
     await tx
       .delete(s.progressEntries)
@@ -71,6 +78,7 @@ export function createAccountService(database: Database) {
   }
   async function clear(tx: Tx, actor: Actor) {
     await removeBooks(tx, actor);
+    await tx.delete(s.readerSeries).where(eq(s.readerSeries.userId, actor.userId));
     await tx.delete(s.shelves).where(eq(s.shelves.userId, actor.userId));
     await tx.delete(goals).where(eq(goals.userId, actor.userId));
     await tx.delete(userSettings).where(eq(userSettings.userId, actor.userId));
@@ -250,7 +258,9 @@ export function createAccountService(database: Database) {
             startedAt: r.startedAt ? new Date(r.startedAt) : null,
             finishedAt: r.finishedAt ? new Date(r.finishedAt) : null,
           });
-        const entryIds = new Map(data.progressEntries.map((entry) => [entry.id, crypto.randomUUID()]));
+        const entryIds = new Map(
+          data.progressEntries.map((entry) => [entry.id, crypto.randomUUID()]),
+        );
         for (const r of data.progressEntries)
           await tx.insert(s.progressEntries).values({
             ...r,
@@ -287,6 +297,25 @@ export function createAccountService(database: Database) {
             userId: actor.userId,
             addedAt: new Date(r.addedAt),
           });
+        const seriesIds = new Map(data.series.map((r) => [r.id, crypto.randomUUID()]));
+        for (const r of data.series)
+          await tx
+            .insert(s.readerSeries)
+            .values({ ...r, id: seriesIds.get(r.id)!, userId: actor.userId });
+        for (const r of data.seriesItems)
+          await tx
+            .insert(s.readerSeriesItems)
+            .values({
+              ...r,
+              id: crypto.randomUUID(),
+              userId: actor.userId,
+              seriesId: seriesIds.get(r.seriesId)!,
+              userBookId: bookIds.get(r.userBookId)!,
+            });
+        for (const r of data.readingQueue)
+          await tx
+            .insert(s.readingQueue)
+            .values({ ...r, userId: actor.userId, userBookId: bookIds.get(r.userBookId)! });
         for (const r of data.goals)
           await tx.insert(goals).values({
             ...r,

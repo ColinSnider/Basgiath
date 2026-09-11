@@ -50,3 +50,30 @@ Next: persist library filters/sort/pagination in the URL and verify authenticate
 - Authenticated browser workflows and Railway deployment remain untested. The local shell preview uses an unreachable dummy database; it does not prove account or provider connectivity.
 
 Run `npm run test:rowan:routes` after `npm run build` to check the built SSR routes without a live database.
+
+## Series and existing accounts — September 10, 2026
+
+Library now includes **Series & queue**. Readers can create and rename private series,
+order volumes, label novellas and optional entries, declare ongoing/unknown/full coverage,
+and queue the next unread volume. Book pages expose membership and queue actions alongside
+edition facts, completed reads, margins, and an editable synopsis. Home prioritizes the
+pinned book and then the curated queue. Starting a book removes it from the upcoming queue.
+Series progress retains completed reads during a reread.
+
+Rowan archives now export version 4 with series, memberships, and reading queue. Versions
+2 and 3 remain readable. Restore remaps ownership and book/series IDs transactionally;
+clear and book deletion also remove the relevant organization records.
+
+For the existing two-reader installation, retain DATABASE_URL as the original account
+and source database, use a migrated ROWAN_DATABASE_URL target, and set
+ROWAN_EXISTING_ACCOUNTS=true with ROWAN_STANDALONE=true. The original login/session store
+is retained. The first authenticated data request translates that reader's legacy books,
+history, ratings, margins, goals, and saved settings, then marks Rowan authoritative in
+the same transaction. Later requests skip the translation. Conflicting target account
+identities are rejected, and legacy source data is not deleted. Existing standalone
+installs can leave ROWAN_EXISTING_ACCOUNTS=false and translate their local legacy tables.
+Browser-only preferences cannot be recovered from the database.
+
+This implements the application path, not the hosted rollout. Target migrations must be
+applied before switching traffic. No deployment or real-account migration was run in
+this development session; authenticated browser verification remains outstanding.
