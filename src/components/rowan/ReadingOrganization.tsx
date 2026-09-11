@@ -1,3 +1,4 @@
+import { BookCover } from "./BookCover";
 import { useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { ArrowDown, ArrowUp, Layers, ListOrdered, Pin } from "lucide-react";
@@ -221,7 +222,7 @@ function BookLink({
 }) {
   return (
     <button className="rowan-series-book-link" onClick={() => openBook(book)}>
-      {book.coverUrl && <img src={book.coverUrl} alt="" loading="lazy" />}
+      <BookCover title={book.title} authors={book.authors} src={book.coverUrl} className="rowan-cover-small" />
       <span>
         <strong>{book.title}</strong>
         <small>

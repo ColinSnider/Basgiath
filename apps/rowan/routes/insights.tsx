@@ -1,23 +1,6 @@
-import { createFileRoute } from "@tanstack/react-router";
-import { ReaderPage, useReader, useReadingCommands } from "../components/reader";
-import { Insights } from "@/components/rowan/Insights";
-
+import { createFileRoute, redirect } from "@tanstack/react-router";
 export const Route = createFileRoute("/insights")({
-  head: () => ({ meta: [{ title: "Insights — Rowan" }] }),
-  component: () => (
-    <ReaderPage>
-      <Page />
-    </ReaderPage>
-  ),
+  beforeLoad: () => {
+    throw redirect({ to: "/calendar" });
+  },
 });
-
-function Page() {
-  const { sessionId } = useReader();
-  const { run, busy, feedback } = useReadingCommands();
-  return (
-    <>
-      {feedback}
-      <Insights sessionId={sessionId} run={run} busy={busy} />
-    </>
-  );
-}

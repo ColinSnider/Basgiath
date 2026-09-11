@@ -1,3 +1,4 @@
+import { BookCover } from "@/components/rowan/BookCover";
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { rowanSearch, rowanStatus } from "@/lib/rowan-fns";
@@ -109,14 +110,7 @@ export function SearchPage() {
                 key={`${book.ref.provider}:${book.ref.externalId}`}
                 className="flex items-center gap-3 py-3"
               >
-                {book.coverUrl && (
-                  <img
-                    src={book.coverUrl}
-                    alt=""
-                    loading="lazy"
-                    className="h-20 w-14 object-contain"
-                  />
-                )}
+                <BookCover title={book.title} authors={book.authors} src={book.coverUrl} className="rowan-cover-small" />
                 <div className="min-w-0 flex-1">
                   <p className="font-medium">{book.title}</p>
                   <p className="text-sm text-muted-foreground">

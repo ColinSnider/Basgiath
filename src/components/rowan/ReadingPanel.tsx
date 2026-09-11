@@ -1,3 +1,4 @@
+import { BookCover } from "./BookCover";
 import { HistoryEditor } from "./HistoryEditor";
 import { ArrowLeft, BookOpen, Heart, Star } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
@@ -139,18 +140,12 @@ export function ReadingPanel({
             }}
           />
         )}
-        <div className="rowan-book-cover">
-          {book.coverUrl ? (
-            <img
-              src={book.coverUrl}
-              alt={`Cover of ${book.title}`}
-              onError={(event) => {
-                event.currentTarget.hidden = true;
-              }}
-            />
-          ) : null}
-          <BookOpen size={54} strokeWidth={1} aria-hidden="true" />
-        </div>
+        <BookCover
+          title={book.title}
+          authors={book.authors}
+          src={book.coverUrl}
+          className="rowan-cover-hero"
+        />
         <div className="rowan-book-intro">
           <p className="rowan-eyebrow">Between the covers</p>
           <h2>{book.title}</h2>
@@ -423,6 +418,9 @@ export function ReadingPanel({
               )}
               <HistoryEditor history={history.data} busy={busy} run={run} />
             </section>
+            <section className="rowan-book-margins" aria-label="Book margins">
+              <Margins margins={history.data.margins} userBookId={book.id} busy={busy} run={run} />
+            </section>
             {organization}
             <BookEditor
               key={`edit:${history.data.userBookVersion}`}
@@ -438,7 +436,6 @@ export function ReadingPanel({
               run={run}
               busy={busy}
             />
-            <Margins margins={history.data.margins} userBookId={book.id} busy={busy} run={run} />
           </>
         )}
       </div>

@@ -13,7 +13,6 @@ for (const [path, title] of [
   ["/library", "Library"],
   ["/search", "Search"],
   ["/calendar", "History"],
-  ["/insights", "Insights"],
   ["/goals", "Goals"],
   ["/margins", "Margins"],
   ["/account", "Account"],
@@ -35,3 +34,8 @@ const settings = await server.fetch(new Request("http://localhost/settings"));
 assert.equal(settings.status, 307);
 assert.equal(settings.headers.get("location"), "/account");
 console.log("/settings: redirects to /account");
+
+const insights = await server.fetch(new Request("http://localhost/insights"));
+assert.equal(insights.status, 307);
+assert.equal(insights.headers.get("location"), "/calendar");
+console.log("/insights: redirects to unified history");

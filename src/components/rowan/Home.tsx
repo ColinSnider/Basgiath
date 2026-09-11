@@ -1,3 +1,4 @@
+import { BookCover } from "./BookCover";
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
 import { ArrowRight, BookOpen, Bookmark, CircleCheck, Library } from "lucide-react";
@@ -161,13 +162,7 @@ function BookCard({ book, openBook }: { book: Book; openBook: (book: Book) => vo
       onClick={() => openBook(book)}
       aria-label={`Open ${book.title}`}
     >
-      {book.coverUrl ? (
-        <img src={book.coverUrl} alt="" loading="lazy" />
-      ) : (
-        <span className="reader-cover-placeholder" aria-hidden="true">
-          <BookOpen size={25} strokeWidth={1} />
-        </span>
-      )}
+      <BookCover title={book.title} authors={book.authors} src={book.coverUrl} className="rowan-cover-small" />
       <span className="reader-book-copy">
         <span className="reader-book-title">{book.title}</span>
         <span className="reader-muted">{book.authors.join(", ") || "Unknown author"}</span>

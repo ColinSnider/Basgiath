@@ -1,7 +1,6 @@
-import { useEffect, useState } from "react";
 import { Link, Outlet, useLocation } from "@tanstack/react-router";
 import { useQueryClient } from "@tanstack/react-query";
-import { BookOpen, CalendarDays, ChevronRight, Home, Library, Menu, Search, UserRound, X } from "lucide-react";
+import { BookOpen, CalendarDays, Home, Library, Menu, Search, UserRound } from "lucide-react";
 import { useAuth } from "@/lib/auth-context";
 import { useRowanTheme } from "@/components/rowan/useRowanTheme";
 
@@ -48,14 +47,6 @@ export function AppShell() {
   const { pathname } = useLocation();
   const { user, sessionId, logout } = useAuth();
   const cache = useQueryClient();
-  const [moreOpen, setMoreOpen] = useState(false);
-  useEffect(() => setMoreOpen(false), [pathname]);
-  useEffect(() => {
-    if (!moreOpen) return;
-    const close = (event: KeyboardEvent) => event.key === "Escape" && setMoreOpen(false);
-    window.addEventListener("keydown", close);
-    return () => window.removeEventListener("keydown", close);
-  }, [moreOpen]);
   if (pathname === "/login") return <Outlet />;
 
   const page =
@@ -70,38 +61,18 @@ export function AppShell() {
   const moreActive = moreItems.some((item) => item.to === pathname);
 
   const MoreButton = ({ mobile = false }: { mobile?: boolean }) => (
-    <button
-      type="button"
-      className={mobile ? "reader-mobile-more-button" : "reader-more-button"}
-      aria-expanded={moreOpen}
-      aria-haspopup="menu"
+    <Link
+      to="/goals"
+      className={
+        mobile
+          ? "reader-mobile-more-button"
+          : `reader-more-button ${moreActive ? "is-current" : ""}`
+      }
       aria-current={moreActive ? "page" : undefined}
-      onClick={() => setMoreOpen((open) => !open)}
     >
-      {moreOpen ? <X size={mobile ? 20 : 19} /> : <Menu size={mobile ? 20 : 19} />}
+      <Menu size={mobile ? 20 : 19} />
       <span>More</span>
-    </button>
-  );
-
-  const MoreMenu = () => (
-    <div className="reader-more-menu" role="menu" aria-label="More reading tools">
-      <p className="reader-more-menu-label">Reading tools</p>
-      {moreItems.map(({ to, label, description }) => (
-        <Link
-          key={to}
-          to={to}
-          role="menuitem"
-          aria-current={active(to) ? "page" : undefined}
-          onClick={() => setMoreOpen(false)}
-        >
-          <span>
-            <strong>{label}</strong>
-            <small>{description}</small>
-          </span>
-          <ChevronRight size={16} />
-        </Link>
-      ))}
-    </div>
+    </Link>
   );
 
   return (
@@ -131,7 +102,6 @@ export function AppShell() {
           ))}
           <MoreButton />
         </nav>
-        {moreOpen && <MoreMenu />}
         <Link
           to="/account"
           className={`reader-sidebar-account ${active("/account") ? "is-current" : ""}`}
@@ -153,17 +123,19 @@ export function AppShell() {
             <span>Rowan</span>
           </Link>
           <div className="reader-topbar-actions">
-            <div className="reader-topbar-more">
-              <MoreButton mobile />
-              {moreOpen && <MoreMenu />}
-            </div>
             {user && !user.isGuest ? (
               <>
                 <Link className="reader-mobile-account" to="/account" aria-label="Open account">
                   <UserRound size={20} />
                   <span>Account</span>
                 </Link>
-                <button className="reader-signout" onClick={async () => { await logout(); cache.clear(); }}>
+                <button
+                  className="reader-signout"
+                  onClick={async () => {
+                    await logout();
+                    cache.clear();
+                  }}
+                >
                   Sign out
                 </button>
               </>
@@ -172,11 +144,14 @@ export function AppShell() {
             )}
           </div>
         </header>
-        {(pathname === "/calendar" || pathname === "/insights") && (
-          <nav className="reader-context-nav" aria-label="History navigation">
-            <span>History</span>
-            <Link to="/calendar" aria-current={pathname === "/calendar" ? "page" : undefined}>Calendar</Link>
-            <Link to="/insights" aria-current={pathname === "/insights" ? "page" : undefined}>Insights</Link>
+        {moreActive && (
+          <nav className="reader-context-nav" aria-label="More navigation">
+            <span>More</span>
+            {moreItems.map(({ to, label }) => (
+              <Link key={to} to={to} aria-current={pathname === to ? "page" : undefined}>
+                {label}
+              </Link>
+            ))}
           </nav>
         )}
         <main id="page-content" className="reader-page" tabIndex={-1}>

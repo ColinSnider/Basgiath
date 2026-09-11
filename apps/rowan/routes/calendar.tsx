@@ -1,5 +1,6 @@
+import { Insights } from "@/components/rowan/Insights";
 import { createFileRoute } from "@tanstack/react-router";
-import { ReaderPage, useReader } from "../components/reader";
+import { ReaderPage, useReader, useReadingCommands } from "../components/reader";
 import { ReadingCalendar } from "@/components/rowan/ReadingCalendar";
 
 export const Route = createFileRoute("/calendar")({
@@ -13,5 +14,12 @@ export const Route = createFileRoute("/calendar")({
 
 function Page() {
   const { sessionId, openBook } = useReader();
-  return <ReadingCalendar sessionId={sessionId} openBook={openBook} />;
+  const { run, busy, feedback } = useReadingCommands();
+  return (
+    <div className="reader-history-unified">
+      {feedback}
+      <Insights sessionId={sessionId} run={run} busy={busy} />
+      <ReadingCalendar sessionId={sessionId} openBook={openBook} />
+    </div>
+  );
 }

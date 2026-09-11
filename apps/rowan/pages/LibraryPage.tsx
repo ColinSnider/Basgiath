@@ -1,3 +1,5 @@
+import { BookSpine } from "@/components/rowan/BookSpine";
+import { BookCover } from "@/components/rowan/BookCover";
 import { ReadingOrganization } from "@/components/rowan/ReadingOrganization";
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
@@ -7,33 +9,6 @@ import { ReadingProgressBar } from "@/components/rowan/ReadingProgressBar";
 import { control, statuses, useReader, useReadingCommands } from "../components/reader";
 
 type LibraryBook = Awaited<ReturnType<typeof rowanLibrary>>["items"][number];
-
-function BookSpine({ book }: { book: LibraryBook }) {
-  const width = Math.max(46, Math.min(110, Math.round((book.total ?? 260) / 8)));
-  const initials = book.authors
-    .join(" ")
-    .split(" ")
-    .filter(Boolean)
-    .slice(0, 3)
-    .map((part) => part[0]?.toUpperCase() ?? "")
-    .join("");
-  const completed = book.status === "read" || book.status === "reading";
-  return (
-    <div
-      className={`reader-book-spine reader-book-spine-${book.status}`}
-      style={{ width }}
-      aria-label={`${book.title} spine`}
-    >
-      <span className="reader-book-spine-sheen" aria-hidden="true" />
-      {completed && <span className="reader-book-spine-band" aria-hidden="true" />}
-      <span className="reader-book-spine-author">{initials || "R"}</span>
-      <span className="reader-book-spine-title">{book.title}</span>
-      <span className="reader-book-spine-meta">
-        {book.total ? `${book.total}${book.progress?.unit === "second" ? "s" : "p"}` : ""}
-      </span>
-    </div>
-  );
-}
 
 export function LibraryPage() {
   const { sessionId, openBook } = useReader();
@@ -277,7 +252,7 @@ export function LibraryPage() {
         <ul
           className={
             view === "grid"
-              ? "grid grid-cols-2 gap-4 lg:grid-cols-4"
+              ? "reader-library-grid"
               : view === "bookshelf"
                 ? "reader-bookshelf-list"
                 : "space-y-3"
@@ -286,7 +261,11 @@ export function LibraryPage() {
           {library.data?.items.map((book) => (
             <li
               key={book.id}
-              className={view === "bookshelf" ? "reader-bookshelf-item" : undefined}
+              className={
+                view === "bookshelf"
+                  ? "reader-bookshelf-item"
+                  : `reader-library-tile reader-library-tile-${view}`
+              }
             >
               <button
                 className={
@@ -294,26 +273,21 @@ export function LibraryPage() {
                     ? "reader-book-spine-button"
                     : `w-full rounded-xl border border-border bg-card p-4 text-left hover:border-primary ${view === "list" ? "flex items-center gap-4" : "h-full"}`
                 }
+                aria-label={`Open ${book.title}`}
+                title={`${book.title} — ${book.authors.join(", ")}`}
                 onClick={() => openBook(book)}
               >
                 {view === "bookshelf" ? (
                   <BookSpine book={book} />
-                ) : book.coverUrl ? (
-                  <img
-                    src={book.coverUrl}
-                    alt=""
-                    loading="lazy"
-                    className={`rounded object-contain ${view !== "list" ? "h-40 w-full mb-3" : "h-16 w-12"}`}
-                  />
                 ) : (
-                  <div
-                    aria-hidden="true"
-                    className={`rounded bg-muted grid place-items-center font-display text-primary ${view === "grid" ? "h-40 mb-3" : "h-16 w-12 shrink-0"}`}
-                  >
-                    R
-                  </div>
+                  <BookCover
+                    title={book.title}
+                    authors={book.authors}
+                    src={book.coverUrl}
+                    className={view === "grid" ? "rowan-cover-grid" : "rowan-cover-small"}
+                  />
                 )}
-                <div>
+                <div className={view === "bookshelf" ? "sr-only" : "reader-tile-copy"}>
                   <h3 className="font-medium">
                     {book.title}
                     {book.isFavorite && <span aria-label="Favorite"> ♥</span>}
@@ -343,7 +317,7 @@ export function LibraryPage() {
                   )}
                 </div>
               </button>
-              <ReadingProgressBar progress={book.progress} compact={view === "bookshelf"} />
+              {view !== "bookshelf" && <ReadingProgressBar progress={book.progress} />}
             </li>
           ))}
         </ul>

@@ -944,6 +944,7 @@ export function createLibraryService(database: Database, provider: CatalogProvid
           tags: sql<
             string[]
           >`(select coalesce(jsonb_agg(value), '[]'::jsonb) from jsonb_array_elements(case when jsonb_typeof(${userBooks.legacyMetadata}->'tags') = 'array' then ${userBooks.legacyMetadata}->'tags' else '[]'::jsonb end) where jsonb_typeof(value) = 'string')`,
+          format: sql<string | null>`(select e.format from v2.editions e where e.id = ${userBooks.selectedEditionId})`,
           total: sql<number | null>`(
             select case when e.format = 'audiobook' then e.duration_seconds else e.page_count end
             from v2.editions e where e.id = ${userBooks.selectedEditionId}
