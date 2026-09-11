@@ -513,7 +513,7 @@ export const rowanJournal = createServerFn({ method: "POST" })
 export const rowanShelves = createServerFn({ method: "POST" })
   .inputValidator(z.object({ sessionId: key }).strict())
   .handler(async ({ data }) => {
-    const { database, shelfService, actor } = await context(data.sessionId);
+    const { database, shelfService, library, actor } = await context(data.sessionId);
     const shelves = await shelfService.list(actor);
     return Promise.all(
       shelves.map(async (shelf) => {
@@ -526,6 +526,12 @@ export const rowanShelves = createServerFn({ method: "POST" })
           name: shelf.name,
           version: shelf.version,
           itemCount: items?.count ?? 0,
+          books: (
+            await library.libraryPage(actor, {
+              shelfId: shelf.id,
+              offset: 0,
+            })
+          ).items,
         };
       }),
     );

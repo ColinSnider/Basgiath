@@ -92,6 +92,7 @@ export function LibraryPage() {
             setSection("library");
             setOffset(0);
           }}
+          onOpenBook={openBook}
         />
       )}
       <section
@@ -359,8 +360,15 @@ function ShelvesView({
   run,
   onRetry,
   onOpen,
+  onOpenBook,
 }: {
-  shelves: Array<{ id: string; name: string; version: number; itemCount: number }>;
+  shelves: Array<{
+    id: string;
+    name: string;
+    version: number;
+    itemCount: number;
+    books: LibraryBook[];
+  }>;
   loading: boolean;
   error: boolean;
   shelfName: string;
@@ -369,6 +377,7 @@ function ShelvesView({
   run: (command: RowanCommand) => void;
   onRetry: () => void;
   onOpen: (id: string) => void;
+  onOpenBook: (book: LibraryBook) => void;
 }) {
   return (
     <section className="reader-shelves-view space-y-5" aria-labelledby="shelves-heading">
@@ -442,6 +451,22 @@ function ShelvesView({
                   <ArrowRight size={18} />
                 </span>
               </button>
+              <div className="reader-shelf-row" aria-label={`${shelf.name} book positions`}>
+                {shelf.books.length ? (
+                  shelf.books.map((book) => (
+                    <button
+                      key={book.id}
+                      className="reader-book-spine-button"
+                      onClick={() => onOpenBook(book)}
+                      aria-label={`Open ${book.title}`}
+                    >
+                      <BookSpine book={book} />
+                    </button>
+                  ))
+                ) : (
+                  <span className="reader-muted">No books placed here yet.</span>
+                )}
+              </div>
               <RenameShelf shelf={shelf} busy={busy} run={run} />
             </article>
           ))}
