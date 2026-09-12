@@ -1,6 +1,6 @@
 import { useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Download, FileCheck, FolderArchive, ShieldCheck, Trash2, Upload } from "lucide-react";
+import { Download, FileCheck, FolderArchive, ShieldCheck, Trash2, Upload, Palette } from "lucide-react";
 import { rowanSettings, rowanArchive, rowanImportLegacy } from "@/lib/rowan-fns";
 import { parseRowanArchive } from "../../../shared/rowan-archive";
 import { parseImportJson, type ExportData } from "@/lib/user-preferences";
@@ -17,6 +17,7 @@ export function AccountSettings({
   onReplaced: () => void;
   standalone?: boolean;
 }) {
+  const [category, setCategory] = useState<"appearance" | "security" | "data">("appearance");
   const query = useQuery({
     queryKey: ["rowan", sessionId, "settings"],
     queryFn: () => rowanSettings({ data: { sessionId } }),
@@ -80,19 +81,15 @@ export function AccountSettings({
     if (fileInput.current) fileInput.current.value = "";
   }
   return (
-    <div className="reader-settings">
-      {standalone && <section className="reader-card">
-        <div className="reader-card-body">
-          <h2 className="font-display text-xl">Looking for your profile?</h2>
-          <p className="reader-muted">Your name, email, and personal reading summary live on your Profile page.</p>
-          <a href="/profile" className="reader-text-link">Open your profile →</a>
-        </div>
-      </section>}
-      <div className="reader-settings-columns">
-        <div className="space-y-6">
+    <div className={`reader-settings ${standalone ? "reader-settings-redesign" : ""}`}>
+      {standalone && <nav className="reader-settings-navigation" aria-label="Settings categories">
+        {([{id: "appearance", label: "Appearance", icon: Palette}, {id: "security", label: "Security", icon: ShieldCheck}, {id: "data", label: "Library & backups", icon: FolderArchive}] as const).map(({id,label,icon: Icon}) => <button key={id} aria-pressed={category === id} onClick={() => setCategory(id)}><Icon size={18}/><span>{label}</span></button>)}
+      </nav>}
+      <div className="reader-settings-columns" hidden={standalone && category === "data"}>
+        <div className="space-y-6" hidden={standalone && category !== "security"}>
           <ProfileSettings sessionId={sessionId} section={standalone ? "security" : "all"} />
         </div>
-        <div>
+        <div hidden={standalone && category !== "appearance"}>
           {query.isPending && (
             <p role="status" className="reader-state">
               Loading your preferences…
@@ -115,14 +112,14 @@ export function AccountSettings({
         </div>
       </div>
 
-      <section className="reader-card" aria-labelledby="backup-heading">
+      <section className="reader-card" aria-labelledby="backup-heading" hidden={standalone && category !== "data"}>
         <header className="reader-card-heading">
           <div className="reader-section-title">
             <span className="reader-icon reader-icon-gold">
               <FolderArchive size={20} />
             </span>
             <div>
-              <h2 id="backup-heading">Your library, in your hands</h2>
+              <h2 id="backup-heading">Library & backups</h2>
               <p>Take a copy with you, or bring a backup home.</p>
             </div>
           </div>
@@ -316,7 +313,7 @@ export function AccountSettings({
             : "Your legacy library is imported automatically. Personal Rowan changes are retained."}
         </p>
       )}
-      <section className="reader-card reader-danger" aria-labelledby="clear-heading">
+      <section className="reader-card reader-danger" aria-labelledby="clear-heading" hidden={standalone && category !== "data"}>
         <details className="reader-card-body reader-disclosure">
           <summary id="clear-heading">
             <Trash2 size={18} />

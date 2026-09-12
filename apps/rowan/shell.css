@@ -953,6 +953,24 @@
   display: grid;
   gap: 24px;
 }
+.reader-settings-redesign { max-width: 1000px; gap: 20px; }
+.reader-settings-navigation { display: flex; gap: 6px; padding: 6px; border-radius: 16px; border: 1px solid var(--border); background: var(--secondary); }
+.reader-settings-navigation button { display: flex; flex: 1; align-items: center; justify-content: center; gap: 9px; padding: 12px 16px; border-radius: 11px; color: var(--muted-foreground); font-size: 14px; }
+.reader-settings-navigation button[aria-pressed="true"] { color: var(--primary); background: var(--card); box-shadow: 0 2px 6px #0000000c; }
+.reader-settings-redesign .reader-settings-columns { display: block; }
+.reader-settings-redesign [hidden] { display: none !important; }
+.reader-settings-redesign .reader-card { border-radius: 20px; box-shadow: none; }
+.reader-settings-redesign .reader-card-heading { padding: 22px 26px; background: linear-gradient(125deg, var(--card), var(--secondary)); }
+.reader-settings-redesign .reader-card-heading h2 { font-size: 23px; }
+.reader-settings-redesign .reader-card-body { padding: 26px; }
+.reader-settings-redesign .reader-choice-group { padding-bottom: 20px; border-bottom: 1px solid var(--border); }
+.reader-settings-redesign .reader-settings-save { border-radius: 0 0 20px 20px; padding: 18px 26px; }
+.reader-settings-redesign .reader-backup-grid { gap: 26px; }
+@media(max-width: 600px) {
+  .reader-settings-navigation button { flex-direction: column; gap: 6px; padding: 10px 5px; font-size: 12px; }
+  .reader-settings-redesign .reader-card-body, .reader-settings-redesign .reader-card-heading { padding: 18px; }
+  .reader-settings-redesign .reader-settings-save { padding: 16px 18px; }
+}
 .reader-settings-columns {
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(0, 1.15fr);
