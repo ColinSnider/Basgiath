@@ -12,7 +12,7 @@ type Shelf = Awaited<ReturnType<typeof rowanShelves>>[number];
 export function LibraryPage() {
   const { sessionId, openBook } = useReader();
   const { run, busy, feedback } = useReadingCommands();
-  const [view, setView] = useState<"grid" | "shelves" | "list">("grid");
+  const [view, setView] = useState<"shelves" | "stacks" | "list">("shelves");
   const [section, setSection] = useState<"books" | "series">("books");
   const [query, setQuery] = useState("");
   const [status, setStatus] = useState("all");
@@ -75,7 +75,7 @@ export function LibraryPage() {
           aria-pressed={section === "books"}
           onClick={() => setSection("books")}
         >
-          Library <span>{allBooks.length} books</span>
+          Shelves <span>{allBooks.length} books</span>
         </button>
         <button
           className={section === "series" ? "is-selected" : ""}
@@ -125,23 +125,15 @@ export function LibraryPage() {
             </select>
           </div>
           <div className="reader-shelf-toolbar">
-            <div
-              className="reader-shelf-view-switch reader-view-slider"
-              style={
-                {
-                  "--view-index": view === "grid" ? 0 : view === "shelves" ? 1 : 2,
-                } as React.CSSProperties
-              }
-              aria-label="Book view"
-            >
-              {(["grid", "shelves", "list"] as const).map((mode) => (
+            <div className="reader-shelf-view-switch" aria-label="Book view">
+              {(["shelves", "stacks", "list"] as const).map((mode) => (
                 <button
                   className={control}
                   aria-pressed={view === mode}
                   key={mode}
                   onClick={() => setView(mode)}
                 >
-                  {mode === "shelves" ? "Shelves" : mode === "grid" ? "Library" : "List"}
+                  {mode === "shelves" ? "Shelves" : mode === "stacks" ? "Book stacks" : "List"}
                 </button>
               ))}
             </div>
@@ -186,19 +178,19 @@ export function LibraryPage() {
           )}
           {!library.isPending && !library.isError && !shelves.isPending && !shelves.isError && (
             <>
-              {view !== "shelves" ? (
-                <ul className={view === "grid" ? "reader-library-grid" : "space-y-3"}>
+              {view === "list" ? (
+                <ul className="space-y-3">
                   {listBooks.map((book) => (
-                    <li className={`reader-library-tile reader-library-tile-${view}`} key={book.id}>
+                    <li className="reader-library-tile reader-library-tile-list" key={book.id}>
                       <button onClick={() => openBook(book)}>
                         <BookCover
                           title={book.title}
                           authors={book.authors}
                           src={book.coverUrl}
-                          className={view === "grid" ? "rowan-cover-grid" : "rowan-cover-small"}
+                          className="rowan-cover-small"
                         />
                         <span className="reader-tile-copy">
-                          <h3>{book.title}</h3>
+                          <strong>{book.title}</strong>
                           <small className="block">
                             {book.authors.join(", ")} · {statuses[book.status]}
                           </small>

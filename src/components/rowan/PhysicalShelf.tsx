@@ -6,10 +6,11 @@ type Book = Awaited<ReturnType<typeof rowanLibrary>>["items"][number];
 // Decorative books never stand in for a saved title or participate in navigation.
 export function ShelfBooks({
   books,
+  view = "shelves",
   openBook,
 }: {
   books: Book[];
-  view?: "shelves";
+  view?: "shelves" | "stacks";
   openBook: (book: Book) => void;
 }) {
   const container = useRef<HTMLDivElement>(null);
@@ -44,7 +45,7 @@ export function ShelfBooks({
     <div className="reader-shelf-boards" ref={container}>
       {rows.map((row, index) => (
         <div className="reader-shelf-board" key={index}>
-          <div className="reader-shelf-upright">
+          <div className="reader-shelf-upright" hidden={view === "stacks"}>
             {row.map((book) => (
               <button
                 title={book.title}

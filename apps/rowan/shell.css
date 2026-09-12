@@ -1848,18 +1848,11 @@
 .rowan-reading-desk .rowan-reading-controls form { display: grid; gap: 14px; }
 .rowan-reading-desk .rowan-reading-controls form label { display: grid; gap: 8px; }
 .rowan-reading-desk .rowan-reading-controls form input { width: 100%; margin: 0; font-size: 22px; padding: 12px; }
-.reader-current-list { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 16px; }
-.reader-current-list > li { min-width: 0; padding: 18px; border: 1px solid var(--border); border-radius: 16px; background: linear-gradient(145deg, var(--card), var(--secondary)); }
-.reader-current-list .reader-book-row { flex-direction: column; align-items: stretch; text-align: left; }
-.reader-current-list .rowan-cover-small { width: 112px; height: 168px; margin: 0 auto 14px; }
-.reader-current-list .reader-book-title { font-size: 20px; }
 @media (max-width: 700px) {
   .rowan-reading-desk { grid-template-columns: 1fr; }
   .rowan-record-tabs { gap: 0; }
   .rowan-record-tabs button { flex: 1; padding: 14px 4px; font-size: 12px; flex-direction: column; gap: 5px; }
   .rowan-record-summary { align-items: start; flex-direction: column; }
-  .reader-current-list { display: flex; overflow-x: auto; scroll-snap-type: x mandatory; padding-bottom: 12px; }
-  .reader-current-list > li { flex: 0 0 82%; scroll-snap-align: start; }
 }
 @media (prefers-reduced-motion: reduce) { .reader-view-slider::before { transition: none; } }
 .reader-app .rowan-cover-hero {
