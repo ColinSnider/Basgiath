@@ -3,7 +3,7 @@ import { LockKeyhole, Mail, Save, UserRound } from "lucide-react";
 import { useAuth } from "@/lib/auth-context";
 import { changePassword, updateDisplayName, updateEmail } from "@/lib/auth-fns";
 
-export function ProfileSettings({ sessionId }: { sessionId: string }) {
+export function ProfileSettings({ sessionId, section = "all" }: { sessionId: string; section?: "profile" | "security" | "all" }) {
   const auth = useAuth();
   const [busy, setBusy] = useState<string | null>(null);
   const [message, setMessage] = useState<{ section: string; text: string; error: boolean } | null>(
@@ -44,7 +44,7 @@ export function ProfileSettings({ sessionId }: { sessionId: string }) {
     );
   return (
     <>
-      <section className="reader-card" aria-labelledby="profile-heading">
+      {section !== "security" && <section className="reader-card" aria-labelledby="profile-heading">
         <header className="reader-card-heading">
           <div className="reader-section-title">
             <span className="reader-icon">
@@ -129,8 +129,8 @@ export function ProfileSettings({ sessionId }: { sessionId: string }) {
             {feedback("email")}
           </form>
         </div>
-      </section>
-      <section className="reader-card" aria-labelledby="security-heading">
+      </section>}
+      {section !== "profile" && <section className="reader-card" aria-labelledby="security-heading">
         <header className="reader-card-heading">
           <div className="reader-section-title">
             <span className="reader-icon">
@@ -215,7 +215,7 @@ export function ProfileSettings({ sessionId }: { sessionId: string }) {
             </form>
           </details>
         </div>
-      </section>
+      </section>}
     </>
   );
 }

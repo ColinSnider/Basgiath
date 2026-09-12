@@ -34,8 +34,8 @@ const historyItems = [
 ] as const;
 const accountPage = {
   to: "/account",
-  label: "Account",
-  description: "Your preferences, backups, and account controls.",
+  label: "Settings",
+  description: "Appearance, sign-in security, and your library backups.",
 };
 
 function Theme({ sessionId }: { sessionId: string }) {

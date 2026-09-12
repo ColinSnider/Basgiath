@@ -3,7 +3,7 @@ import { ReaderPage, useReader } from "../components/reader";
 import { AccountSettings } from "@/components/rowan/AccountSettings";
 
 export const Route = createFileRoute("/account")({
-  head: () => ({ meta: [{ title: "Account — Rowan" }] }),
+  head: () => ({ meta: [{ title: "Settings — Rowan" }] }),
   component: () => (
     <ReaderPage>
       <Page />

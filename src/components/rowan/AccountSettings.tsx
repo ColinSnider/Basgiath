@@ -81,9 +81,16 @@ export function AccountSettings({
   }
   return (
     <div className="reader-settings">
+      {standalone && <section className="reader-card">
+        <div className="reader-card-body">
+          <h2 className="font-display text-xl">Looking for your profile?</h2>
+          <p className="reader-muted">Your name, email, and personal reading summary live on your Profile page.</p>
+          <a href="/profile" className="reader-text-link">Open your profile →</a>
+        </div>
+      </section>}
       <div className="reader-settings-columns">
         <div className="space-y-6">
-          <ProfileSettings sessionId={sessionId} />
+          <ProfileSettings sessionId={sessionId} section={standalone ? "security" : "all"} />
         </div>
         <div>
           {query.isPending && (

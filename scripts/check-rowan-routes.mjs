@@ -15,7 +15,7 @@ for (const [path, title] of [
   ["/calendar", "History"],
   ["/goals", "Goals"],
   ["/margins", "Margins"],
-  ["/account", "Account"],
+  ["/account", "Settings"],
   ["/profile", "Profile"],
   ["/books/11111111-1111-4111-8111-111111111111", "Book details"],
 ]) {

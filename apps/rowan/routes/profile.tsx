@@ -31,7 +31,7 @@ function ProfilePage() {
         {home.data.last ? <button className="reader-book-row" onClick={() => openBook(home.data!.last!.book)}><BookCover title={home.data.last.book.title} authors={home.data.last.book.authors} src={home.data.last.book.coverUrl} className="rowan-cover-small"/><span className="reader-book-copy"><span className="reader-book-title">{home.data.last.book.title}</span><span className="reader-muted">{home.data.last.book.authors.join(", ")}</span></span></button> : <p>Your next finished book will have a place here.</p>}
       </div></section>
     </>}
-    <ProfileSettings sessionId={sessionId}/>
+    <ProfileSettings sessionId={sessionId} section="profile"/>
     <Link to="/account" className="reader-text-link">Appearance, backups, and account settings</Link>
   </div>;
 }
