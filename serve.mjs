@@ -5,6 +5,7 @@ import { fileURLToPath } from "node:url";
 import { drizzle } from "drizzle-orm/node-postgres";
 import { migrate } from "drizzle-orm/node-postgres/migrator";
 import pg from "pg";
+import { rowanMigrationConfig } from "./scripts/rowan-migration-config.mjs";
 
 const __dirname = fileURLToPath(new URL(".", import.meta.url));
 const standalone = process.env.ROWAN_STANDALONE !== "false";
@@ -32,12 +33,15 @@ async function runMigrations() {
 }
 
 async function runRowanMigrations() {
-  if (!process.env.ROWAN_DATABASE_URL || process.env.ROWAN_DATABASE_URL === process.env.DATABASE_URL) return;
+  if (!process.env.ROWAN_DATABASE_URL) return;
   const pool = new pg.Pool({ connectionString: process.env.ROWAN_DATABASE_URL });
   try {
     const db = drizzle(pool);
     await migrate(db, { migrationsFolder: join(__dirname, "migrations") });
-    await migrate(db, { migrationsFolder: join(__dirname, "migrations-v2") });
+    await migrate(
+      db,
+      standalone ? rowanMigrationConfig : { migrationsFolder: join(__dirname, "migrations-v2") },
+    );
     console.log("Rowan database migrations applied successfully.");
   } finally {
     await pool.end();
@@ -46,8 +50,8 @@ async function runRowanMigrations() {
 
 if (!standalone) {
   await runMigrations();
-  await runRowanMigrations();
 }
+await runRowanMigrations();
 
 const MIME = {
   ".html": "text/html; charset=utf-8",
@@ -122,8 +126,10 @@ const server = createServer(async (req, res) => {
     }
 
     const forwardedProto = req.headers["x-forwarded-proto"];
-    const protocolCandidate = typeof forwardedProto === "string" ? forwardedProto.split(",")[0].trim() : "";
-    const protocol = protocolCandidate === "https" || protocolCandidate === "http" ? protocolCandidate : undefined;
+    const protocolCandidate =
+      typeof forwardedProto === "string" ? forwardedProto.split(",")[0].trim() : "";
+    const protocol =
+      protocolCandidate === "https" || protocolCandidate === "http" ? protocolCandidate : undefined;
     const host = req.headers.host ?? "localhost";
     const url = `${protocol ?? "http"}://${host}${req.url ?? "/"}`;
     const headers = new Headers();

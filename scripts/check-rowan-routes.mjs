@@ -10,7 +10,7 @@ delete process.env.DATABASE_URL;
 const { default: server } = await import("../dist-rowan/server/server.js");
 for (const [path, title] of [
   ["/", "Home"],
-  ["/library", "Shelves"],
+  ["/library", "Library"],
   ["/search", "Search"],
   ["/calendar", "History"],
   ["/goals", "Goals"],

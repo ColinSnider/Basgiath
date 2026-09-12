@@ -3,7 +3,7 @@ import { ReaderPage } from "../components/reader";
 import { LibraryPage } from "../pages/LibraryPage";
 
 export const Route = createFileRoute("/library")({
-  head: () => ({ meta: [{ title: "Shelves — Rowan" }] }),
+  head: () => ({ meta: [{ title: "Library — Rowan" }] }),
   component: () => (
     <ReaderPage>
       <Page />

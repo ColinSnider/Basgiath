@@ -1,7 +1,7 @@
 import { BookCover } from "./BookCover";
 import { ReadingTimer } from "./ReadingTimer";
 import { HistoryEditor } from "./HistoryEditor";
-import { ArrowLeft, BookOpen, Heart } from "lucide-react";
+import { ArrowLeft, BookOpen, Heart, NotebookPen, History, Info } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import type { CSSProperties } from "react";
 import { useQuery } from "@tanstack/react-query";
@@ -97,6 +97,7 @@ export function ReadingPanel({
 }) {
   const [unit, setUnit] = useState<"page" | "second" | "percent">("page");
   const [position, setPosition] = useState("");
+  const [tab, setTab] = useState<"reading" | "margins" | "history" | "details">("reading");
   const panel = useRef<HTMLElement>(null);
   useEffect(() => {
     panel.current?.focus({ preventScroll: true });
@@ -214,17 +215,22 @@ export function ReadingPanel({
           {active && <ReadingProgressBar progress={active} />}
         </div>
       </header>
-      <div className="rowan-book-content space-y-5">
-        {history.data &&
-          typeof history.data.metadata.description === "string" &&
-          history.data.metadata.description.trim() && (
-            <section className="space-y-2">
-              <h3 className="font-display text-xl">About this book</h3>
-              <p className="whitespace-pre-line text-muted-foreground">
-                {history.data.metadata.description}
-              </p>
-            </section>
-          )}
+      <div className="rowan-book-content rowan-book-record">
+        <nav className="rowan-record-tabs" aria-label="Book record">
+          {(
+            [
+              { id: "reading", label: "Reading", icon: BookOpen },
+              { id: "margins", label: "Margins", icon: NotebookPen },
+              { id: "history", label: "History", icon: History },
+              { id: "details", label: "Details", icon: Info },
+            ] as const
+          ).map(({ id, label, icon: Icon }) => (
+            <button key={id} aria-pressed={tab === id} onClick={() => setTab(id)}>
+              <Icon size={17} />
+              {label}
+            </button>
+          ))}
+        </nav>
         {history.isPending && <p>Loading reading history…</p>}
         {history.isError && (
           <p role="alert">
@@ -236,7 +242,19 @@ export function ReadingPanel({
         )}
         {history.data && (
           <>
-            <div className="flex flex-wrap items-center gap-3">
+            <div className="rowan-record-summary">
+              <div>
+                <span className="rowan-eyebrow">Your copy</span>
+                <p>
+                  {active
+                    ? active.state === "paused"
+                      ? "Ready when you are."
+                      : "A little further, every day."
+                    : book.status === "read"
+                      ? "One for the memories."
+                      : "Your next chapter starts here."}
+                </p>
+              </div>
               <button
                 className={control}
                 disabled={busy}
@@ -254,8 +272,7 @@ export function ReadingPanel({
                 {history.data.isFavorite ? "♥ Favorite" : "♡ Add to favorites"}
               </button>
             </div>
-            <ReadingTimer sessions={history.data.sessions} run={run} busy={busy} />
-            {shelves.length > 0 && (
+            {tab === "details" && shelves.length > 0 && (
               <fieldset className="flex flex-wrap gap-3">
                 <legend className="mb-2 text-sm font-medium">On your shelves</legend>
                 {shelves.map((shelf) => (
@@ -280,134 +297,171 @@ export function ReadingPanel({
                 ))}
               </fieldset>
             )}
-            <section className="rowan-reading-controls space-y-4">
-              <h3 className="font-display text-2xl">Your reading journey</h3>
-              {active ? (
-                <>
-                  <ReadingProgressBar progress={active} />
-                  <form
-                    className="flex flex-wrap gap-2"
-                    onSubmit={(e) => {
-                      e.preventDefault();
-                      run({
-                        type: "progress",
-                        key: crypto.randomUUID(),
-                        sessionId: active.id,
-                        expectedVersion: active.version,
-                        position: value,
-                        occurredAt: new Date().toISOString(),
-                      });
-                    }}
-                  >
-                    <label className="text-sm">
-                      Current position (
-                      {active.unit === "second"
-                        ? "seconds"
-                        : active.unit === "page"
-                          ? "pages"
-                          : "%"}
-                      )
-                      <input
-                        className={`${control} ml-2 w-28`}
-                        required
-                        type="number"
-                        step={1}
-                        min={active.position}
-                        max={active.total ?? undefined}
-                        value={position}
-                        onChange={(e) => setPosition(e.target.value)}
-                      />
-                    </label>
-                    <button
-                      className={control}
-                      disabled={
-                        busy || active.state !== "active" || !position || !Number.isInteger(value)
-                      }
-                    >
-                      Log progress
-                    </button>
-                  </form>
-                  <div className="flex flex-wrap gap-2">
-                    {(
-                      [active.state === "paused" ? "resume" : "pause", "finish", "dnf"] as const
-                    ).map((action) => (
-                      <button
-                        key={action}
-                        className={control}
-                        disabled={busy}
-                        onClick={() =>
+            {tab === "reading" && (
+              <div className="rowan-reading-desk">
+                <section className="rowan-reading-controls rowan-record-card space-y-4">
+                  <span className="rowan-eyebrow">
+                    <BookOpen size={15} /> Your bookmark
+                  </span>
+                  <h3 className="font-display text-2xl">
+                    {active ? "Where are you now?" : "Make time for a story"}
+                  </h3>
+                  {active ? (
+                    <>
+                      <ReadingProgressBar progress={active} />
+                      <form
+                        className="flex flex-wrap gap-2"
+                        onSubmit={(e) => {
+                          e.preventDefault();
                           run({
-                            type: "transition",
+                            type: "progress",
                             key: crypto.randomUUID(),
                             sessionId: active.id,
                             expectedVersion: active.version,
-                            action,
+                            position: value,
                             occurredAt: new Date().toISOString(),
+                          });
+                        }}
+                      >
+                        <label className="text-sm">
+                          Current position (
+                          {active.unit === "second"
+                            ? "seconds"
+                            : active.unit === "page"
+                              ? "pages"
+                              : "%"}
+                          )
+                          <input
+                            className={`${control} ml-2 w-28`}
+                            required
+                            type="number"
+                            step={1}
+                            min={active.position}
+                            max={active.total ?? undefined}
+                            value={position}
+                            onChange={(e) => setPosition(e.target.value)}
+                          />
+                        </label>
+                        <button
+                          className="reader-button"
+                          disabled={
+                            busy ||
+                            active.state !== "active" ||
+                            !position ||
+                            !Number.isInteger(value)
+                          }
+                        >
+                          Log progress
+                        </button>
+                      </form>
+                      <div className="flex flex-wrap gap-2">
+                        {(
+                          [active.state === "paused" ? "resume" : "pause", "finish", "dnf"] as const
+                        ).map((action) => (
+                          <button
+                            key={action}
+                            className={action === "finish" ? "reader-button" : control}
+                            disabled={busy}
+                            onClick={() =>
+                              run({
+                                type: "transition",
+                                key: crypto.randomUUID(),
+                                sessionId: active.id,
+                                expectedVersion: active.version,
+                                action,
+                                occurredAt: new Date().toISOString(),
+                              })
+                            }
+                          >
+                            {action === "dnf"
+                              ? "Did not finish"
+                              : action === "finish"
+                                ? "Finish reading"
+                                : action === "pause"
+                                  ? "Pause"
+                                  : "Resume"}
+                          </button>
+                        ))}
+                      </div>
+                    </>
+                  ) : (
+                    <div className="flex flex-wrap gap-2">
+                      <select
+                        className={control}
+                        aria-label="Progress unit"
+                        value={unit}
+                        onChange={(e) => setUnit(e.target.value as typeof unit)}
+                      >
+                        <option value="page">Pages</option>
+                        <option value="second">Audio seconds</option>
+                        <option value="percent">Percent</option>
+                      </select>
+                      <button
+                        className="reader-button"
+                        disabled={busy}
+                        onClick={() =>
+                          run({
+                            type: "start",
+                            key: crypto.randomUUID(),
+                            userBookId: book.id,
+                            expectedVersion: history.data!.userBookVersion,
+                            unit,
+                            position: 0,
+                            startedAt: new Date().toISOString(),
                           })
                         }
                       >
-                        {action === "dnf"
-                          ? "Did not finish"
-                          : action === "finish"
-                            ? "Finish reading"
-                            : action === "pause"
-                              ? "Pause"
-                              : "Resume"}
+                        {history.data.sessions.length ? "Read again" : "Start reading"}
                       </button>
-                    ))}
-                  </div>
-                </>
-              ) : (
-                <div className="flex flex-wrap gap-2">
-                  <select
-                    className={control}
-                    aria-label="Progress unit"
-                    value={unit}
-                    onChange={(e) => setUnit(e.target.value as typeof unit)}
-                  >
-                    <option value="page">Pages</option>
-                    <option value="second">Audio seconds</option>
-                    <option value="percent">Percent</option>
-                  </select>
-                  <button
-                    className={control}
-                    disabled={busy}
-                    onClick={() =>
-                      run({
-                        type: "start",
-                        key: crypto.randomUUID(),
-                        userBookId: book.id,
-                        expectedVersion: history.data!.userBookVersion,
-                        unit,
-                        position: 0,
-                        startedAt: new Date().toISOString(),
-                      })
-                    }
-                  >
-                    {history.data.sessions.length ? "Read again" : "Start reading"}
-                  </button>
-                </div>
-              )}
-              <HistoryEditor history={history.data} busy={busy} run={run} />
-            </section>
-            <section className="rowan-book-margins" aria-label="Book margins">
-              <Margins margins={history.data.margins} userBookId={book.id} busy={busy} run={run} />
-            </section>
-            {organization}
-            <BookEditor
-              key={`edit:${history.data.userBookVersion}`}
-              sessionId={sessionId}
-              book={book}
-              history={history.data}
-              close={close}
-            />
-            <EditionForm
-              key={history.data.userBookVersion}
-              userBookId={book.id}
-              history={history.data}
-              run={run}
-              busy={busy}
-            />
+                    </div>
+                  )}
+                </section>
+                <ReadingTimer sessions={history.data.sessions} run={run} busy={busy} />
+              </div>
+            )}
+            {tab === "history" && (
+              <section className="rowan-record-card">
+                <HistoryEditor history={history.data} busy={busy} run={run} />
+              </section>
+            )}
+            {tab === "margins" && (
+              <section className="rowan-book-margins" aria-label="Book margins">
+                <Margins
+                  margins={history.data.margins}
+                  userBookId={book.id}
+                  busy={busy}
+                  run={run}
+                />
+              </section>
+            )}
+            {tab === "details" && (
+              <div className="rowan-record-details">
+                <section className="rowan-record-card">
+                  <h3 className="font-display text-2xl">About this book</h3>
+                  <p className="whitespace-pre-line text-muted-foreground">
+                    {typeof history.data.metadata.description === "string" &&
+                    history.data.metadata.description.trim()
+                      ? history.data.metadata.description
+                      : "No synopsis yet. You can add one in book details below."}
+                  </p>
+                </section>
+                {organization}
+                <BookEditor
+                  key={`edit:${history.data.userBookVersion}`}
+                  sessionId={sessionId}
+                  book={book}
+                  history={history.data}
+                  close={close}
+                />
+                <EditionForm
+                  key={history.data.userBookVersion}
+                  userBookId={book.id}
+                  history={history.data}
+                  run={run}
+                  busy={busy}
+                />
+              </div>
+            )}
           </>
         )}
       </div>

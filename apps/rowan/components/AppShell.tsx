@@ -8,7 +8,7 @@ const primary = [
   { to: "/", label: "Home", icon: Home, description: "Your reading life, one book at a time." },
   {
     to: "/library",
-    label: "Shelves",
+    label: "Library",
     icon: Library,
     description: "Your books, shelves, and reading lists.",
   },

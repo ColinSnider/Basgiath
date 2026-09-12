@@ -1766,6 +1766,102 @@
   grid-template-columns: repeat(auto-fill, minmax(165px, 1fr));
   gap: 16px;
 }
+.reader-view-slider {
+  position: relative;
+  isolation: isolate;
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  width: min(100%, 380px);
+  padding: 4px;
+  gap: 0;
+  border-radius: 14px;
+  background: var(--secondary);
+}
+.reader-view-slider::before {
+  content: "";
+  position: absolute;
+  z-index: -1;
+  inset: 4px auto 4px 4px;
+  width: calc((100% - 8px) / 3);
+  border-radius: 10px;
+  background: linear-gradient(125deg, var(--primary), #8d3b35);
+  box-shadow: 0 2px 5px #45162020;
+  transform: translateX(calc(var(--view-index) * 100%));
+  transition: transform 180ms ease;
+}
+.reader-view-slider button, .reader-view-slider button[aria-pressed="true"] {
+  border: 0;
+  background: transparent;
+}
+.reader-library-tile-grid .rowan-cover-grid { margin: 0 auto 16px; }
+.reader-library-tile-grid { box-shadow: 0 4px 14px #45162008; }
+.reader-library-tile-grid:hover { border-color: var(--primary); }
+.reader-shelf-boards { display: grid; gap: 30px; }
+.reader-shelf-board {
+  width: 100%;
+  min-width: 0;
+  min-height: 190px;
+  padding: 12px 6px 5px;
+  overflow: visible;
+  border-bottom: 7px solid color-mix(in srgb, var(--foreground) 24%, var(--card));
+}
+.reader-shelf-silhouettes {
+  display: flex;
+  align-items: flex-end;
+  justify-content: flex-end;
+  flex: 1;
+  min-width: 76px;
+  height: 150px;
+  gap: 4px;
+  opacity: .42;
+  pointer-events: none;
+}
+.reader-shelf-silhouettes i {
+  display: block;
+  width: 21px;
+  height: 123px;
+  border: 1px solid var(--border);
+  border-radius: 3px 3px 1px 1px;
+  background: linear-gradient(90deg, var(--border), var(--secondary) 22%, var(--muted));
+  box-shadow: inset 3px 0 0 #ffffff30;
+}
+.shelf-arrangement-0 { flex-direction: column; justify-content: flex-end; }
+.shelf-arrangement-0 i { width: 74px; height: 19px; }
+.shelf-arrangement-0 i:first-child { width: 65px; transform: rotate(-3deg); }
+.shelf-arrangement-0 i:last-child, .shelf-arrangement-1 i:last-child { display: none; }
+.shelf-arrangement-1 i:first-child { height: 137px; transform: rotate(-12deg); transform-origin: bottom left; margin-right: 18px; }
+.shelf-arrangement-2 { position: relative; padding-bottom: 21px; }
+.shelf-arrangement-2 i:first-child { transform: rotate(-9deg); height: 108px; margin-right: 9px; }
+.shelf-arrangement-2 i:last-child { position: absolute; right: 0; bottom: 0; width: 76px; height: 19px; }
+.shelf-arrangement-3 i { display: none; }
+.rowan-book-record { padding: 0 clamp(16px, 3vw, 36px) 32px; max-width: none; }
+.rowan-record-tabs { display: flex; border-bottom: 1px solid var(--border); gap: 6px; padding-top: 12px; margin-bottom: 24px; }
+.rowan-record-tabs button { display: flex; align-items: center; justify-content: center; gap: 8px; padding: 16px 20px; color: var(--muted-foreground); border-bottom: 3px solid transparent; }
+.rowan-record-tabs button[aria-pressed="true"] { color: var(--primary); border-color: var(--primary); }
+.rowan-record-summary { display: flex; align-items: center; justify-content: space-between; gap: 18px; margin-bottom: 24px; }
+.rowan-record-summary p { font-family: var(--font-display); font-size: clamp(20px, 3vw, 28px); }
+.rowan-reading-desk { display: grid; grid-template-columns: 1.2fr 1fr; gap: 22px; align-items: start; }
+.rowan-record-card { padding: clamp(20px, 3vw, 28px); border: 1px solid var(--border); border-radius: 18px; background: var(--card); }
+.rowan-record-card > .rowan-eyebrow { display: flex; align-items: center; gap: 8px; color: var(--primary); }
+.rowan-record-details { display: grid; gap: 20px; margin-top: 24px; }
+.rowan-reading-desk .rowan-reading-controls { margin: 0; }
+.rowan-reading-desk .rowan-reading-controls form { display: grid; gap: 14px; }
+.rowan-reading-desk .rowan-reading-controls form label { display: grid; gap: 8px; }
+.rowan-reading-desk .rowan-reading-controls form input { width: 100%; margin: 0; font-size: 22px; padding: 12px; }
+.reader-current-list { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 16px; }
+.reader-current-list > li { min-width: 0; padding: 18px; border: 1px solid var(--border); border-radius: 16px; background: linear-gradient(145deg, var(--card), var(--secondary)); }
+.reader-current-list .reader-book-row { flex-direction: column; align-items: stretch; text-align: left; }
+.reader-current-list .rowan-cover-small { width: 112px; height: 168px; margin: 0 auto 14px; }
+.reader-current-list .reader-book-title { font-size: 20px; }
+@media (max-width: 700px) {
+  .rowan-reading-desk { grid-template-columns: 1fr; }
+  .rowan-record-tabs { gap: 0; }
+  .rowan-record-tabs button { flex: 1; padding: 14px 4px; font-size: 12px; flex-direction: column; gap: 5px; }
+  .rowan-record-summary { align-items: start; flex-direction: column; }
+  .reader-current-list { display: flex; overflow-x: auto; scroll-snap-type: x mandatory; padding-bottom: 12px; }
+  .reader-current-list > li { flex: 0 0 82%; scroll-snap-align: start; }
+}
+@media (prefers-reduced-motion: reduce) { .reader-view-slider::before { transition: none; } }
 .reader-app .rowan-cover-hero {
   width: 100%;
 }
