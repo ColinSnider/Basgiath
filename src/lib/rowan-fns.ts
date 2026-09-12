@@ -30,6 +30,15 @@ const moment = z.string().datetime({ offset: true });
 const command = z.discriminatedUnion("type", [
   z
     .object({
+      type: z.literal("timer"),
+      key,
+      sessionId: key,
+      expectedVersion: z.number().int().nonnegative(),
+      action: z.enum(["start", "stop"]),
+    })
+    .strict(),
+  z
+    .object({
       type: z.literal("correctProgress"),
       key,
       sessionId: key,
@@ -513,7 +522,7 @@ export const rowanJournal = createServerFn({ method: "POST" })
 export const rowanShelves = createServerFn({ method: "POST" })
   .inputValidator(z.object({ sessionId: key }).strict())
   .handler(async ({ data }) => {
-    const { database, shelfService, library, actor } = await context(data.sessionId);
+    const { database, shelfService, actor } = await context(data.sessionId);
     const shelves = await shelfService.list(actor);
     return Promise.all(
       shelves.map(async (shelf) => {
@@ -526,12 +535,6 @@ export const rowanShelves = createServerFn({ method: "POST" })
           name: shelf.name,
           version: shelf.version,
           itemCount: items?.count ?? 0,
-          books: (
-            await library.libraryPage(actor, {
-              shelfId: shelf.id,
-              offset: 0,
-            })
-          ).items,
         };
       }),
     );
@@ -567,6 +570,9 @@ export const rowanHistory = createServerFn({ method: "POST" })
       halfStars: history.halfStars,
       tags: history.tags,
       sessions: history.sessions.map((s) => ({
+        timerStartedAt: s.timerStartedAt?.toISOString() ?? null,
+        readingSeconds: s.readingSeconds,
+        timedReads: s.timedReads,
         id: s.id,
         state: s.state,
         unit: s.unit,
@@ -597,6 +603,11 @@ export const rowanMutate = createServerFn({ method: "POST" })
     try {
       // Narrow the discriminated union before passing validated commands to the domain.
       switch (data.command.type) {
+        case "timer": {
+          const { type, ...value } = data.command;
+          await library.timer(actor, value);
+          break;
+        }
         case "correctProgress": {
           const { type, ...value } = data.command;
           await library.correctProgress(actor, value);

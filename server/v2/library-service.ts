@@ -134,6 +134,22 @@ function fingerprint(operation: string, data: object) {
   return createHash("sha256").update(JSON.stringify({ operation, data })).digest("hex");
 }
 
+function stopTimer(session: typeof readingSessions.$inferSelect, now = new Date()) {
+  if (!session.timerStartedAt) return {};
+  const seconds = Math.max(
+    0,
+    Math.floor((now.getTime() - session.timerStartedAt.getTime()) / 1000),
+  );
+  return {
+    timerStartedAt: null,
+    readingSeconds: session.readingSeconds + seconds,
+    timedReads: [
+      ...session.timedReads,
+      { startedAt: session.timerStartedAt.toISOString(), endedAt: now.toISOString(), seconds },
+    ],
+  };
+}
+
 /** All private access takes a server-derived actor. */
 export function createLibraryService(database: Database, provider: CatalogProvider) {
   async function mutate(
@@ -273,7 +289,7 @@ export function createLibraryService(database: Database, provider: CatalogProvid
           return JSON.stringify(
             {
               format: "rowan-archive",
-              version: 4,
+              version: 5,
               exportedAt: new Date().toISOString(),
               userBooks: await tx
                 .select()
@@ -294,7 +310,8 @@ export function createLibraryService(database: Database, provider: CatalogProvid
               readingSessions: await tx
                 .select()
                 .from(readingSessions)
-                .where(sql`${readingSessions.userBookId} in (${owned})`),
+                .where(sql`${readingSessions.userBookId} in (${owned})`)
+                .then((rows) => rows.map((session) => ({ ...session, ...stopTimer(session) }))),
               progressEntries: await tx
                 .select()
                 .from(progressEntries)
@@ -825,6 +842,7 @@ export function createLibraryService(database: Database, provider: CatalogProvid
           .select({
             book,
             state: readingSessions.state,
+            timerStartedAt: readingSessions.timerStartedAt,
             position: readingSessions.position,
             total: readingSessions.total,
             unit: readingSessions.unit,
@@ -944,7 +962,12 @@ export function createLibraryService(database: Database, provider: CatalogProvid
           tags: sql<
             string[]
           >`(select coalesce(jsonb_agg(value), '[]'::jsonb) from jsonb_array_elements(case when jsonb_typeof(${userBooks.legacyMetadata}->'tags') = 'array' then ${userBooks.legacyMetadata}->'tags' else '[]'::jsonb end) where jsonb_typeof(value) = 'string')`,
-          format: sql<string | null>`(select e.format from v2.editions e where e.id = ${userBooks.selectedEditionId})`,
+          format: sql<
+            string | null
+          >`(select e.format from v2.editions e where e.id = ${userBooks.selectedEditionId})`,
+          shelfIds: sql<
+            string[]
+          >`(select coalesce(jsonb_agg(si.shelf_id), '[]'::jsonb) from v2.shelf_items si where si.user_book_id = ${userBooks.id} and si.user_id = ${actor.userId})`,
           total: sql<number | null>`(
             select case when e.format = 'audiobook' then e.duration_seconds else e.page_count end
             from v2.editions e where e.id = ${userBooks.selectedEditionId}
@@ -1389,7 +1412,7 @@ export function createLibraryService(database: Database, provider: CatalogProvid
                 : "dnf";
         await tx
           .update(readingSessions)
-          .set({ state, finishedAt, version: session.version + 1 })
+          .set({ state, finishedAt, ...stopTimer(session), version: session.version + 1 })
           .where(eq(readingSessions.id, session.id));
         await tx
           .update(userBooks)
@@ -1407,6 +1430,61 @@ export function createLibraryService(database: Database, provider: CatalogProvid
               .where(eq(readingOrganization.userId, actor.userId));
         }
         // Finishing does not fabricate an observed last-day page/audio delta.
+        return {
+          workId: book.workId,
+          userBookId: book.id,
+          sessionId: session.id,
+          version: session.version + 1,
+        };
+      });
+    },
+
+    async timer(
+      actor: Actor,
+      input: { key: string; sessionId: string; expectedVersion: number; action: "start" | "stop" },
+    ) {
+      const data = z
+        .object({
+          key: id,
+          sessionId: id,
+          expectedVersion: version,
+          action: z.enum(["start", "stop"]),
+        })
+        .strict()
+        .parse(input);
+      return mutate(actor, data.key, fingerprint("timer", data), async (tx) => {
+        const { session, book } = await ownedSession(tx, actor, data.sessionId);
+        expectVersion(session.version, data.expectedVersion);
+        if (data.action === "start" && session.state !== "active")
+          throw new DomainError(
+            "INVALID_TRANSITION",
+            "Resume this book before starting its timer.",
+          );
+        if (data.action === "start") {
+          const [running] = await tx
+            .select({ id: readingSessions.id })
+            .from(readingSessions)
+            .innerJoin(userBooks, eq(userBooks.id, readingSessions.userBookId))
+            .where(
+              and(
+                eq(userBooks.userId, actor.userId),
+                sql`${readingSessions.timerStartedAt} is not null`,
+              ),
+            );
+          if (running)
+            throw new DomainError(
+              "INVALID_TRANSITION",
+              "A reading timer is already running. Stop it before starting another.",
+            );
+        } else if (!session.timerStartedAt)
+          throw new DomainError("INVALID_TRANSITION", "This timer is already stopped.");
+        await tx
+          .update(readingSessions)
+          .set({
+            ...(data.action === "start" ? { timerStartedAt: new Date() } : stopTimer(session)),
+            version: session.version + 1,
+          })
+          .where(eq(readingSessions.id, session.id));
         return {
           workId: book.workId,
           userBookId: book.id,

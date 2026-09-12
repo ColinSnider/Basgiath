@@ -380,6 +380,7 @@ test("v2 catalog and reading lifecycle work against isolated PostgreSQL", async 
         present: true,
       };
       const added = await shelfService.setItem(actor, add);
+      assert.deepEqual((await service.libraryPage(actor, { userBookId: saved.userBookId })).items[0].shelfIds, [shelf.shelfId]);
       assert.deepEqual(await shelfService.setItem(actor, add), added);
       assert.deepEqual(await shelfService.membership(actor, saved.userBookId), [
         { shelfId: shelf.shelfId },
@@ -427,6 +428,7 @@ test("v2 catalog and reading lifecycle work against isolated PostgreSQL", async 
       assert.equal((await shelfService.list(actor))[0].name, "Autumn favorites");
       const remove = { ...add, key: key(), expectedVersion: renamed.version, present: false };
       const removed = await shelfService.setItem(actor, remove);
+      assert.deepEqual((await service.libraryPage(actor, { userBookId: saved.userBookId })).items[0].shelfIds, []);
       assert.deepEqual(await shelfService.setItem(actor, remove), removed);
       assert.deepEqual(await shelfService.membership(actor, saved.userBookId), []);
       assert.equal((await service.libraryPage(actor, { shelfId: shelf.shelfId })).items.length, 0);

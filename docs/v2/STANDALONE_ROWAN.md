@@ -77,3 +77,21 @@ Browser-only preferences cannot be recovered from the database.
 This implements the application path, not the hosted rollout. Target migrations must be
 applied before switching traffic. No deployment or real-account migration was run in
 this development session; authenticated browser verification remains outstanding.
+
+### Shelves and reading time — September 11
+
+Library and shelf management now share the Shelves page. Named shelves render their
+actual membership as upright spines and horizontal book stacks, with a separate stacks
+view and a retained list view. Unfiled books remain visible; shelf membership can be
+edited from the same page. Ratings and tags are removed from the Rowan interface;
+existing archive data is preserved.
+
+Migration `0007_reading_timer` adds durable reading timers and individual timed-read
+history. Leaving a page does not stop a timer. Stopping, pausing, or finishing records
+elapsed time. Only one timer per reader can run at once. Archive version 5 includes
+timed reads, accepts older archives, and restores clocks in a stopped state.
+
+Validation: 34 targeted service tests, Rowan typecheck, and production build passed.
+Mobile shelf/stack and timer controls were checked with sample component data. These
+are local changes; hosted migration, deployment, and authenticated browser validation
+have not been performed. iOS Live Activity support remains future work.

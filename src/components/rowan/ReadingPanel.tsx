@@ -1,6 +1,7 @@
 import { BookCover } from "./BookCover";
+import { ReadingTimer } from "./ReadingTimer";
 import { HistoryEditor } from "./HistoryEditor";
-import { ArrowLeft, BookOpen, Heart, Star } from "lucide-react";
+import { ArrowLeft, BookOpen, Heart } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import type { CSSProperties } from "react";
 import { useQuery } from "@tanstack/react-query";
@@ -167,11 +168,6 @@ export function ReadingPanel({
                 <Heart size={14} fill="currentColor" /> A favorite
               </span>
             )}
-            {history.data?.halfStars != null && (
-              <span>
-                <Star size={14} fill="currentColor" /> {history.data.halfStars / 2} / 5
-              </span>
-            )}
           </div>
           {history.data && (
             <dl className="rowan-book-facts">
@@ -257,32 +253,8 @@ export function ReadingPanel({
               >
                 {history.data.isFavorite ? "♥ Favorite" : "♡ Add to favorites"}
               </button>
-              <label className="text-sm">
-                Your rating{" "}
-                <select
-                  className={control}
-                  disabled={busy}
-                  value={history.data.halfStars ?? ""}
-                  onChange={(e) =>
-                    run({
-                      type: "personalize",
-                      key: crypto.randomUUID(),
-                      userBookId: book.id,
-                      expectedVersion: history.data!.userBookVersion,
-                      halfStars: e.target.value === "" ? null : Number(e.target.value),
-                    })
-                  }
-                >
-                  <option value="">Not rated</option>
-                  {Array.from({ length: 10 }, (_, i) => i + 1).map((value) => (
-                    <option key={value} value={value}>
-                      {value / 2} / 5
-                    </option>
-                  ))}
-                </select>
-              </label>
-              <TagEditor book={book} history={history.data} busy={busy} run={run} />
             </div>
+            <ReadingTimer sessions={history.data.sessions} run={run} busy={busy} />
             {shelves.length > 0 && (
               <fieldset className="flex flex-wrap gap-3">
                 <legend className="mb-2 text-sm font-medium">On your shelves</legend>
@@ -440,51 +412,5 @@ export function ReadingPanel({
         )}
       </div>
     </section>
-  );
-}
-
-function TagEditor({
-  book,
-  history,
-  busy,
-  run,
-}: {
-  book: Item;
-  history: Awaited<ReturnType<typeof rowanHistory>>;
-  busy: boolean;
-  run: (command: RowanCommand) => void;
-}) {
-  const [value, setValue] = useState(history.tags.join(", "));
-  return (
-    <form
-      className="flex items-center gap-2"
-      onSubmit={(event) => {
-        event.preventDefault();
-        run({
-          type: "personalize",
-          key: crypto.randomUUID(),
-          userBookId: book.id,
-          expectedVersion: history.userBookVersion,
-          tags: value
-            .split(",")
-            .map((tag) => tag.trim())
-            .filter(Boolean),
-        });
-      }}
-    >
-      <label className="text-sm">
-        Tags{" "}
-        <input
-          className={control}
-          value={value}
-          onChange={(event) => setValue(event.target.value)}
-          placeholder="fantasy, reread"
-          maxLength={500}
-        />
-      </label>
-      <button className={control} disabled={busy}>
-        Save tags
-      </button>
-    </form>
   );
 }

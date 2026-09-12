@@ -30,7 +30,7 @@ export function BookEditor({
           setError("");
           const fields = new FormData(event.currentTarget);
           try {
-            const metadata = metadataSchema.parse(JSON.parse(String(fields.get("metadata"))));
+            const metadata = metadataSchema.parse({ ...history.metadata });
             metadata.description = String(fields.get("description")).trim();
             edit.run({
               type: "editBook",
@@ -86,18 +86,6 @@ export function BookEditor({
             placeholder="Synopsis or your own description"
           />
         </label>
-        <details>
-          <summary>Additional metadata</summary>
-          <p className="text-sm text-muted-foreground">
-            Existing source fields are retained. Internal import history is protected.
-          </p>
-          <textarea
-            className={`${control} w-full font-mono`}
-            name="metadata"
-            rows={8}
-            defaultValue={JSON.stringify(history.metadata, null, 2)}
-          />
-        </details>
         <button className={control} disabled={busy}>
           Save book details
         </button>
@@ -119,7 +107,7 @@ export function BookEditor({
         onClick={() => {
           if (
             window.confirm(
-              `Permanently delete “${book.title}” and its reading history, margins, and rating from Rowan? The legacy copy remains, but will not be imported again automatically.`,
+              `Permanently delete “${book.title}” and its reading history and margins from Rowan? The legacy copy remains, but will not be imported again automatically.`,
             )
           )
             deletion.run({

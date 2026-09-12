@@ -55,7 +55,7 @@ export const bookEditSchema = z
 const archiveSchema = z
   .object({
     format: z.literal("rowan-archive"),
-    version: z.union([z.literal(2), z.literal(3), z.literal(4)]),
+    version: z.union([z.literal(2), z.literal(3), z.literal(4), z.literal(5)]),
     exportedAt: date,
     works: rows(
       z
@@ -121,6 +121,11 @@ const archiveSchema = z
           startedAt: date.nullable(),
           finishedAt: date.nullable(),
           unit: z.enum(["page", "second", "percent"]),
+          timerStartedAt: date.nullable().default(null),
+          readingSeconds: integer.default(0),
+          timedReads: z
+            .array(z.object({ startedAt: date, endedAt: date, seconds: integer }).strict())
+            .default([]),
           total: integer.positive().nullable(),
           position: integer,
           version: integer,

@@ -83,7 +83,6 @@ export function Insights({
               ["Reads finished this year", query.data.finishedReads],
               ["Distinct books finished", query.data.uniqueWorks],
               ["Books in your library", query.data.libraryCount],
-              ["Average personal rating", query.data.averageRating?.toFixed(1) ?? "Unrated"],
             ].map(([label, value]) => (
               <div key={label}>
                 <dt className="text-sm text-muted-foreground">{label}</dt>

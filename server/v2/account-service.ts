@@ -251,6 +251,7 @@ export function createAccountService(database: Database) {
         for (const r of data.readingSessions)
           await tx.insert(s.readingSessions).values({
             ...r,
+            timerStartedAt: null,
             id: sessionIds.get(r.id)!,
             userBookId: bookIds.get(r.userBookId)!,
             workId: workIds.get(r.workId)!,

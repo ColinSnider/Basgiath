@@ -59,6 +59,7 @@ export function RowanHome({
               return (
                 <li key={item.book.id}>
                   <BookCard book={item.book} openBook={openBook} />
+                  {item.timerStartedAt && <p className="text-sm text-primary">Reading timer is running · Open book to stop and save</p>}
                   <ReadingProgressBar progress={item} />
                   <button className="reader-text-link" onClick={() => openBook(item.book)}>
                     {item.state === "paused" ? "Open paused read" : "Continue reading"}
@@ -166,11 +167,6 @@ function BookCard({ book, openBook }: { book: Book; openBook: (book: Book) => vo
       <span className="reader-book-copy">
         <span className="reader-book-title">{book.title}</span>
         <span className="reader-muted">{book.authors.join(", ") || "Unknown author"}</span>
-        {book.halfStars !== null && (
-          <span className="reader-book-rating" aria-label={`Rated ${book.halfStars / 2} out of 5`}>
-            ★ {book.halfStars / 2} / 5
-          </span>
-        )}
       </span>
     </button>
   );

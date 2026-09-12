@@ -50,6 +50,13 @@
       "when": 1788913167430,
       "tag": "0006_reading_organization",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1789100000000,
+      "tag": "0007_reading_timer",
+      "breakpoints": true
     }
   ]
 }
