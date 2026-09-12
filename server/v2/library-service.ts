@@ -1,4 +1,5 @@
 import { effectiveProgress, loggedProgress } from "../../shared/reading-progress.ts";
+import { backlogImport, historyChange } from "../../shared/backlog.ts";
 import { goalTimeframeSchema } from "../../shared/rowan-archive.ts";
 import { createHash } from "node:crypto";
 import { and, eq, sql, ilike, or, desc } from "drizzle-orm";
@@ -205,6 +206,55 @@ export function createLibraryService(database: Database, provider: CatalogProvid
   }
 
   return {
+    async changeHistory(actor: Actor, input: z.input<typeof historyChange>) {
+      const data = historyChange.parse(input);
+      return mutate(actor, data.key, fingerprint("history", data), async tx => {
+        const book = await ownedBook(tx, actor, data.userBookId);
+        if (data.action === "add") {
+          expectVersion(book.version, data.expectedVersion);
+          const [edition] = book.selectedEditionId ? await tx.select().from(editions).where(eq(editions.id, book.selectedEditionId)) : [];
+          for (let i = 0; i < data.count; i++) await tx.insert(readingSessions).values({userBookId: book.id, workId: book.workId, editionId: book.selectedEditionId, state: "completed", unit: edition?.format === "audiobook" ? "second" : "page", total: edition?.format === "audiobook" ? edition.durationSeconds : edition?.pageCount ?? null, startedAt: i === 0 && data.startedAt ? new Date(data.startedAt) : null, finishedAt: i === 0 && data.finishedAt ? new Date(data.finishedAt) : null});
+        } else {
+          if (!data.sessionId) throw new DomainError("NOT_FOUND", "Choose a reading attempt.");
+          const {session} = await ownedSession(tx, actor, data.sessionId);
+          if (session.userBookId !== book.id) throw new DomainError("NOT_FOUND", "Reading attempt not found.");
+          expectVersion(session.version, data.expectedVersion);
+          if (data.action === "remove") {
+            const logs = await tx.select({id: progressEntries.id}).from(progressEntries).where(eq(progressEntries.readingSessionId, session.id)).limit(1);
+            if (session.state !== "completed" || logs.length || session.timedReads.length || session.readingSeconds || session.timerStartedAt) throw new DomainError("INVALID_TRANSITION", "Only backlogged reads without progress or timer records can be removed here.");
+            await tx.delete(readingSessions).where(eq(readingSessions.id, session.id));
+          } else {
+            if ((session.state === "active" || session.state === "paused") && data.finishedAt) throw new DomainError("INVALID_TRANSITION", "Finish this reading attempt before setting its finish date.");
+            await tx.update(readingSessions).set({startedAt: data.startedAt ? new Date(data.startedAt) : null, finishedAt: data.finishedAt ? new Date(data.finishedAt) : null, version: session.version + 1}).where(eq(readingSessions.id, session.id));
+          }
+        }
+        const remaining = await tx.select({state: readingSessions.state}).from(readingSessions).where(eq(readingSessions.userBookId, book.id));
+        const status = data.action === "add" && book.status === "want_to_read" ? "read" : data.action === "remove" && book.status === "read" && !remaining.some(s => s.state === "completed") ? (remaining.some(s => s.state === "dnf") ? "dnf" : "want_to_read") : book.status;
+        await tx.update(userBooks).set({version: book.version + 1, status}).where(eq(userBooks.id, book.id));
+        return {workId: book.workId, userBookId: book.id, sessionId: data.sessionId ?? null, version: book.version + 1};
+      });
+    },
+    async importBacklog(actor: Actor, input: z.input<typeof backlogImport>) {
+      const data = backlogImport.parse(input);
+      return mutate(actor, data.key, fingerprint("backlog-import", data), async tx => {
+        let first: MutationResult | undefined;
+        for (const row of data.rows) {
+          let book;
+          if (row.userBookId) book = await ownedBook(tx, actor, row.userBookId);
+          else {
+            const [work] = await tx.insert(works).values({title: row.title, authors: row.author ? [row.author] : []}).returning();
+            const [edition] = await tx.insert(editions).values({workId: work.id, format: row.format, pageCount: row.format === "audiobook" ? null : row.total, durationSeconds: row.format === "audiobook" ? row.total : null}).returning();
+            [book] = await tx.insert(userBooks).values({userId: actor.userId, workId: work.id, selectedEditionId: edition.id}).returning();
+          }
+          const [edition] = book.selectedEditionId ? await tx.select().from(editions).where(eq(editions.id, book.selectedEditionId)) : [];
+          for (let i = 0; i < row.reads; i++) await tx.insert(readingSessions).values({userBookId: book.id, workId: book.workId, editionId: book.selectedEditionId, state: "completed", unit: edition?.format === "audiobook" ? "second" : "page", total: edition?.format === "audiobook" ? edition.durationSeconds : edition?.pageCount ?? null, startedAt: i === 0 && row.startedAt ? new Date(row.startedAt) : null, finishedAt: i === 0 && row.finishedAt ? new Date(row.finishedAt) : null});
+          await tx.update(userBooks).set({version: book.version + 1, status: row.reads && book.status === "want_to_read" ? "read" : book.status}).where(eq(userBooks.id, book.id));
+          first ??= {workId: book.workId, userBookId: book.id, sessionId: null, version: book.version + 1};
+        }
+        return first!;
+      });
+    },
+
     async goals(actor: Actor) {
       z.number().int().positive().parse(actor.userId);
       return database

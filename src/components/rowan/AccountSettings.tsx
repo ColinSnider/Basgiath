@@ -7,6 +7,7 @@ import { parseImportJson, type ExportData } from "@/lib/user-preferences";
 import { useAccountMutation } from "./useAccountMutation";
 import { ProfileSettings } from "./ProfileSettings";
 import { AppearanceSettings } from "./AppearanceSettings";
+import { CsvImport } from "./CsvImport";
 
 export function AccountSettings({
   sessionId,
@@ -125,6 +126,7 @@ export function AccountSettings({
           </div>
         </header>
         <div className="reader-backup-grid reader-card-body">
+          <CsvImport key={sessionId} sessionId={sessionId} />
           <div className="space-y-4">
             <Download size={24} className="text-primary" aria-hidden="true" />
             <h3>Download a backup</h3>

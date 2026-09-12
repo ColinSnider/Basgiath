@@ -4,7 +4,6 @@ import { Link } from "@tanstack/react-router";
 import { ArrowRight, BookOpen, Bookmark, CircleCheck, Library } from "lucide-react";
 import { rowanHome } from "@/lib/rowan-fns";
 import { ReadingProgressBar } from "./ReadingProgressBar";
-import { HomeQuickActions } from "./HomeQuickActions";
 
 type HomeData = Awaited<ReturnType<typeof rowanHome>>;
 type Book = HomeData["next"][number];
@@ -66,11 +65,6 @@ export function RowanHome({
                     </p>
                   )}
                   <ReadingProgressBar progress={item} />
-                  <HomeQuickActions sessionId={sessionId} item={item} />
-                  <button className="reader-text-link" onClick={() => openBook(item.book)}>
-                    {item.state === "paused" ? "Open paused read" : "Continue reading"}
-                    <ArrowRight size={15} />
-                  </button>
                 </li>
               );
             })}

@@ -1,4 +1,5 @@
 import { createOrganizationService } from "../../server/v2/organization-service";
+import { backlogImport, historyChange } from "../../shared/backlog";
 import { organizationCommand } from "../../shared/reading-organization";
 import { createAccountService } from "../../server/v2/account-service";
 import { bookEditSchema, settingsSchema, goalTimeframeSchema } from "../../shared/rowan-archive";
@@ -28,6 +29,8 @@ import { createHash } from "node:crypto";
 const key = z.string().uuid();
 const moment = z.string().datetime({ offset: true });
 const command = z.discriminatedUnion("type", [
+  z.object({type: z.literal("history"), payload: historyChange}).strict(),
+  z.object({type: z.literal("backlogImport"), payload: backlogImport}).strict(),
   z
     .object({
       type: z.literal("timer"),
@@ -612,6 +615,14 @@ export const rowanMutate = createServerFn({ method: "POST" })
     try {
       // Narrow the discriminated union before passing validated commands to the domain.
       switch (data.command.type) {
+        case "history": {
+          await library.changeHistory(actor, data.command.payload);
+          break;
+        }
+        case "backlogImport": {
+          await library.importBacklog(actor, data.command.payload);
+          break;
+        }
         case "timer": {
           const { type, ...value } = data.command;
           await library.timer(actor, value);

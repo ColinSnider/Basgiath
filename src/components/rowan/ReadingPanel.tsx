@@ -421,7 +421,7 @@ export function ReadingPanel({
             )}
             {tab === "history" && (
               <section className="rowan-record-card">
-                <HistoryEditor history={history.data} busy={busy} run={run} />
+                <HistoryEditor userBookId={book.id} history={history.data} busy={busy} run={run} />
               </section>
             )}
             {tab === "margins" && (
