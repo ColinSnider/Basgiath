@@ -187,7 +187,7 @@ export function LibraryPage() {
           {!library.isPending && !library.isError && !shelves.isPending && !shelves.isError && (
             <>
               {view !== "shelves" ? (
-                <ul className={view === "grid" ? "reader-library-grid" : "space-y-3"}>
+                <ul className={view === "grid" ? "reader-library-grid" : "reader-library-list"}>
                   {listBooks.map((book) => (
                     <li className={`reader-library-tile reader-library-tile-${view}`} key={book.id}>
                       <button onClick={() => openBook(book)}>
@@ -199,9 +199,8 @@ export function LibraryPage() {
                         />
                         <span className="reader-tile-copy">
                           <h3>{book.title}</h3>
-                          <small className="block">
-                            {book.authors.join(", ")} · {statuses[book.status]}
-                          </small>
+                          <small className="block">{book.authors.join(", ") || "Unknown author"}</small>
+                          <span className="reader-list-status">{statuses[book.status]}</span>
                         </span>
                       </button>
                       <ReadingProgressBar progress={book.progress} />

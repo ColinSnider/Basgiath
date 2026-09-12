@@ -1782,7 +1782,7 @@
   position: absolute;
   z-index: -1;
   inset: 4px auto 4px 4px;
-  width: calc((100% - 8px) / 3);
+  width: calc((100% - 8px) / var(--view-count, 3));
   border-radius: 10px;
   background: linear-gradient(125deg, var(--primary), #8d3b35);
   box-shadow: 0 2px 5px #45162020;
@@ -1848,18 +1848,26 @@
 .rowan-reading-desk .rowan-reading-controls form { display: grid; gap: 14px; }
 .rowan-reading-desk .rowan-reading-controls form label { display: grid; gap: 8px; }
 .rowan-reading-desk .rowan-reading-controls form input { width: 100%; margin: 0; font-size: 22px; padding: 12px; }
-.reader-current-list { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 16px; }
-.reader-current-list > li { min-width: 0; padding: 18px; border: 1px solid var(--border); border-radius: 16px; background: linear-gradient(145deg, var(--card), var(--secondary)); }
-.reader-current-list .reader-book-row { flex-direction: column; align-items: stretch; text-align: left; }
-.reader-current-list .rowan-cover-small { width: 112px; height: 168px; margin: 0 auto 14px; }
-.reader-current-list .reader-book-title { font-size: 20px; }
+.reader-current-list .rowan-cover-small { width: 57px; height: 86px; }
+.reader-library-list { display: grid; border: 1px solid var(--border); border-radius: 16px; overflow: hidden; background: var(--card); }
+.reader-library-list .reader-library-tile-list { display: grid; grid-template-columns: minmax(0, 1fr) minmax(180px, 30%); align-items: center; border: 0; border-radius: 0; padding: 18px 22px; gap: 24px; }
+.reader-library-list .reader-library-tile-list + li { border-top: 1px solid var(--border); }
+.reader-library-list .reader-library-tile-list > button { padding: 0; min-width: 0; text-align: left; }
+.reader-library-list .reader-library-tile-list > .reader-progress { padding: 0; margin: 0; }
+.reader-library-list .reader-tile-copy h3 { font: 1.1rem/1.35 var(--font-display); margin-bottom: 4px; }
+.reader-tile-copy small { color: var(--muted-foreground); }
+.reader-list-status { display: block; font-size: 12px; color: var(--primary); margin-top: 6px; }
+.reader-more-switch { grid-template-columns: repeat(2, 1fr); margin: 20px 32px 0; width: min(340px, calc(100% - 64px)); }
+.reader-more-switch a { padding: 10px 16px; text-align: center; border-radius: 10px; color: var(--muted-foreground); }
+.reader-more-switch a[aria-current="page"] { color: var(--primary-foreground); }
 @media (max-width: 700px) {
   .rowan-reading-desk { grid-template-columns: 1fr; }
   .rowan-record-tabs { gap: 0; }
   .rowan-record-tabs button { flex: 1; padding: 14px 4px; font-size: 12px; flex-direction: column; gap: 5px; }
   .rowan-record-summary { align-items: start; flex-direction: column; }
-  .reader-current-list { display: flex; overflow-x: auto; scroll-snap-type: x mandatory; padding-bottom: 12px; }
-  .reader-current-list > li { flex: 0 0 82%; scroll-snap-align: start; }
+  .reader-library-list .reader-library-tile-list { grid-template-columns: minmax(0, 1fr); gap: 12px; padding: 16px; }
+  .reader-library-list .reader-library-tile-list > .reader-progress { margin-left: 68px; }
+  .reader-more-switch { margin: 16px 20px 0; width: calc(100% - 40px); }
 }
 @media (prefers-reduced-motion: reduce) { .reader-view-slider::before { transition: none; } }
 .reader-app .rowan-cover-hero {

@@ -145,8 +145,7 @@ export function AppShell() {
           </div>
         </header>
         {moreActive && (
-          <nav className="reader-context-nav" aria-label="More navigation">
-            <span>More</span>
+          <nav className="reader-more-switch reader-view-slider" style={{ "--view-index": pathname === "/margins" ? 1 : 0, "--view-count": 2 } as React.CSSProperties} aria-label="More navigation">
             {moreItems.map(({ to, label }) => (
               <Link key={to} to={to} aria-current={pathname === to ? "page" : undefined}>
                 {label}
@@ -156,7 +155,6 @@ export function AppShell() {
         )}
         <main id="page-content" className="reader-page" tabIndex={-1}>
           <header className={pathname === "/" ? "sr-only" : "reader-page-heading"}>
-            <p className="reader-caption">Your reading companion</p>
             <h1>
               {page?.label ?? (pathname.startsWith("/books/") ? "Book details" : "Page not found")}
             </h1>
