@@ -491,7 +491,7 @@
   width: 58px;
   flex-shrink: 0;
   object-fit: contain;
-  border-radius: 3px 6px 6px 3px;
+  border-radius: 8px;
 }
 .reader-cover-placeholder {
   display: grid;
@@ -1558,7 +1558,7 @@
   width: 96px;
   aspect-ratio: 2 / 3;
   overflow: hidden;
-  border-radius: 3px 7px 7px 3px;
+  border-radius: 8px;
   background: hsl(var(--cover-hue) 26% 25%);
   color: #fff9e9;
   box-shadow: 0 3px 9px #0002;
@@ -1809,7 +1809,7 @@
   display: flex;
   align-items: flex-end;
   justify-content: flex-end;
-  flex: 1;
+  flex: 0 0 80px;
   min-width: 76px;
   height: 150px;
   gap: 4px;
@@ -1829,9 +1829,9 @@
 .shelf-arrangement-0 i { width: 74px; height: 19px; }
 .shelf-arrangement-0 i:first-child { width: 65px; transform: rotate(-3deg); }
 .shelf-arrangement-0 i:last-child, .shelf-arrangement-1 i:last-child { display: none; }
-.shelf-arrangement-1 i:first-child { height: 137px; transform: rotate(-12deg); transform-origin: bottom left; margin-right: 18px; }
+.shelf-arrangement-1 i:first-child { height: 137px; transform: rotate(12deg); transform-origin: bottom left; margin-right: 18px; }
 .shelf-arrangement-2 { position: relative; padding-bottom: 21px; }
-.shelf-arrangement-2 i:first-child { transform: rotate(-9deg); height: 108px; margin-right: 9px; }
+.shelf-arrangement-2 i:first-child { transform: rotate(9deg); height: 108px; margin-right: 9px; }
 .shelf-arrangement-2 i:last-child { position: absolute; right: 0; bottom: 0; width: 76px; height: 19px; }
 .shelf-arrangement-3 i { display: none; }
 .rowan-book-record { padding: 0 clamp(16px, 3vw, 36px) 32px; max-width: none; }
@@ -1857,7 +1857,7 @@
 .reader-library-list .reader-tile-copy h3 { font: 1.1rem/1.35 var(--font-display); margin-bottom: 4px; }
 .reader-tile-copy small { color: var(--muted-foreground); }
 .reader-list-status { display: block; font-size: 12px; color: var(--primary); margin-top: 6px; }
-.reader-more-switch { grid-template-columns: repeat(2, 1fr); margin: 20px 32px 0; width: min(340px, calc(100% - 64px)); }
+.reader-more-switch { grid-template-columns: repeat(2, 1fr); margin: 0 0 24px; width: min(340px, 100%); }
 .reader-more-switch a { padding: 10px 16px; text-align: center; border-radius: 10px; color: var(--muted-foreground); }
 .reader-more-switch a[aria-current="page"] { color: var(--primary-foreground); }
 @media (max-width: 700px) {
@@ -1867,8 +1867,22 @@
   .rowan-record-summary { align-items: start; flex-direction: column; }
   .reader-library-list .reader-library-tile-list { grid-template-columns: minmax(0, 1fr); gap: 12px; padding: 16px; }
   .reader-library-list .reader-library-tile-list > .reader-progress { margin-left: 68px; }
-  .reader-more-switch { margin: 16px 20px 0; width: calc(100% - 40px); }
+  .reader-more-switch { margin: 0 0 24px; width: 100%; }
 }
+.reader-account-trigger { display: grid; place-items: center; width: 42px; height: 42px; border: 1px solid var(--border); border-radius: 50%; background: var(--card); color: var(--primary); }
+.reader-account-trigger:hover, .reader-account-trigger[data-state="open"] { background: var(--secondary); }
+.reader-sidebar-note { margin-top: auto; }
+.reader-profile { display: grid; gap: 24px; }
+.reader-profile-intro { display: flex; gap: 24px; align-items: center; padding: clamp(24px, 4vw, 48px); border-radius: 24px; background: linear-gradient(120deg, var(--secondary), var(--card)); border: 1px solid var(--border); }
+.reader-profile-intro h2 { font: clamp(28px, 4vw, 44px)/1.2 var(--font-display); margin: 8px 0; }
+.reader-profile-intro small { display: block; margin-top: 12px; color: var(--muted-foreground); }
+.reader-profile-avatar { display: grid; place-items: center; flex: none; width: 88px; height: 88px; border-radius: 50%; background: var(--primary); color: var(--primary-foreground); font: 32px var(--font-display); }
+.reader-profile-stats { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; }
+.reader-profile-stats > div { display: grid; gap: 10px; padding: 22px; border: 1px solid var(--border); border-radius: 18px; background: var(--card); }
+.reader-profile-stats svg { color: var(--primary); }
+.reader-profile-stats strong { font: 32px var(--font-display); }
+.reader-profile-stats span { font-size: 13px; color: var(--muted-foreground); }
+@media(max-width: 600px) { .reader-profile-intro { flex-direction: column; text-align: center; } .reader-profile-stats { gap: 8px; } .reader-profile-stats > div { padding: 12px; } }
 @media (prefers-reduced-motion: reduce) { .reader-view-slider::before { transition: none; } }
 .reader-app .rowan-cover-hero {
   width: 100%;

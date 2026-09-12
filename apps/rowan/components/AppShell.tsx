@@ -1,8 +1,8 @@
 import { Link, Outlet, useLocation } from "@tanstack/react-router";
-import { useQueryClient } from "@tanstack/react-query";
 import { BookOpen, CalendarDays, Home, Library, Menu, Search, UserRound } from "lucide-react";
 import { useAuth } from "@/lib/auth-context";
 import { useRowanTheme } from "@/components/rowan/useRowanTheme";
+import { AccountMenu } from "./AccountMenu";
 
 const primary = [
   { to: "/", label: "Home", icon: Home, description: "Your reading life, one book at a time." },
@@ -45,15 +45,14 @@ function Theme({ sessionId }: { sessionId: string }) {
 
 export function AppShell() {
   const { pathname } = useLocation();
-  const { user, sessionId, logout } = useAuth();
-  const cache = useQueryClient();
+  const { user, sessionId } = useAuth();
   if (pathname === "/login") return <Outlet />;
 
   const page =
     primary.find((item) => item.to === pathname) ??
     moreItems.find((item) => item.to === pathname) ??
     historyItems.find((item) => item.to === pathname) ??
-    (pathname === accountPage.to ? accountPage : undefined);
+    (pathname === "/profile" ? {label: "Profile", description: "A little about you and your reading life."} : pathname === accountPage.to ? accountPage : undefined);
   const active = (to: string) =>
     pathname === to ||
     (to === "/library" && pathname.startsWith("/books/")) ||
@@ -102,14 +101,6 @@ export function AppShell() {
           ))}
           <MoreButton />
         </nav>
-        <Link
-          to="/account"
-          className={`reader-sidebar-account ${active("/account") ? "is-current" : ""}`}
-          aria-current={active("/account") ? "page" : undefined}
-        >
-          <UserRound size={19} />
-          <span>Account</span>
-        </Link>
         <p className="reader-sidebar-note">
           Keep the books.
           <br />
@@ -124,26 +115,17 @@ export function AppShell() {
           </Link>
           <div className="reader-topbar-actions">
             {user && !user.isGuest ? (
-              <>
-                <Link className="reader-mobile-account" to="/account" aria-label="Open account">
-                  <UserRound size={20} />
-                  <span>Account</span>
-                </Link>
-                <button
-                  className="reader-signout"
-                  onClick={async () => {
-                    await logout();
-                    cache.clear();
-                  }}
-                >
-                  Sign out
-                </button>
-              </>
+              <AccountMenu />
             ) : (
               <Link to="/login">Sign in</Link>
             )}
           </div>
         </header>
+        <main id="page-content" className="reader-page" tabIndex={-1}>
+          <header className={pathname === "/" ? "sr-only" : "reader-page-heading"}>
+            <h1>{page?.label ?? (pathname.startsWith("/books/") ? "Book details" : "Page not found")}</h1>
+            {page && "description" in page && <p>{page.description}</p>}
+          </header>
         {moreActive && (
           <nav className="reader-more-switch reader-view-slider" style={{ "--view-index": pathname === "/margins" ? 1 : 0, "--view-count": 2 } as React.CSSProperties} aria-label="More navigation">
             {moreItems.map(({ to, label }) => (
@@ -153,13 +135,6 @@ export function AppShell() {
             ))}
           </nav>
         )}
-        <main id="page-content" className="reader-page" tabIndex={-1}>
-          <header className={pathname === "/" ? "sr-only" : "reader-page-heading"}>
-            <h1>
-              {page?.label ?? (pathname.startsWith("/books/") ? "Book details" : "Page not found")}
-            </h1>
-            {page && "description" in page && <p>{page.description}</p>}
-          </header>
           <div className="space-y-6">
             <Outlet />
           </div>

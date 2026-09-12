@@ -11,6 +11,7 @@
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as SettingsRouteImport } from './routes/settings'
 import { Route as SearchRouteImport } from './routes/search'
+import { Route as ProfileRouteImport } from './routes/profile'
 import { Route as MarginsRouteImport } from './routes/margins'
 import { Route as LoginRouteImport } from './routes/login'
 import { Route as LibraryRouteImport } from './routes/library'
@@ -29,6 +30,11 @@ const SettingsRoute = SettingsRouteImport.update({
 const SearchRoute = SearchRouteImport.update({
   id: '/search',
   path: '/search',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ProfileRoute = ProfileRouteImport.update({
+  id: '/profile',
+  path: '/profile',
   getParentRoute: () => rootRouteImport,
 } as any)
 const MarginsRoute = MarginsRouteImport.update({
@@ -86,6 +92,7 @@ export interface FileRoutesByFullPath {
   '/library': typeof LibraryRoute
   '/login': typeof LoginRoute
   '/margins': typeof MarginsRoute
+  '/profile': typeof ProfileRoute
   '/search': typeof SearchRoute
   '/settings': typeof SettingsRoute
   '/books/$bookId': typeof BooksBookIdRoute
@@ -99,6 +106,7 @@ export interface FileRoutesByTo {
   '/library': typeof LibraryRoute
   '/login': typeof LoginRoute
   '/margins': typeof MarginsRoute
+  '/profile': typeof ProfileRoute
   '/search': typeof SearchRoute
   '/settings': typeof SettingsRoute
   '/books/$bookId': typeof BooksBookIdRoute
@@ -113,6 +121,7 @@ export interface FileRoutesById {
   '/library': typeof LibraryRoute
   '/login': typeof LoginRoute
   '/margins': typeof MarginsRoute
+  '/profile': typeof ProfileRoute
   '/search': typeof SearchRoute
   '/settings': typeof SettingsRoute
   '/books/$bookId': typeof BooksBookIdRoute
@@ -128,6 +137,7 @@ export interface FileRouteTypes {
     | '/library'
     | '/login'
     | '/margins'
+    | '/profile'
     | '/search'
     | '/settings'
     | '/books/$bookId'
@@ -141,6 +151,7 @@ export interface FileRouteTypes {
     | '/library'
     | '/login'
     | '/margins'
+    | '/profile'
     | '/search'
     | '/settings'
     | '/books/$bookId'
@@ -154,6 +165,7 @@ export interface FileRouteTypes {
     | '/library'
     | '/login'
     | '/margins'
+    | '/profile'
     | '/search'
     | '/settings'
     | '/books/$bookId'
@@ -168,6 +180,7 @@ export interface RootRouteChildren {
   LibraryRoute: typeof LibraryRoute
   LoginRoute: typeof LoginRoute
   MarginsRoute: typeof MarginsRoute
+  ProfileRoute: typeof ProfileRoute
   SearchRoute: typeof SearchRoute
   SettingsRoute: typeof SettingsRoute
   BooksBookIdRoute: typeof BooksBookIdRoute
@@ -187,6 +200,13 @@ declare module '@tanstack/react-router' {
       path: '/search'
       fullPath: '/search'
       preLoaderRoute: typeof SearchRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/profile': {
+      id: '/profile'
+      path: '/profile'
+      fullPath: '/profile'
+      preLoaderRoute: typeof ProfileRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/margins': {
@@ -264,6 +284,7 @@ const rootRouteChildren: RootRouteChildren = {
   LibraryRoute: LibraryRoute,
   LoginRoute: LoginRoute,
   MarginsRoute: MarginsRoute,
+  ProfileRoute: ProfileRoute,
   SearchRoute: SearchRoute,
   SettingsRoute: SettingsRoute,
   BooksBookIdRoute: BooksBookIdRoute,

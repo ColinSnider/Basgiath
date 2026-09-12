@@ -16,6 +16,7 @@ for (const [path, title] of [
   ["/goals", "Goals"],
   ["/margins", "Margins"],
   ["/account", "Account"],
+  ["/profile", "Profile"],
   ["/books/11111111-1111-4111-8111-111111111111", "Book details"],
 ]) {
   const response = await server.fetch(new Request(`http://localhost${path}`));
@@ -27,9 +28,9 @@ for (const [path, title] of [
   assert.ok(!html.includes("rowan-workspace"), `${path}: no monolithic workspace`);
   console.log(`${path}: Rowan ${title}`);
 }
-const missing = await server.fetch(new Request("http://localhost/profile"));
+const missing = await server.fetch(new Request("http://localhost/not-a-page"));
 assert.equal(missing.status, 404);
-console.log("/profile: 404 (legacy route absent)");
+console.log("/not-a-page: 404");
 const settings = await server.fetch(new Request("http://localhost/settings"));
 assert.equal(settings.status, 307);
 assert.equal(settings.headers.get("location"), "/account");
