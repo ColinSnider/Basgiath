@@ -1,4 +1,5 @@
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import { FileSpreadsheet, CheckCircle2 } from "lucide-react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { rowanLibrary, rowanMutate } from "@/lib/rowan-fns";
 import { backlogImport } from "../../../shared/backlog";
@@ -7,7 +8,24 @@ import type { z } from "zod";
 type Row = z.infer<typeof backlogImport>["rows"][number];
 const control =
   "rounded-lg border border-border bg-background px-3 py-2 text-sm disabled:opacity-50";
-export function CsvImport({ sessionId }: { sessionId: string }) {
+const labels: Record<CsvField, string> = {
+  title: "Book title",
+  author: "Author",
+  format: "Reading format",
+  total: "Book length — pages / audio seconds",
+  reads: "Completed reads",
+  startedAt: "Start date",
+  finishedAt: "Finish date",
+};
+export function CsvImport({
+  sessionId,
+  disabled = false,
+  onBusyChange,
+}: {
+  sessionId: string;
+  disabled?: boolean;
+  onBusyChange?: (busy: boolean) => void;
+}) {
   const cache = useQueryClient();
   const [csv, setCsv] = useState<string[][] | null>(null);
   const [mapping, setMapping] = useState<Partial<Record<CsvField, number>>>({});
@@ -32,7 +50,11 @@ export function CsvImport({ sessionId }: { sessionId: string }) {
     },
     onError: () => setError("Import result is uncertain. Retry this same import safely."),
   });
-  const busy = loading || mutation.isPending || !!pending.current;
+  const ownBusy = loading || mutation.isPending || !!pending.current;
+  const busy = disabled || ownBusy;
+  useEffect(() => {
+    onBusyChange?.(ownBusy);
+  }, [ownBusy, onBusyChange]);
   const books = useQuery({
     queryKey: ["rowan", sessionId, "csv-book-choices"],
     enabled: !!rows,
@@ -50,15 +72,25 @@ export function CsvImport({ sessionId }: { sessionId: string }) {
     },
   });
   return (
-    <section className="space-y-3 rounded-xl border border-border p-4">
-      <h3 className="font-display text-xl">Import CSV</h3>
-      <p>
+    <section className="reader-csv-import space-y-4" aria-label="Import CSV reading list">
+      <ol className="reader-import-steps" aria-label="Import progress">
+        {["Choose file", "Map columns", "Review & import"].map((label, index) => (
+          <li key={label} aria-current={(rows ? 2 : csv ? 1 : 0) === index ? "step" : undefined}>
+            <span>{index + 1}</span>
+            {label}
+          </li>
+        ))}
+      </ol>
+      <p className="reader-muted">
         Map your columns, then review. New books are added; existing books stay. Dates apply to one
-        completed read; extra reads have unknown dates. Total length uses pages, or seconds for
-        audio.
+        completed read; extra reads have unknown dates. Book length means the full page count for
+        print/ebooks, or the full duration in seconds for audiobooks—not your current progress.
       </p>
-      <label className="block">
-        Choose CSV (up to 2 MB, 500 rows)
+      <label className="reader-file-label reader-import-file">
+        <span className="flex items-center gap-2">
+          <FileSpreadsheet size={20} aria-hidden="true" /> Choose a CSV reading list
+        </span>
+        <span className="reader-muted text-sm">Up to 2 MB · 500 books</span>
         <input
           className="block max-w-full"
           type="file"
@@ -94,15 +126,15 @@ export function CsvImport({ sessionId }: { sessionId: string }) {
         />
       </label>
       {csv && !rows && (
-        <div className="space-y-3">
+        <div className="reader-restore-review space-y-3">
           <p>
             {csv.length - 1} rows found. Title is required. Formats: book, ebook, audiobook. Blank
             read count defaults to one with dates, otherwise zero.
           </p>
-          <div className="flex flex-wrap gap-3">
+          <div className="reader-import-mapping">
             {csvFields.map((field) => (
               <label key={field}>
-                {field}
+                {labels[field]}
                 <select
                   className={`${control} block max-w-full`}
                   value={mapping[field] ?? ""}
@@ -137,7 +169,7 @@ export function CsvImport({ sessionId }: { sessionId: string }) {
             </select>
           </label>
           <button
-            className={control}
+            className="reader-button"
             disabled={busy || mapping.title === undefined}
             onClick={() => {
               setError("");
@@ -163,8 +195,9 @@ export function CsvImport({ sessionId }: { sessionId: string }) {
         </div>
       )}
       {rows && (
-        <div className="space-y-3">
+        <div className="reader-restore-review space-y-3">
           <h4>
+            <CheckCircle2 size={18} className="inline mr-2" aria-hidden="true" />
             Review {rows.length} books · {rows.reduce((n, row) => n + row.reads, 0)} completed reads
             to add
           </h4>
@@ -278,12 +311,18 @@ export function CsvImport({ sessionId }: { sessionId: string }) {
                   {row.format} · {row.total ?? "Unknown"}{" "}
                   {row.format === "audiobook" ? "seconds" : "pages"}
                 </p>
-                <button type="button" className={control} onClick={() => setRows(rows.filter((_, i) => i !== index))}>Exclude this row</button>
+                <button
+                  type="button"
+                  className={control}
+                  onClick={() => setRows(rows.filter((_, i) => i !== index))}
+                >
+                  Exclude this row
+                </button>
               </fieldset>
             ))}
           </div>
           <button
-            className={control}
+            className="reader-button"
             disabled={busy || books.isPending || books.isError || !rows.length}
             onClick={() => {
               setError("");

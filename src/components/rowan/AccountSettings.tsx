@@ -1,6 +1,14 @@
 import { useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Download, FileCheck, FolderArchive, ShieldCheck, Trash2, Upload, Palette } from "lucide-react";
+import {
+  Download,
+  FileCheck,
+  FolderArchive,
+  ShieldCheck,
+  Trash2,
+  Upload,
+  Palette,
+} from "lucide-react";
 import { rowanSettings, rowanArchive, rowanImportLegacy } from "@/lib/rowan-fns";
 import { parseRowanArchive } from "../../../shared/rowan-archive";
 import { parseImportJson, type ExportData } from "@/lib/user-preferences";
@@ -40,6 +48,8 @@ export function AccountSettings({
   const [exportNotice, setExportNotice] = useState("");
   const [exporting, setExporting] = useState(false);
   const [readingFile, setReadingFile] = useState(false);
+  const [importType, setImportType] = useState<"json" | "csv">("json");
+  const [csvBusy, setCsvBusy] = useState(false);
   const fileInput = useRef<HTMLInputElement>(null);
   const selection = useRef(0);
   const save = useAccountMutation(sessionId);
@@ -72,7 +82,8 @@ export function AccountSettings({
     onReplaced();
   });
   const settings = query.data?.settings;
-  const busy = save.busy || replace.busy || legacyImport.isPending || exporting || readingFile;
+  const otherBusy = save.busy || replace.busy || legacyImport.isPending || exporting || readingFile;
+  const busy = otherBusy || csvBusy;
   function cancelRestore() {
     selection.current++;
     setReadingFile(false);
@@ -83,9 +94,22 @@ export function AccountSettings({
   }
   return (
     <div className={`reader-settings ${standalone ? "reader-settings-redesign" : ""}`}>
-      {standalone && <nav className="reader-settings-navigation" aria-label="Settings categories">
-        {([{id: "appearance", label: "Appearance", icon: Palette}, {id: "security", label: "Security", icon: ShieldCheck}, {id: "data", label: "Library & backups", icon: FolderArchive}] as const).map(({id,label,icon: Icon}) => <button key={id} aria-pressed={category === id} onClick={() => setCategory(id)}><Icon size={18}/><span>{label}</span></button>)}
-      </nav>}
+      {standalone && (
+        <nav className="reader-settings-navigation" aria-label="Settings categories">
+          {(
+            [
+              { id: "appearance", label: "Appearance", icon: Palette },
+              { id: "security", label: "Security", icon: ShieldCheck },
+              { id: "data", label: "Library & backups", icon: FolderArchive },
+            ] as const
+          ).map(({ id, label, icon: Icon }) => (
+            <button key={id} aria-pressed={category === id} onClick={() => setCategory(id)}>
+              <Icon size={18} />
+              <span>{label}</span>
+            </button>
+          ))}
+        </nav>
+      )}
       <div className="reader-settings-columns" hidden={standalone && category === "data"}>
         <div className="space-y-6" hidden={standalone && category !== "security"}>
           <ProfileSettings sessionId={sessionId} section={standalone ? "security" : "all"} />
@@ -113,7 +137,11 @@ export function AccountSettings({
         </div>
       </div>
 
-      <section className="reader-card" aria-labelledby="backup-heading" hidden={standalone && category !== "data"}>
+      <section
+        className="reader-card"
+        aria-labelledby="backup-heading"
+        hidden={standalone && category !== "data"}
+      >
         <header className="reader-card-heading">
           <div className="reader-section-title">
             <span className="reader-icon reader-icon-gold">
@@ -126,13 +154,12 @@ export function AccountSettings({
           </div>
         </header>
         <div className="reader-backup-grid reader-card-body">
-          <CsvImport key={sessionId} sessionId={sessionId} />
           <div className="space-y-4">
             <Download size={24} className="text-primary" aria-hidden="true" />
             <h3>Download a backup</h3>
             <p className="reader-muted">
-              Keep your books, reading history, shelves, series, reading queue, margins, goals, and preferences in a Rowan
-              archive.
+              Keep your books, reading history, shelves, series, reading queue, margins, goals, and
+              preferences in a Rowan archive.
             </p>
             <button
               className="reader-button"
@@ -169,142 +196,177 @@ export function AccountSettings({
           </div>
           <div className="space-y-4">
             <Upload size={24} className="text-primary" aria-hidden="true" />
-            <h3>Restore from an archive</h3>
+            <h3>Bring your books to Rowan</h3>
             <p className="reader-muted">
-              Choose a Rowan backup or Basgiath export to check its contents. Nothing changes until
-              you confirm the restore.
+              Restore a backup or import a reading list. Review everything before saving.
             </p>
-            <label className="reader-file-label">
-              Choose archive (JSON, up to 20 MB)
-              <input
-                ref={fileInput}
-                type="file"
-                accept=".json,application/json"
+            <nav className="reader-library-switch reader-import-switch" aria-label="Import format">
+              <button
+                type="button"
+                className={importType === "json" ? "is-selected" : ""}
+                aria-pressed={importType === "json"}
                 disabled={busy}
-                onChange={async (event) => {
-                  const selected = event.target.files?.[0];
-                  const request = ++selection.current;
-                  setFile(null);
-                  setError("");
-                  setImportNotice("");
-                  setRestoreConfirmation("");
-                  if (!selected) return;
-                  setReadingFile(true);
-                  try {
-                    if (selected.size > 20 * 1024 * 1024) throw new Error("Archive exceeds 20 MB.");
-                    const raw = await selected.text();
-                    try {
-                      const data = parseRowanArchive(raw);
-                      if (request === selection.current)
-                        setFile({
-                          raw,
-                          name: selected.name,
-                          books: data.userBooks.length,
-                          sessions: data.readingSessions.length,
-                          margins: data.margins.length,
-                          kind: "rowan",
-                        });
-                    } catch {
-                      const data = parseImportJson(raw);
-                      if (request === selection.current)
-                        setFile({
-                          raw,
-                          name: selected.name,
-                          books: data.books.length,
-                          sessions: data.books.reduce(
-                            (total, book) => total + (book.reads?.length ?? 0),
-                            0,
-                          ),
-                          margins: data.margins.length,
-                          kind: "basgiath",
-                          legacy: data,
-                        });
-                    }
-                  } catch (cause) {
-                    if (request === selection.current)
-                      setError(
-                        cause instanceof Error
-                          ? cause.message
-                          : "Choose a valid Rowan or Basgiath JSON archive. No data was changed.",
-                      );
-                  } finally {
-                    if (request === selection.current) setReadingFile(false);
-                  }
-                }}
-              />
-            </label>
-            {readingFile && <p role="status">Checking archive…</p>}
-            {error && (
-              <p role="alert" className="text-destructive">
-                {error}
-              </p>
-            )}
-            {legacyImport.isError && (
-              <p role="alert" className="text-destructive">
-                {legacyImport.error instanceof Error
-                  ? legacyImport.error.message
-                  : "Basgiath export could not be imported. No data was changed."}
-              </p>
-            )}
-            {importNotice && <p role="status">{importNotice}</p>}
-            {file && (
-              <form
-                className="reader-restore-review space-y-4"
-                onSubmit={(event) => {
-                  event.preventDefault();
-                  if (!busy && restoreConfirmation === "RESTORE") {
-                    if (file.kind === "basgiath" && file.legacy) {
-                      legacyImport.mutate(file.legacy);
-                    } else {
-                      replace.run({
-                        type: "restore",
-                        key: crypto.randomUUID(),
-                        raw: file.raw,
-                        confirmation: "RESTORE",
-                      });
-                    }
-                  }
-                }}
+                onClick={() => setImportType("json")}
               >
-                <p className="flex items-center gap-2">
-                  <FileCheck size={18} />
-                  <strong className="break-all">{file.name}</strong>
+                JSON backup<span>Rowan or Basgiath</span>
+              </button>
+              <button
+                type="button"
+                className={importType === "csv" ? "is-selected" : ""}
+                aria-pressed={importType === "csv"}
+                disabled={busy}
+                onClick={() => setImportType("csv")}
+              >
+                CSV reading list<span>Map your columns</span>
+              </button>
+            </nav>
+            <div hidden={importType !== "csv"}>
+              <CsvImport
+                key={sessionId}
+                sessionId={sessionId}
+                disabled={otherBusy}
+                onBusyChange={setCsvBusy}
+              />
+            </div>
+            <div hidden={importType !== "json"} className="space-y-4">
+              <p className="reader-muted">
+                Choose a Rowan backup or Basgiath export to check its contents. Nothing changes
+                until you confirm the restore.
+              </p>
+              <label className="reader-file-label reader-import-file">
+                Choose archive (JSON, up to 20 MB)
+                <input
+                  ref={fileInput}
+                  type="file"
+                  accept=".json,application/json"
+                  disabled={busy}
+                  onChange={async (event) => {
+                    const selected = event.target.files?.[0];
+                    const request = ++selection.current;
+                    setFile(null);
+                    setError("");
+                    setImportNotice("");
+                    setRestoreConfirmation("");
+                    if (!selected) return;
+                    setReadingFile(true);
+                    try {
+                      if (selected.size > 20 * 1024 * 1024)
+                        throw new Error("Archive exceeds 20 MB.");
+                      const raw = await selected.text();
+                      try {
+                        const data = parseRowanArchive(raw);
+                        if (request === selection.current)
+                          setFile({
+                            raw,
+                            name: selected.name,
+                            books: data.userBooks.length,
+                            sessions: data.readingSessions.length,
+                            margins: data.margins.length,
+                            kind: "rowan",
+                          });
+                      } catch {
+                        const data = parseImportJson(raw);
+                        if (request === selection.current)
+                          setFile({
+                            raw,
+                            name: selected.name,
+                            books: data.books.length,
+                            sessions: data.books.reduce(
+                              (total, book) => total + (book.reads?.length ?? 0),
+                              0,
+                            ),
+                            margins: data.margins.length,
+                            kind: "basgiath",
+                            legacy: data,
+                          });
+                      }
+                    } catch (cause) {
+                      if (request === selection.current)
+                        setError(
+                          cause instanceof Error
+                            ? cause.message
+                            : "Choose a valid Rowan or Basgiath JSON archive. No data was changed.",
+                        );
+                    } finally {
+                      if (request === selection.current) setReadingFile(false);
+                    }
+                  }}
+                />
+              </label>
+              {readingFile && <p role="status">Checking archive…</p>}
+              {error && (
+                <p role="alert" className="text-destructive">
+                  {error}
                 </p>
-                <p>
-                  {file.books} books · {file.sessions} reading sessions · {file.margins} margins
+              )}
+              {legacyImport.isError && (
+                <p role="alert" className="text-destructive">
+                  {legacyImport.error instanceof Error
+                    ? legacyImport.error.message
+                    : "Basgiath export could not be imported. No data was changed."}
                 </p>
-                <p className="reader-muted">
-                  {file.kind === "basgiath"
-                    ? "This imports your Basgiath books, reading history, margins, goals, and preferences into Rowan. Your existing Rowan data stays until the import completes."
-                    : "This replaces your current library, goals, shelves, series, reading queue, and preferences. Download a backup before continuing."}
-                </p>
-                <label className="reader-setting-form">
-                  Type RESTORE to {file.kind === "basgiath" ? "import this data" : "replace your data"}
-                  <input
-                    value={restoreConfirmation}
-                    onChange={(event) => setRestoreConfirmation(event.target.value)}
-                    autoComplete="off"
-                    disabled={busy}
-                  />
-                </label>
-                <div className="reader-field-action">
-                  <button
-                    className="reader-button"
-                    disabled={busy || restoreConfirmation !== "RESTORE"}
-                  >
-                    {file.kind === "basgiath" ? "Import into Rowan" : "Restore this archive"}
-                  </button>
-                  <button
-                    type="button"
-                    className="reader-button reader-button-quiet"
-                    onClick={cancelRestore}
-                    disabled={replace.busy}
-                  >
-                    Cancel
-                  </button>
-                </div>
-              </form>
-            )}
+              )}
+              {importNotice && <p role="status">{importNotice}</p>}
+              {file && (
+                <form
+                  className="reader-restore-review space-y-4"
+                  onSubmit={(event) => {
+                    event.preventDefault();
+                    if (!busy && restoreConfirmation === "RESTORE") {
+                      if (file.kind === "basgiath" && file.legacy) {
+                        legacyImport.mutate(file.legacy);
+                      } else {
+                        replace.run({
+                          type: "restore",
+                          key: crypto.randomUUID(),
+                          raw: file.raw,
+                          confirmation: "RESTORE",
+                        });
+                      }
+                    }
+                  }}
+                >
+                  <p className="flex items-center gap-2">
+                    <FileCheck size={18} />
+                    <strong className="break-all">{file.name}</strong>
+                  </p>
+                  <p>
+                    {file.books} books · {file.sessions} reading sessions · {file.margins} margins
+                  </p>
+                  <p className="reader-muted">
+                    {file.kind === "basgiath"
+                      ? "This imports your Basgiath books, reading history, margins, goals, and preferences into Rowan. Your existing Rowan data stays until the import completes."
+                      : "This replaces your current library, goals, shelves, series, reading queue, and preferences. Download a backup before continuing."}
+                  </p>
+                  <label className="reader-setting-form">
+                    Type RESTORE to{" "}
+                    {file.kind === "basgiath" ? "import this data" : "replace your data"}
+                    <input
+                      value={restoreConfirmation}
+                      onChange={(event) => setRestoreConfirmation(event.target.value)}
+                      autoComplete="off"
+                      disabled={busy}
+                    />
+                  </label>
+                  <div className="reader-field-action">
+                    <button
+                      className="reader-button"
+                      disabled={busy || restoreConfirmation !== "RESTORE"}
+                    >
+                      {file.kind === "basgiath" ? "Import into Rowan" : "Restore this archive"}
+                    </button>
+                    <button
+                      type="button"
+                      className="reader-button reader-button-quiet"
+                      onClick={cancelRestore}
+                      disabled={replace.busy}
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                </form>
+              )}
+            </div>
           </div>
         </div>
       </section>
@@ -315,7 +377,11 @@ export function AccountSettings({
             : "Your legacy library is imported automatically. Personal Rowan changes are retained."}
         </p>
       )}
-      <section className="reader-card reader-danger" aria-labelledby="clear-heading" hidden={standalone && category !== "data"}>
+      <section
+        className="reader-card reader-danger"
+        aria-labelledby="clear-heading"
+        hidden={standalone && category !== "data"}
+      >
         <details className="reader-card-body reader-disclosure">
           <summary id="clear-heading">
             <Trash2 size={18} />
@@ -323,8 +389,8 @@ export function AccountSettings({
           </summary>
           <div className="space-y-4 mt-4">
             <p>
-              This removes your Rowan library, reading history, margins, shelves, series, reading queue, goals, and saved
-              preferences. Your sign-in account remains.
+              This removes your Rowan library, reading history, margins, shelves, series, reading
+              queue, goals, and saved preferences. Your sign-in account remains.
             </p>
             <p className="reader-muted">
               This cannot be undone without a backup. Download an archive above before clearing your

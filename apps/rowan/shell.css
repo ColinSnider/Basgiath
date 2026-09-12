@@ -1179,6 +1179,20 @@
   grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
   gap: 32px;
 }
+.reader-import-switch { width: 100%; }
+.reader-import-switch button { flex: 1; min-width: 0; }
+.reader-import-switch button:disabled { opacity: .55; cursor: wait; }
+.reader-import-steps { display: flex; flex-wrap: wrap; gap: 12px; padding: 0; list-style: none; font-size: .78rem; color: var(--muted-foreground); }
+.reader-import-steps li { display: flex; align-items: center; gap: 6px; }
+.reader-import-steps li span { display: grid; place-items: center; width: 24px; height: 24px; border-radius: 50%; background: var(--muted); }
+.reader-import-steps [aria-current="step"] { color: var(--primary); font-weight: 600; }
+.reader-import-steps [aria-current="step"] span { background: var(--primary); color: var(--primary-foreground); }
+.reader-import-file { padding: 20px; border: 1px dashed var(--border); border-radius: 16px; background: linear-gradient(135deg, color-mix(in srgb, var(--primary) 7%, var(--card)), var(--card)); }
+.reader-import-mapping { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(210px, 100%), 1fr)); gap: 14px; }
+.reader-import-mapping label { min-width: 0; font-size: .85rem; }
+.reader-import-mapping select { width: 100%; margin-top: 5px; }
+.reader-csv-import fieldset { min-width: 0; background: var(--card); }
+.reader-csv-import input, .reader-csv-import select { max-width: 100%; }
 .reader-backup-grid > div + div {
   border-left: 1px solid var(--border);
   padding-left: 32px;

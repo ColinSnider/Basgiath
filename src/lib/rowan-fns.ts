@@ -29,8 +29,16 @@ import { createHash } from "node:crypto";
 const key = z.string().uuid();
 const moment = z.string().datetime({ offset: true });
 const command = z.discriminatedUnion("type", [
-  z.object({type: z.literal("history"), payload: historyChange}).strict(),
-  z.object({type: z.literal("backlogImport"), payload: backlogImport}).strict(),
+  z
+    .object({
+      type: z.literal("syncOpenLibrary"),
+      key,
+      userBookId: key,
+      expectedVersion: z.number().int().nonnegative(),
+    })
+    .strict(),
+  z.object({ type: z.literal("history"), payload: historyChange }).strict(),
+  z.object({ type: z.literal("backlogImport"), payload: backlogImport }).strict(),
   z
     .object({
       type: z.literal("timer"),
@@ -90,7 +98,11 @@ const command = z.discriminatedUnion("type", [
       expectedVersion: z.number().int().nonnegative().nullable(),
       action: z.enum(["save", "delete"]),
       kind: z.enum(["note", "quote"]).optional(),
-      body: z.string().max(10000).refine(value => value.trim().length > 0, "A margin needs text.").optional(),
+      body: z
+        .string()
+        .max(10000)
+        .refine((value) => value.trim().length > 0, "A margin needs text.")
+        .optional(),
       locator: z.string().trim().max(120).nullable().optional(),
     })
     .strict(),
@@ -107,7 +119,16 @@ const command = z.discriminatedUnion("type", [
       expectedVersion: z.number().int().nonnegative(),
     })
     .strict(),
-  z.object({type: z.literal("shelfManage"), key, shelfId: key, expectedVersion: z.number().int().nonnegative(), action: z.enum(["delete", "up", "down"]), userBookId: key.optional()}).strict(),
+  z
+    .object({
+      type: z.literal("shelfManage"),
+      key,
+      shelfId: key,
+      expectedVersion: z.number().int().nonnegative(),
+      action: z.enum(["delete", "up", "down"]),
+      userBookId: key.optional(),
+    })
+    .strict(),
   z
     .object({
       type: z.literal("shelfItem"),
@@ -544,7 +565,7 @@ export const rowanShelves = createServerFn({ method: "POST" })
           id: shelf.id,
           name: shelf.name,
           description: shelf.description,
-          bookIds: items.map(item => item.userBookId),
+          bookIds: items.map((item) => item.userBookId),
           version: shelf.version,
           itemCount: items.length,
         };
@@ -615,6 +636,11 @@ export const rowanMutate = createServerFn({ method: "POST" })
     try {
       // Narrow the discriminated union before passing validated commands to the domain.
       switch (data.command.type) {
+        case "syncOpenLibrary": {
+          const { type, ...value } = data.command;
+          await library.syncOpenLibrary(actor, value);
+          break;
+        }
         case "history": {
           await library.changeHistory(actor, data.command.payload);
           break;
@@ -659,7 +685,7 @@ export const rowanMutate = createServerFn({ method: "POST" })
           break;
         }
         case "shelfManage": {
-          const {type, ...value} = data.command;
+          const { type, ...value } = data.command;
           await shelfService.manage(actor, value);
           break;
         }

@@ -206,50 +206,208 @@ export function createLibraryService(database: Database, provider: CatalogProvid
   }
 
   return {
+    async syncOpenLibrary(
+      actor: Actor,
+      input: { key: string; userBookId: string; expectedVersion: number },
+    ) {
+      const data = z
+        .object({ key: id, userBookId: id, expectedVersion: version })
+        .strict()
+        .parse(input);
+      const book = await database
+        .select({ book: userBooks, mapping: externalMappings })
+        .from(userBooks)
+        .leftJoin(
+          externalMappings,
+          and(
+            eq(externalMappings.workId, userBooks.workId),
+            eq(externalMappings.provider, "openlibrary"),
+          ),
+        )
+        .where(and(eq(userBooks.id, data.userBookId), eq(userBooks.userId, actor.userId)))
+        .limit(1);
+      if (!book[0]) throw new DomainError("NOT_FOUND", "Book not found.");
+      if (!book[0].mapping)
+        throw new DomainError("NOT_FOUND", "This book has no Open Library link to sync.");
+      let fetched: z.infer<typeof catalogRecordSchema>;
+      try {
+        fetched = catalogRecordSchema.parse(
+          await provider.fetchWork({
+            provider: "openlibrary",
+            externalId: book[0].mapping.externalId,
+          }),
+        );
+      } catch {
+        throw new DomainError(
+          "PROVIDER_UNAVAILABLE",
+          "Open Library could not be reached. Try again.",
+        );
+      }
+      return mutate(actor, data.key, fingerprint("syncOpenLibrary", data), async (tx) => {
+        const owned = await ownedBook(tx, actor, data.userBookId);
+        expectVersion(owned.version, data.expectedVersion);
+        await tx
+          .update(works)
+          .set({ title: fetched.title, authors: fetched.authors, coverUrl: fetched.coverUrl })
+          .where(eq(works.id, owned.workId));
+        await tx
+          .update(userBooks)
+          .set({ version: owned.version + 1 })
+          .where(eq(userBooks.id, owned.id));
+        return {
+          workId: owned.workId,
+          userBookId: owned.id,
+          sessionId: null,
+          version: owned.version + 1,
+        };
+      });
+    },
+
     async changeHistory(actor: Actor, input: z.input<typeof historyChange>) {
       const data = historyChange.parse(input);
-      return mutate(actor, data.key, fingerprint("history", data), async tx => {
+      return mutate(actor, data.key, fingerprint("history", data), async (tx) => {
         const book = await ownedBook(tx, actor, data.userBookId);
         if (data.action === "add") {
           expectVersion(book.version, data.expectedVersion);
-          const [edition] = book.selectedEditionId ? await tx.select().from(editions).where(eq(editions.id, book.selectedEditionId)) : [];
-          for (let i = 0; i < data.count; i++) await tx.insert(readingSessions).values({userBookId: book.id, workId: book.workId, editionId: book.selectedEditionId, state: "completed", unit: edition?.format === "audiobook" ? "second" : "page", total: edition?.format === "audiobook" ? edition.durationSeconds : edition?.pageCount ?? null, startedAt: i === 0 && data.startedAt ? new Date(data.startedAt) : null, finishedAt: i === 0 && data.finishedAt ? new Date(data.finishedAt) : null});
+          const [edition] = book.selectedEditionId
+            ? await tx.select().from(editions).where(eq(editions.id, book.selectedEditionId))
+            : [];
+          for (let i = 0; i < data.count; i++)
+            await tx.insert(readingSessions).values({
+              userBookId: book.id,
+              workId: book.workId,
+              editionId: book.selectedEditionId,
+              state: "completed",
+              unit: edition?.format === "audiobook" ? "second" : "page",
+              total:
+                edition?.format === "audiobook"
+                  ? edition.durationSeconds
+                  : (edition?.pageCount ?? null),
+              startedAt: i === 0 && data.startedAt ? new Date(data.startedAt) : null,
+              finishedAt: i === 0 && data.finishedAt ? new Date(data.finishedAt) : null,
+            });
         } else {
           if (!data.sessionId) throw new DomainError("NOT_FOUND", "Choose a reading attempt.");
-          const {session} = await ownedSession(tx, actor, data.sessionId);
-          if (session.userBookId !== book.id) throw new DomainError("NOT_FOUND", "Reading attempt not found.");
+          const { session } = await ownedSession(tx, actor, data.sessionId);
+          if (session.userBookId !== book.id)
+            throw new DomainError("NOT_FOUND", "Reading attempt not found.");
           expectVersion(session.version, data.expectedVersion);
           if (data.action === "remove") {
-            const logs = await tx.select({id: progressEntries.id}).from(progressEntries).where(eq(progressEntries.readingSessionId, session.id)).limit(1);
-            if (session.state !== "completed" || logs.length || session.timedReads.length || session.readingSeconds || session.timerStartedAt) throw new DomainError("INVALID_TRANSITION", "Only backlogged reads without progress or timer records can be removed here.");
+            const logs = await tx
+              .select({ id: progressEntries.id })
+              .from(progressEntries)
+              .where(eq(progressEntries.readingSessionId, session.id))
+              .limit(1);
+            if (
+              session.state !== "completed" ||
+              logs.length ||
+              session.timedReads.length ||
+              session.readingSeconds ||
+              session.timerStartedAt
+            )
+              throw new DomainError(
+                "INVALID_TRANSITION",
+                "Only backlogged reads without progress or timer records can be removed here.",
+              );
             await tx.delete(readingSessions).where(eq(readingSessions.id, session.id));
           } else {
-            if ((session.state === "active" || session.state === "paused") && data.finishedAt) throw new DomainError("INVALID_TRANSITION", "Finish this reading attempt before setting its finish date.");
-            await tx.update(readingSessions).set({startedAt: data.startedAt ? new Date(data.startedAt) : null, finishedAt: data.finishedAt ? new Date(data.finishedAt) : null, version: session.version + 1}).where(eq(readingSessions.id, session.id));
+            if ((session.state === "active" || session.state === "paused") && data.finishedAt)
+              throw new DomainError(
+                "INVALID_TRANSITION",
+                "Finish this reading attempt before setting its finish date.",
+              );
+            await tx
+              .update(readingSessions)
+              .set({
+                startedAt: data.startedAt ? new Date(data.startedAt) : null,
+                finishedAt: data.finishedAt ? new Date(data.finishedAt) : null,
+                version: session.version + 1,
+              })
+              .where(eq(readingSessions.id, session.id));
           }
         }
-        const remaining = await tx.select({state: readingSessions.state}).from(readingSessions).where(eq(readingSessions.userBookId, book.id));
-        const status = data.action === "add" && book.status === "want_to_read" ? "read" : data.action === "remove" && book.status === "read" && !remaining.some(s => s.state === "completed") ? (remaining.some(s => s.state === "dnf") ? "dnf" : "want_to_read") : book.status;
-        await tx.update(userBooks).set({version: book.version + 1, status}).where(eq(userBooks.id, book.id));
-        return {workId: book.workId, userBookId: book.id, sessionId: data.sessionId ?? null, version: book.version + 1};
+        const remaining = await tx
+          .select({ state: readingSessions.state })
+          .from(readingSessions)
+          .where(eq(readingSessions.userBookId, book.id));
+        const status =
+          data.action === "add" && book.status === "want_to_read"
+            ? "read"
+            : data.action === "remove" &&
+                book.status === "read" &&
+                !remaining.some((s) => s.state === "completed")
+              ? remaining.some((s) => s.state === "dnf")
+                ? "dnf"
+                : "want_to_read"
+              : book.status;
+        await tx
+          .update(userBooks)
+          .set({ version: book.version + 1, status })
+          .where(eq(userBooks.id, book.id));
+        return {
+          workId: book.workId,
+          userBookId: book.id,
+          sessionId: data.sessionId ?? null,
+          version: book.version + 1,
+        };
       });
     },
     async importBacklog(actor: Actor, input: z.input<typeof backlogImport>) {
       const data = backlogImport.parse(input);
-      return mutate(actor, data.key, fingerprint("backlog-import", data), async tx => {
+      return mutate(actor, data.key, fingerprint("backlog-import", data), async (tx) => {
         let first: MutationResult | undefined;
         for (const row of data.rows) {
           let book;
           if (row.userBookId) book = await ownedBook(tx, actor, row.userBookId);
           else {
-            const [work] = await tx.insert(works).values({title: row.title, authors: row.author ? [row.author] : []}).returning();
-            const [edition] = await tx.insert(editions).values({workId: work.id, format: row.format, pageCount: row.format === "audiobook" ? null : row.total, durationSeconds: row.format === "audiobook" ? row.total : null}).returning();
-            [book] = await tx.insert(userBooks).values({userId: actor.userId, workId: work.id, selectedEditionId: edition.id}).returning();
+            const [work] = await tx
+              .insert(works)
+              .values({ title: row.title, authors: row.author ? [row.author] : [] })
+              .returning();
+            const [edition] = await tx
+              .insert(editions)
+              .values({
+                workId: work.id,
+                format: row.format,
+                pageCount: row.format === "audiobook" ? null : row.total,
+                durationSeconds: row.format === "audiobook" ? row.total : null,
+              })
+              .returning();
+            [book] = await tx
+              .insert(userBooks)
+              .values({ userId: actor.userId, workId: work.id, selectedEditionId: edition.id })
+              .returning();
           }
-          const [edition] = book.selectedEditionId ? await tx.select().from(editions).where(eq(editions.id, book.selectedEditionId)) : [];
-          for (let i = 0; i < row.reads; i++) await tx.insert(readingSessions).values({userBookId: book.id, workId: book.workId, editionId: book.selectedEditionId, state: "completed", unit: edition?.format === "audiobook" ? "second" : "page", total: edition?.format === "audiobook" ? edition.durationSeconds : edition?.pageCount ?? null, startedAt: i === 0 && row.startedAt ? new Date(row.startedAt) : null, finishedAt: i === 0 && row.finishedAt ? new Date(row.finishedAt) : null});
-          await tx.update(userBooks).set({version: book.version + 1, status: row.reads && book.status === "want_to_read" ? "read" : book.status}).where(eq(userBooks.id, book.id));
-          first ??= {workId: book.workId, userBookId: book.id, sessionId: null, version: book.version + 1};
+          const [edition] = book.selectedEditionId
+            ? await tx.select().from(editions).where(eq(editions.id, book.selectedEditionId))
+            : [];
+          for (let i = 0; i < row.reads; i++)
+            await tx.insert(readingSessions).values({
+              userBookId: book.id,
+              workId: book.workId,
+              editionId: book.selectedEditionId,
+              state: "completed",
+              unit: edition?.format === "audiobook" ? "second" : "page",
+              total:
+                edition?.format === "audiobook"
+                  ? edition.durationSeconds
+                  : (edition?.pageCount ?? null),
+              startedAt: i === 0 && row.startedAt ? new Date(row.startedAt) : null,
+              finishedAt: i === 0 && row.finishedAt ? new Date(row.finishedAt) : null,
+            });
+          await tx
+            .update(userBooks)
+            .set({
+              version: book.version + 1,
+              status: row.reads && book.status === "want_to_read" ? "read" : book.status,
+            })
+            .where(eq(userBooks.id, book.id));
+          first ??= {
+            workId: book.workId,
+            userBookId: book.id,
+            sessionId: null,
+            version: book.version + 1,
+          };
         }
         return first!;
       });
@@ -405,10 +563,27 @@ export function createLibraryService(database: Database, provider: CatalogProvid
       );
     },
 
-    async marginJournal(actor: Actor, input: { query: string; offset: number; userBookId?: string; kind?: "note" | "quote"; from?: string; to?: string }) {
+    async marginJournal(
+      actor: Actor,
+      input: {
+        query: string;
+        offset: number;
+        userBookId?: string;
+        kind?: "note" | "quote";
+        from?: string;
+        to?: string;
+      },
+    ) {
       z.number().int().positive().parse(actor.userId);
       const data = z
-        .object({ query: z.string().trim().max(200), offset: z.number().int().min(0).max(100000), userBookId: id.optional(), kind: z.enum(["note", "quote"]).optional(), from: z.string().datetime().optional(), to: z.string().datetime().optional() })
+        .object({
+          query: z.string().trim().max(200),
+          offset: z.number().int().min(0).max(100000),
+          userBookId: id.optional(),
+          kind: z.enum(["note", "quote"]).optional(),
+          from: z.string().datetime().optional(),
+          to: z.string().datetime().optional(),
+        })
         .strict()
         .parse(input);
       const term = `%${data.query.replace(/[\\%_]/g, "\\$&")}%`;
@@ -452,7 +627,11 @@ export function createLibraryService(database: Database, provider: CatalogProvid
         .limit(25)
         .offset(data.offset);
       return {
-        items: rows.slice(0, 24).map((row) => ({ ...row, createdAt: row.createdAt.toISOString(), updatedAt: row.updatedAt.toISOString() })),
+        items: rows.slice(0, 24).map((row) => ({
+          ...row,
+          createdAt: row.createdAt.toISOString(),
+          updatedAt: row.updatedAt.toISOString(),
+        })),
         nextOffset: rows.length > 24 ? data.offset + 24 : null,
       };
     },
@@ -1022,9 +1201,13 @@ export function createLibraryService(database: Database, provider: CatalogProvid
             string[]
           >`(select coalesce(jsonb_agg(value), '[]'::jsonb) from jsonb_array_elements(case when jsonb_typeof(${userBooks.legacyMetadata}->'tags') = 'array' then ${userBooks.legacyMetadata}->'tags' else '[]'::jsonb end) where jsonb_typeof(value) = 'string')`,
           addedAt: userBooks.addedAt,
-          lastFinishedAt: sql<string | null>`(select max(rs.finished_at)::text from v2.reading_sessions rs where rs.user_book_id = ${userBooks.id} and rs.state = 'completed')`,
+          lastFinishedAt: sql<
+            string | null
+          >`(select max(rs.finished_at)::text from v2.reading_sessions rs where rs.user_book_id = ${userBooks.id} and rs.state = 'completed')`,
           hasRead: sql<boolean>`exists (select 1 from v2.reading_sessions rs where rs.user_book_id = ${userBooks.id} and rs.state = 'completed')`,
-          readYears: sql<string[]>`(select coalesce(jsonb_agg(distinct extract(year from rs.finished_at at time zone 'UTC')::text), '[]'::jsonb) from v2.reading_sessions rs where rs.user_book_id = ${userBooks.id} and rs.state = 'completed' and rs.finished_at is not null)`,
+          readYears: sql<
+            string[]
+          >`(select coalesce(jsonb_agg(distinct extract(year from rs.finished_at at time zone 'UTC')::text), '[]'::jsonb) from v2.reading_sessions rs where rs.user_book_id = ${userBooks.id} and rs.state = 'completed' and rs.finished_at is not null)`,
           format: sql<
             string | null
           >`(select e.format from v2.editions e where e.id = ${userBooks.selectedEditionId})`,
@@ -1129,7 +1312,11 @@ export function createLibraryService(database: Database, provider: CatalogProvid
           expectedVersion: version.nullable(),
           action: z.enum(["save", "delete"]),
           kind: z.enum(["note", "quote"]).optional(),
-          body: z.string().max(10000).refine(value => value.trim().length > 0, "A margin needs text.").optional(),
+          body: z
+            .string()
+            .max(10000)
+            .refine((value) => value.trim().length > 0, "A margin needs text.")
+            .optional(),
           locator: z.string().trim().max(120).nullable().optional(),
         })
         .strict()

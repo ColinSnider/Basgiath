@@ -2,6 +2,7 @@ import { useState } from "react";
 import type { rowanHistory } from "@/lib/rowan-fns";
 import { metadataSchema } from "../../../shared/rowan-archive";
 import { useAccountMutation } from "./useAccountMutation";
+import { useReadingCommands } from "../../../apps/rowan/components/reader";
 
 const control =
   "rounded-lg border border-border bg-background px-3 py-2 text-sm disabled:opacity-50";
@@ -18,8 +19,9 @@ export function BookEditor({
 }) {
   const edit = useAccountMutation(sessionId);
   const deletion = useAccountMutation(sessionId, close);
+  const { run: runSync, busy: syncing, feedback: syncFeedback } = useReadingCommands();
   const [error, setError] = useState("");
-  const busy = edit.busy || deletion.busy;
+  const busy = edit.busy || deletion.busy || syncing;
   return (
     <details className="rounded-xl border border-border p-4">
       <summary className="cursor-pointer">Edit book details</summary>
@@ -90,6 +92,29 @@ export function BookEditor({
           Save book details
         </button>
       </form>
+      <div className="mt-4 rounded-lg border border-border bg-muted/30 p-3">
+        <h4 className="font-medium">Catalog details</h4>
+        <p className="text-sm text-muted-foreground">
+          Refresh title, author, cover, and synopsis from Open Library. Your saved page count and
+          reading history stay unchanged.
+        </p>
+        <button
+          type="button"
+          className={control}
+          disabled={busy}
+          onClick={() =>
+            runSync({
+              type: "syncOpenLibrary",
+              key: crypto.randomUUID(),
+              userBookId: book.id,
+              expectedVersion: history.userBookVersion,
+            })
+          }
+        >
+          Sync with Open Library
+        </button>
+        {syncFeedback}
+      </div>
       <p role="status">{error || edit.message || deletion.message}</p>
       {edit.uncertain && (
         <button className={control} onClick={edit.retry}>
