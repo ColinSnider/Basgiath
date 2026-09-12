@@ -12,7 +12,6 @@ import { join } from "node:path";
 
 const rowanMigrationConfig = {
   migrationsFolder: "migrations-v2",
-  migrationsSchema: "rowan_migrations",
 } as const;
 
 test("a fresh standalone database supports accounts and Rowan without legacy imports", async () => {
