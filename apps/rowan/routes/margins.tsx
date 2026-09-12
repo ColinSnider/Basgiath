@@ -13,5 +13,5 @@ export const Route = createFileRoute("/margins")({
 
 function Page() {
   const { sessionId, openBook } = useReader();
-  return <Journal sessionId={sessionId} openBook={openBook} />;
+  return <Journal key={sessionId} sessionId={sessionId} openBook={openBook} />;
 }

@@ -39,9 +39,26 @@ export function useReader() {
   const router = useRouter();
   return {
     sessionId: sessionId!,
-    openBook: (book: { id: string }) =>
-      void router.navigate({ href: "/books/" + encodeURIComponent(book.id) }),
-    goLibrary: () => void router.navigate({ to: "/library" }),
+    openBook: (book: { id: string }) => {
+      if (router.state.location.pathname === "/library") {
+        try {
+          sessionStorage.setItem(`rowan-library:${sessionId}`, router.state.location.href);
+        } catch {
+          /* Browsing still works without storage. */
+        }
+      }
+      void router.navigate({ href: "/books/" + encodeURIComponent(book.id) });
+    },
+    goLibrary: () => {
+      let href = "/library";
+      try {
+        const saved = sessionStorage.getItem(`rowan-library:${sessionId}`);
+        if (saved === "/library" || saved?.startsWith("/library?")) href = saved;
+      } catch {
+        /* Fall back to the library. */
+      }
+      void router.navigate({ href });
+    },
   };
 }
 

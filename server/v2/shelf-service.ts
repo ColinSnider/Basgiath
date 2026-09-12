@@ -82,7 +82,7 @@ export function createShelfService(database: Database) {
           throw new DomainError("INVALID_TRANSITION", "A shelf with this name already exists.");
         const [shelf] = await tx
           .insert(shelves)
-          .values({ userId: actor.userId, name: data.name })
+          .values({ userId: actor.userId, name: data.name, sortOrder: sql`(select coalesce(max(sort_order), -1) + 1 from v2.shelves where user_id = ${actor.userId})` })
           .returning();
         return { shelfId: shelf.id, userBookId: null, version: shelf.version };
       });
@@ -90,10 +90,10 @@ export function createShelfService(database: Database) {
 
     async rename(
       actor: Actor,
-      input: { key: string; shelfId: string; name: string; expectedVersion: number },
+      input: { key: string; shelfId: string; name: string; description?: string; expectedVersion: number },
     ) {
       const data = z
-        .object({ key: id, shelfId: id, name, expectedVersion: version })
+        .object({ key: id, shelfId: id, name, description: z.string().trim().max(1000).optional(), expectedVersion: version })
         .strict()
         .parse(input);
       return mutate(actor, data.key, hash("shelf.rename", data), async (tx) => {
@@ -112,7 +112,7 @@ export function createShelfService(database: Database) {
         const nextVersion = shelf.version + 1;
         await tx
           .update(shelves)
-          .set({ name: data.name, version: nextVersion })
+          .set({ name: data.name, description: data.description ?? shelf.description, version: nextVersion })
           .where(eq(shelves.id, shelf.id));
         return { shelfId: shelf.id, userBookId: null, version: nextVersion };
       });
@@ -157,7 +157,7 @@ export function createShelfService(database: Database) {
         if (data.present && !existing)
           await tx
             .insert(shelfItems)
-            .values({ shelfId: shelf.id, userId: actor.userId, userBookId: book.id });
+            .values({ shelfId: shelf.id, userId: actor.userId, userBookId: book.id, sortOrder: sql`(select coalesce(max(sort_order), -1) + 1 from v2.shelf_items where shelf_id = ${shelf.id})` });
         if (!data.present && existing)
           await tx.delete(shelfItems).where(eq(shelfItems.id, existing.id));
         const changed = data.present !== Boolean(existing);
@@ -168,13 +168,41 @@ export function createShelfService(database: Database) {
       });
     },
 
+    async manage(actor: Actor, input: {key: string; shelfId: string; expectedVersion: number; action: "delete" | "up" | "down"; userBookId?: string}) {
+      const data = z.object({key: id, shelfId: id, expectedVersion: version, action: z.enum(["delete", "up", "down"]), userBookId: id.optional()}).strict().parse(input);
+      return mutate(actor, data.key, hash("shelf.manage", data), async tx => {
+        const shelf = await ownedShelf(tx, actor, data.shelfId);
+        if (shelf.version !== data.expectedVersion) throw new DomainError("VERSION_CONFLICT", "The shelf changed. Refresh before saving again.");
+        if (data.action === "delete") {
+          if (data.userBookId) throw new DomainError("INVALID_TRANSITION", "Delete applies to a shelf, not a book.");
+          await tx.delete(shelfItems).where(eq(shelfItems.shelfId, shelf.id));
+          await tx.delete(shelves).where(eq(shelves.id, shelf.id));
+        } else if (data.userBookId) {
+          const items = await tx.select().from(shelfItems).where(eq(shelfItems.shelfId, shelf.id)).orderBy(shelfItems.sortOrder, shelfItems.addedAt, shelfItems.id);
+          const index = items.findIndex(item => item.userBookId === data.userBookId);
+          if (index < 0) throw new DomainError("NOT_FOUND", "Book is not on this shelf.");
+          const target = index + (data.action === "up" ? -1 : 1);
+          if (target >= 0 && target < items.length) [items[index], items[target]] = [items[target], items[index]];
+          for (const [position, item] of items.entries()) await tx.update(shelfItems).set({sortOrder: position}).where(eq(shelfItems.id, item.id));
+          await tx.update(shelves).set({version: shelf.version + 1}).where(eq(shelves.id, shelf.id));
+        } else {
+          const items = await tx.select().from(shelves).where(eq(shelves.userId, actor.userId)).orderBy(shelves.sortOrder, shelves.createdAt, shelves.id);
+          const index = items.findIndex(item => item.id === shelf.id);
+          const target = index + (data.action === "up" ? -1 : 1);
+          if (target >= 0 && target < items.length) [items[index], items[target]] = [items[target], items[index]];
+          for (const [position, item] of items.entries()) await tx.update(shelves).set({sortOrder: position, version: item.version + 1}).where(eq(shelves.id, item.id));
+        }
+        return {shelfId: shelf.id, userBookId: data.userBookId ?? null, version: shelf.version + 1};
+      });
+    },
+
     async list(actor: Actor) {
       owner(actor);
       return database
         .select()
         .from(shelves)
         .where(eq(shelves.userId, actor.userId))
-        .orderBy(shelves.createdAt, shelves.id);
+        .orderBy(shelves.sortOrder, shelves.createdAt, shelves.id);
     },
 
     async membership(actor: Actor, userBookId: string) {

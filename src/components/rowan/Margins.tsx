@@ -28,7 +28,7 @@ export function Margins({ margins, ...actions }: Actions & { margins: Margin[] }
   );
 }
 
-function MarginCard({ margin, ...actions }: Actions & { margin: Margin }) {
+export function MarginCard({ margin, ...actions }: Actions & { margin: Margin }) {
   const [editing, setEditing] = useState(false);
   const [deleting, setDeleting] = useState(false);
   return (
@@ -41,7 +41,9 @@ function MarginCard({ margin, ...actions }: Actions & { margin: Margin }) {
           {margin.locator && <p className="text-xs text-primary">{margin.locator}</p>}
           <p className="whitespace-pre-wrap break-words">{margin.body}</p>
           <p className="text-xs text-muted-foreground">
-            {new Date(margin.updatedAt).toLocaleDateString()}
+            {new Date(margin.createdAt).toLocaleDateString()}
+            {margin.updatedAt !== margin.createdAt &&
+              ` · Edited ${new Date(margin.updatedAt).toLocaleDateString()}`}
           </p>
           <div className="flex gap-2">
             <button className={control} disabled={actions.busy} onClick={() => setEditing(true)}>
@@ -83,7 +85,7 @@ function MarginCard({ margin, ...actions }: Actions & { margin: Margin }) {
   );
 }
 
-function MarginEditor({
+export function MarginEditor({
   margin,
   cancel,
   savedIds,
@@ -93,6 +95,10 @@ function MarginEditor({
   const [body, setBody] = useState(margin?.body ?? "");
   const [locator, setLocator] = useState(margin?.locator ?? "");
   const [submittedId, setSubmittedId] = useState<string | null>(null);
+  const [submittedVersion, setSubmittedVersion] = useState<number | null>(null);
+  useEffect(() => {
+    if (margin && submittedVersion !== null && margin.version > submittedVersion) cancel?.();
+  }, [margin, submittedVersion, cancel]);
   useEffect(() => {
     if (submittedId && savedIds?.includes(submittedId)) {
       setBody("");
@@ -107,6 +113,7 @@ function MarginEditor({
         e.preventDefault();
         const marginId = margin?.id ?? crypto.randomUUID();
         if (!margin) setSubmittedId(marginId);
+        else setSubmittedVersion(margin.version);
         actions.run({
           type: "margin",
           key: crypto.randomUUID(),
@@ -115,7 +122,7 @@ function MarginEditor({
           expectedVersion: margin?.version ?? null,
           action: "save",
           kind,
-          body: body.trim(),
+          body,
           locator: locator.trim() || null,
         });
       }}

@@ -4,6 +4,7 @@ import { Link } from "@tanstack/react-router";
 import { ArrowRight, BookOpen, Bookmark, CircleCheck, Library } from "lucide-react";
 import { rowanHome } from "@/lib/rowan-fns";
 import { ReadingProgressBar } from "./ReadingProgressBar";
+import { HomeQuickActions } from "./HomeQuickActions";
 
 type HomeData = Awaited<ReturnType<typeof rowanHome>>;
 type Book = HomeData["next"][number];
@@ -59,8 +60,13 @@ export function RowanHome({
               return (
                 <li key={item.book.id}>
                   <BookCard book={item.book} openBook={openBook} />
-                  {item.timerStartedAt && <p className="text-sm text-primary">Reading timer is running · Open book to stop and save</p>}
+                  {item.timerStartedAt && (
+                    <p className="text-sm text-primary">
+                      Reading timer is running
+                    </p>
+                  )}
                   <ReadingProgressBar progress={item} />
+                  <HomeQuickActions sessionId={sessionId} item={item} />
                   <button className="reader-text-link" onClick={() => openBook(item.book)}>
                     {item.state === "paused" ? "Open paused read" : "Continue reading"}
                     <ArrowRight size={15} />
@@ -163,7 +169,12 @@ function BookCard({ book, openBook }: { book: Book; openBook: (book: Book) => vo
       onClick={() => openBook(book)}
       aria-label={`Open ${book.title}`}
     >
-      <BookCover title={book.title} authors={book.authors} src={book.coverUrl} className="rowan-cover-small" />
+      <BookCover
+        title={book.title}
+        authors={book.authors}
+        src={book.coverUrl}
+        className="rowan-cover-small"
+      />
       <span className="reader-book-copy">
         <span className="reader-book-title">{book.title}</span>
         <span className="reader-muted">{book.authors.join(", ") || "Unknown author"}</span>

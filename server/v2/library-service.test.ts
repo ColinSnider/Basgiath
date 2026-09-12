@@ -522,6 +522,10 @@ test("v2 catalog and reading lifecycle work against isolated PostgreSQL", async 
       assert.equal(home.last?.book.id, saved.userBookId);
       assert.equal(home.last?.finishedAt, later);
       assert.ok(home.current.some((item) => item.book.id === saved.userBookId));
+      const active = (await service.readingHistory(actor, saved.userBookId)).sessions.find(session => session.state === "active")!;
+      const current = home.current.find(item => item.book.id === saved.userBookId)!;
+      assert.equal(current.sessionId, active.id);
+      assert.equal(current.version, active.version);
       assert.ok(home.current.every((item) => ["active", "paused"].includes(item.state)));
       assert.ok(home.next.every((book) => book.status === "want_to_read"));
       const others = await service.home(other);
@@ -752,7 +756,8 @@ test("v2 catalog and reading lifecycle work against isolated PostgreSQL", async 
         marginId,
         expectedVersion: null,
         action: "save",
-        body: "A unique private passage",
+        body: "  A unique private passage — 100%_雪\n\n",
+        kind: "quote",
       });
       assert.equal(
         (await service.marginJournal(actor, { query: "unique private", offset: 0 })).items.length,
@@ -762,6 +767,16 @@ test("v2 catalog and reading lifecycle work against isolated PostgreSQL", async 
         (await service.marginJournal(other, { query: "unique private", offset: 0 })).items.length,
         0,
       );
+      const journal = await service.marginJournal(actor, {query: "100%_雪", offset: 0, userBookId: manual.userBookId, kind: "quote"});
+      assert.equal(journal.items.length, 1);
+      assert.equal(journal.items[0].body, "  A unique private passage — 100%_雪\n\n");
+      assert.equal((await service.marginJournal(actor, {query: "", offset: 0, userBookId: manual.userBookId, kind: "note"})).items.length, 0);
+      assert.equal((await service.marginJournal(actor, {query: "", offset: 0, to: journal.items[0].createdAt})).items.some(item => item.id === marginId), false);
+      await service.changeMargin(actor, {key: key(), userBookId: manual.userBookId, marginId, expectedVersion: 0, action: "save", body: "  Edited\n"});
+      const edited = (await service.marginJournal(actor, {query: "Edited", offset: 0, from: journal.items[0].createdAt})).items.find(item => item.id === marginId)!;
+      assert.equal(edited.createdAt, journal.items[0].createdAt);
+      assert.equal(edited.body, "  Edited\n");
+      assert.equal(edited.version, 1);
       const google = createLibraryService(
         database as unknown as Parameters<typeof createLibraryService>[0],
         {

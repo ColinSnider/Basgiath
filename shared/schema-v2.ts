@@ -233,6 +233,8 @@ export const shelves = v2.table(
       .notNull()
       .references(() => users.id, { onDelete: "restrict" }),
     name: text("name").notNull(),
+    description: text("description").notNull().default(""),
+    sortOrder: integer("sort_order").notNull().default(0),
     version: integer("version").notNull().default(0),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   },
@@ -248,6 +250,7 @@ export const shelfItems = v2.table(
   {
     id: uuid("id").primaryKey().defaultRandom(),
     shelfId: uuid("shelf_id").notNull(),
+    sortOrder: integer("sort_order").notNull().default(0),
     userId: integer("user_id").notNull(),
     userBookId: uuid("user_book_id").notNull(),
     addedAt: timestamp("added_at", { withTimezone: true }).notNull().defaultNow(),

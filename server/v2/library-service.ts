@@ -289,7 +289,7 @@ export function createLibraryService(database: Database, provider: CatalogProvid
           return JSON.stringify(
             {
               format: "rowan-archive",
-              version: 5,
+              version: 6,
               exportedAt: new Date().toISOString(),
               userBooks: await tx
                 .select()
@@ -355,10 +355,10 @@ export function createLibraryService(database: Database, provider: CatalogProvid
       );
     },
 
-    async marginJournal(actor: Actor, input: { query: string; offset: number }) {
+    async marginJournal(actor: Actor, input: { query: string; offset: number; userBookId?: string; kind?: "note" | "quote"; from?: string; to?: string }) {
       z.number().int().positive().parse(actor.userId);
       const data = z
-        .object({ query: z.string().trim().max(200), offset: z.number().int().min(0).max(100000) })
+        .object({ query: z.string().trim().max(200), offset: z.number().int().min(0).max(100000), userBookId: id.optional(), kind: z.enum(["note", "quote"]).optional(), from: z.string().datetime().optional(), to: z.string().datetime().optional() })
         .strict()
         .parse(input);
       const term = `%${data.query.replace(/[\\%_]/g, "\\$&")}%`;
@@ -368,6 +368,9 @@ export function createLibraryService(database: Database, provider: CatalogProvid
           body: margins.body,
           kind: margins.kind,
           locator: margins.locator,
+          version: margins.version,
+          userBookId: margins.userBookId,
+          createdAt: margins.createdAt,
           updatedAt: margins.updatedAt,
           book: {
             id: userBooks.id,
@@ -388,14 +391,18 @@ export function createLibraryService(database: Database, provider: CatalogProvid
           and(
             eq(userBooks.userId, actor.userId),
             sql`${margins.deletedAt} is null`,
+            data.userBookId ? eq(margins.userBookId, data.userBookId) : undefined,
+            data.kind ? eq(margins.kind, data.kind) : undefined,
+            data.from ? sql`${margins.createdAt} >= ${data.from}::timestamptz` : undefined,
+            data.to ? sql`${margins.createdAt} < ${data.to}::timestamptz` : undefined,
             data.query ? or(ilike(margins.body, term), ilike(personalTitle, term)) : undefined,
           ),
         )
-        .orderBy(desc(margins.updatedAt), margins.id)
+        .orderBy(desc(margins.createdAt), margins.id)
         .limit(25)
         .offset(data.offset);
       return {
-        items: rows.slice(0, 24).map((row) => ({ ...row, updatedAt: row.updatedAt.toISOString() })),
+        items: rows.slice(0, 24).map((row) => ({ ...row, createdAt: row.createdAt.toISOString(), updatedAt: row.updatedAt.toISOString() })),
         nextOffset: rows.length > 24 ? data.offset + 24 : null,
       };
     },
@@ -842,6 +849,8 @@ export function createLibraryService(database: Database, provider: CatalogProvid
           .select({
             book,
             state: readingSessions.state,
+            sessionId: readingSessions.id,
+            version: readingSessions.version,
             timerStartedAt: readingSessions.timerStartedAt,
             position: readingSessions.position,
             total: readingSessions.total,
@@ -962,6 +971,10 @@ export function createLibraryService(database: Database, provider: CatalogProvid
           tags: sql<
             string[]
           >`(select coalesce(jsonb_agg(value), '[]'::jsonb) from jsonb_array_elements(case when jsonb_typeof(${userBooks.legacyMetadata}->'tags') = 'array' then ${userBooks.legacyMetadata}->'tags' else '[]'::jsonb end) where jsonb_typeof(value) = 'string')`,
+          addedAt: userBooks.addedAt,
+          lastFinishedAt: sql<string | null>`(select max(rs.finished_at)::text from v2.reading_sessions rs where rs.user_book_id = ${userBooks.id} and rs.state = 'completed')`,
+          hasRead: sql<boolean>`exists (select 1 from v2.reading_sessions rs where rs.user_book_id = ${userBooks.id} and rs.state = 'completed')`,
+          readYears: sql<string[]>`(select coalesce(jsonb_agg(distinct extract(year from rs.finished_at at time zone 'UTC')::text), '[]'::jsonb) from v2.reading_sessions rs where rs.user_book_id = ${userBooks.id} and rs.state = 'completed' and rs.finished_at is not null)`,
           format: sql<
             string | null
           >`(select e.format from v2.editions e where e.id = ${userBooks.selectedEditionId})`,
@@ -1066,7 +1079,7 @@ export function createLibraryService(database: Database, provider: CatalogProvid
           expectedVersion: version.nullable(),
           action: z.enum(["save", "delete"]),
           kind: z.enum(["note", "quote"]).optional(),
-          body: z.string().trim().min(1).max(10000).optional(),
+          body: z.string().max(10000).refine(value => value.trim().length > 0, "A margin needs text.").optional(),
           locator: z.string().trim().max(120).nullable().optional(),
         })
         .strict()

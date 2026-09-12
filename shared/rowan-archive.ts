@@ -55,7 +55,7 @@ export const bookEditSchema = z
 const archiveSchema = z
   .object({
     format: z.literal("rowan-archive"),
-    version: z.union([z.literal(2), z.literal(3), z.literal(4), z.literal(5)]),
+    version: z.union([z.literal(2), z.literal(3), z.literal(4), z.literal(5), z.literal(6)]),
     exportedAt: date,
     works: rows(
       z
@@ -175,13 +175,15 @@ const archiveSchema = z
           id,
           userId: owner,
           name: z.string().trim().min(1).max(120),
+          description: z.string().max(1000).default(""),
+          sortOrder: integer.default(0),
           version: integer,
           createdAt: date,
         })
         .strict(),
     ),
     shelfItems: rows(
-      z.object({ id, shelfId: id, userId: owner, userBookId: id, addedAt: date }).strict(),
+      z.object({ id, shelfId: id, userId: owner, userBookId: id, addedAt: date, sortOrder: integer.default(0) }).strict(),
     ),
     series: rows(
       z

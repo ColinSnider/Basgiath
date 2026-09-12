@@ -82,7 +82,7 @@ test("progress corrections preserve originals, recalculate history, and survive 
   });
   await t.test("archive remaps correction chains in arbitrary order; clear remains atomic", async () => {
     const archive = JSON.parse(await library.archive(actor));
-    assert.equal(archive.version, 5);
+    assert.equal(archive.version, 6);
     archive.progressEntries.reverse();
     const parsed = parseRowanArchive(JSON.stringify(archive));
     assert.equal(parsed.progressEntries.length, 8);

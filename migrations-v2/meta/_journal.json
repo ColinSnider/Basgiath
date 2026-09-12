@@ -57,6 +57,13 @@
       "when": 1789100000000,
       "tag": "0007_reading_timer",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1789200000000,
+      "tag": "0008_shelf_management",
+      "breakpoints": true
     }
   ]
 }

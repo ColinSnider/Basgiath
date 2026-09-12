@@ -87,7 +87,7 @@ const command = z.discriminatedUnion("type", [
       expectedVersion: z.number().int().nonnegative().nullable(),
       action: z.enum(["save", "delete"]),
       kind: z.enum(["note", "quote"]).optional(),
-      body: z.string().trim().min(1).max(10000).optional(),
+      body: z.string().max(10000).refine(value => value.trim().length > 0, "A margin needs text.").optional(),
       locator: z.string().trim().max(120).nullable().optional(),
     })
     .strict(),
@@ -100,9 +100,11 @@ const command = z.discriminatedUnion("type", [
       key,
       shelfId: key,
       name: z.string().trim().min(1).max(120),
+      description: z.string().trim().max(1000).optional(),
       expectedVersion: z.number().int().nonnegative(),
     })
     .strict(),
+  z.object({type: z.literal("shelfManage"), key, shelfId: key, expectedVersion: z.number().int().nonnegative(), action: z.enum(["delete", "up", "down"]), userBookId: key.optional()}).strict(),
   z
     .object({
       type: z.literal("shelfItem"),
@@ -512,6 +514,10 @@ export const rowanJournal = createServerFn({ method: "POST" })
         sessionId: key,
         query: z.string().max(200),
         offset: z.number().int().min(0).max(100000),
+        userBookId: key.optional(),
+        kind: z.enum(["note", "quote"]).optional(),
+        from: z.string().datetime().optional(),
+        to: z.string().datetime().optional(),
       })
       .strict(),
   )
@@ -526,15 +532,18 @@ export const rowanShelves = createServerFn({ method: "POST" })
     const shelves = await shelfService.list(actor);
     return Promise.all(
       shelves.map(async (shelf) => {
-        const [items] = await database
-          .select({ count: count() })
+        const items = await database
+          .select({ userBookId: v2ShelfItems.userBookId })
           .from(v2ShelfItems)
-          .where(eq(v2ShelfItems.shelfId, shelf.id));
+          .where(eq(v2ShelfItems.shelfId, shelf.id))
+          .orderBy(v2ShelfItems.sortOrder, v2ShelfItems.addedAt, v2ShelfItems.id);
         return {
           id: shelf.id,
           name: shelf.name,
+          description: shelf.description,
+          bookIds: items.map(item => item.userBookId),
           version: shelf.version,
-          itemCount: items?.count ?? 0,
+          itemCount: items.length,
         };
       }),
     );
@@ -636,6 +645,11 @@ export const rowanMutate = createServerFn({ method: "POST" })
         case "shelfCreate": {
           const { type, ...value } = data.command;
           await shelfService.create(actor, value);
+          break;
+        }
+        case "shelfManage": {
+          const {type, ...value} = data.command;
+          await shelfService.manage(actor, value);
           break;
         }
         case "shelfRename": {
