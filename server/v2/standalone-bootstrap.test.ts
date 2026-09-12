@@ -6,10 +6,14 @@ import { readMigrationFiles } from "drizzle-orm/migrator";
 import { migrate } from "drizzle-orm/pglite/migrator";
 import { users, sessions } from "../../shared/schema.ts";
 import { createLibraryService } from "./library-service.ts";
-import { rowanMigrationConfig } from "../../scripts/rowan-migration-config.mjs";
 import { mkdtemp, mkdir, readFile, writeFile, copyFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+
+const rowanMigrationConfig = {
+  migrationsFolder: "migrations-v2",
+  migrationsSchema: "rowan_migrations",
+} as const;
 
 test("a fresh standalone database supports accounts and Rowan without legacy imports", async () => {
   const client = new PGlite();
