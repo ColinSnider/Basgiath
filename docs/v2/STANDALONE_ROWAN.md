@@ -15,7 +15,7 @@ npm run db:migrate:rowan
 npm run dev:rowan
 ```
 
-Open the displayed local URL and create a Rowan account. Google Books remains optional through `GOOGLE_BOOKS_ENABLED` and `GOOGLE_BOOKS_API_KEY`.
+Open the displayed local URL and create a Rowan account. Set `GOOGLE_BOOKS_API_KEY` for the primary Google Books search. Open Library is available through “Search more on Open Library.” The old `GOOGLE_BOOKS_ENABLED` flag is no longer used by Rowan.
 
 `npm run dev`, `npm run build`, and `npm start` now select Rowan. The explicit `:rowan` commands are equivalent. Builds produce `dist-rowan/`. `npm run typecheck:rowan` checks the application's route types. The old app is available only through `dev:legacy`, `build:legacy`, and `start:legacy`.
 

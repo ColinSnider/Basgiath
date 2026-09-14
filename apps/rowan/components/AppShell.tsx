@@ -1,5 +1,15 @@
 import { Link, Outlet, useLocation } from "@tanstack/react-router";
-import { BookOpen, CalendarDays, Home, Library, Menu, Search, UserRound } from "lucide-react";
+import {
+  BookOpen,
+  CalendarDays,
+  Home,
+  Library,
+  Menu,
+  Search,
+  UserRound,
+  Target,
+  NotebookPen,
+} from "lucide-react";
 import { useAuth } from "@/lib/auth-context";
 import { useRowanTheme } from "@/components/rowan/useRowanTheme";
 import { AccountMenu } from "./AccountMenu";
@@ -52,7 +62,11 @@ export function AppShell() {
     primary.find((item) => item.to === pathname) ??
     moreItems.find((item) => item.to === pathname) ??
     historyItems.find((item) => item.to === pathname) ??
-    (pathname === "/profile" ? {label: "Profile", description: "A little about you and your reading life."} : pathname === accountPage.to ? accountPage : undefined);
+    (pathname === "/profile"
+      ? { label: "Profile", description: "A little about you and your reading life." }
+      : pathname === accountPage.to
+        ? accountPage
+        : undefined);
   const active = (to: string) =>
     pathname === to ||
     (to === "/library" && pathname.startsWith("/books/")) ||
@@ -114,27 +128,39 @@ export function AppShell() {
             <span>Rowan</span>
           </Link>
           <div className="reader-topbar-actions">
-            {user && !user.isGuest ? (
-              <AccountMenu />
-            ) : (
-              <Link to="/login">Sign in</Link>
-            )}
+            {user && !user.isGuest ? <AccountMenu /> : <Link to="/login">Sign in</Link>}
           </div>
         </header>
         <main id="page-content" className="reader-page" tabIndex={-1}>
           <header className={pathname === "/" ? "sr-only" : "reader-page-heading"}>
-            <h1>{page?.label ?? (pathname.startsWith("/books/") ? "Book details" : "Page not found")}</h1>
+            <h1>
+              {page?.label ?? (pathname.startsWith("/books/") ? "Book details" : "Page not found")}
+            </h1>
             {page && "description" in page && <p>{page.description}</p>}
           </header>
-        {moreActive && (
-          <nav className="reader-more-switch reader-view-slider" style={{ "--view-index": pathname === "/margins" ? 1 : 0, "--view-count": 2 } as React.CSSProperties} aria-label="More navigation">
-            {moreItems.map(({ to, label }) => (
-              <Link key={to} to={to} aria-current={pathname === to ? "page" : undefined}>
-                {label}
-              </Link>
-            ))}
-          </nav>
-        )}
+          {moreActive && (
+            <nav
+              className="reader-more-switch reader-view-slider"
+              style={
+                {
+                  "--view-index": pathname === "/margins" ? 1 : 0,
+                  "--view-count": 2,
+                } as React.CSSProperties
+              }
+              aria-label="More navigation"
+            >
+              {moreItems.map(({ to, label }) => (
+                <Link key={to} to={to} aria-current={pathname === to ? "page" : undefined}>
+                  {to === "/goals" ? (
+                    <Target size={17} aria-hidden="true" />
+                  ) : (
+                    <NotebookPen size={17} aria-hidden="true" />
+                  )}
+                  {label}
+                </Link>
+              ))}
+            </nav>
+          )}
           <div className="space-y-6">
             <Outlet />
           </div>

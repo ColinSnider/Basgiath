@@ -1,4 +1,16 @@
 import { useState } from "react";
+import {
+  Search,
+  SlidersHorizontal,
+  LayoutGrid,
+  List,
+  Library,
+  Heart,
+  BookCheck,
+  X,
+  Plus,
+  Layers,
+} from "lucide-react";
 import { useNavigate, useSearch } from "@tanstack/react-router";
 import { librarySearch } from "../components/library-search";
 import { useQuery } from "@tanstack/react-query";
@@ -14,6 +26,7 @@ type Shelf = Awaited<ReturnType<typeof rowanShelves>>[number];
 export function LibraryPage() {
   const { sessionId, openBook } = useReader();
   const { run, busy, feedback } = useReadingCommands();
+  const [filtersOpen, setFiltersOpen] = useState(false);
   const browsing = librarySearch.parse(useSearch({ strict: false }));
   const navigate = useNavigate();
   const {
@@ -29,6 +42,16 @@ export function LibraryPage() {
     read,
     sort,
   } = browsing;
+  const filterCount = [
+    status !== "all",
+    !!selectedShelf,
+    format !== "all",
+    !!author,
+    !!year,
+    favorite,
+    read,
+    sort !== "shelf",
+  ].filter(Boolean).length;
   const update = (patch: Partial<typeof browsing>) =>
     void navigate({
       to: "/library",
@@ -132,6 +155,7 @@ export function LibraryPage() {
           aria-pressed={section === "books"}
           onClick={() => setSection("books")}
         >
+          <Library size={18} className="inline mr-2" aria-hidden="true" />
           Library <span>{allBooks.length} books</span>
         </button>
         <button
@@ -139,6 +163,7 @@ export function LibraryPage() {
           aria-pressed={section === "series"}
           onClick={() => setSection("series")}
         >
+          <Layers size={18} className="inline mr-2" aria-hidden="true" />
           Series & queue
         </button>
       </nav>
@@ -146,133 +171,158 @@ export function LibraryPage() {
         <ReadingOrganization sessionId={sessionId} openBook={openBook} />
       ) : (
         <section className="reader-shelf-library">
-          <div className="reader-shelf-toolbar">
-            <select
-              className={control}
-              aria-label="Sort books"
-              value={sort}
-              onChange={(e) => update({ sort: e.target.value as typeof sort })}
-            >
-              {Object.entries({
-                shelf: "Shelf order / title",
-                title: "Title A–Z",
-                author: "Author A–Z",
-                newest: "Recently added",
-                oldest: "Oldest added",
-                finished: "Recently finished",
-                pages: "Longest books",
-              }).map(([value, label]) => (
-                <option value={value} key={value}>
-                  {label}
-                </option>
-              ))}
-            </select>
-            <select
-              className={control}
-              aria-label="Format"
-              value={format}
-              onChange={(e) => update({ format: e.target.value })}
-            >
-              {Object.entries({
-                all: "All formats",
-                book: "Print",
-                ebook: "Ebook",
-                audiobook: "Audiobook",
-                unknown: "Unspecified",
-              }).map(([value, label]) => (
-                <option value={value} key={value}>
-                  {label}
-                </option>
-              ))}
-            </select>
-            <select
-              className={control}
-              aria-label="Author"
-              value={author}
-              onChange={(e) => update({ author: e.target.value })}
-            >
-              <option value="">All authors</option>
-              {authors.map((name) => (
-                <option key={name}>{name}</option>
-              ))}
-            </select>
-            <select
-              className={control}
-              aria-label="Completion year (UTC)"
-              value={year}
-              onChange={(e) => update({ year: e.target.value })}
-            >
-              <option value="">All completion years</option>
-              {years.map((value) => (
-                <option key={value}>{value}</option>
-              ))}
-            </select>
+          <div className="reader-library-searchbar">
+            <label className="reader-library-search">
+              <Search size={18} aria-hidden="true" />
+              <input
+                className={control}
+                aria-label="Find a book"
+                placeholder="Find a book or author…"
+                value={query}
+                onChange={(event) => setQuery(event.target.value)}
+              />
+            </label>
             <button
-              className={control}
-              aria-pressed={favorite}
-              onClick={() => update({ favorite: !favorite })}
+              className={`${control} reader-filter-trigger`}
+              aria-expanded={filtersOpen}
+              aria-controls="library-filter-panel"
+              onClick={() => setFiltersOpen(!filtersOpen)}
             >
-              ♥ Favorites
+              <SlidersHorizontal size={18} aria-hidden="true" />
+              Filters{filterCount > 0 && <span className="reader-count">{filterCount}</span>}
             </button>
-            <button className={control} aria-pressed={read} onClick={() => update({ read: !read })}>
-              Previously read
-            </button>
-            <button
-              className={control}
-              onClick={() =>
-                update({
-                  query: "",
-                  status: "all",
-                  shelf: "",
-                  format: "all",
-                  author: "",
-                  year: "",
-                  favorite: false,
-                  read: false,
-                })
-              }
-            >
-              Clear filters
-            </button>
-            <span role="status">
-              {listBooks.length} of {allBooks.length} books
-            </span>
           </div>
-          <div className="reader-shelf-toolbar">
-            <input
-              className={control}
-              aria-label="Find a book"
-              placeholder="Find a book or author…"
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-            />
-            <select
-              className={control}
-              aria-label="Reading status"
-              value={status}
-              onChange={(e) => setStatus(e.target.value)}
-            >
-              {Object.entries(statuses).map(([key, label]) => (
-                <option value={key} key={key}>
-                  {label}
-                </option>
-              ))}
-            </select>
-            <select
-              className={control}
-              aria-label="Shelf"
-              value={selectedShelf}
-              onChange={(e) => setSelectedShelf(e.target.value)}
-            >
-              <option value="">All shelves</option>
-              {shelves.data?.map((s) => (
-                <option key={s.id} value={s.id}>
-                  {s.name}
-                </option>
-              ))}
-              <option value="unfiled">Unfiled books</option>
-            </select>
-          </div>
+          {filtersOpen && (
+            <div id="library-filter-panel" className="reader-filter-panel">
+              <div className="reader-shelf-toolbar">
+                <select
+                  className={control}
+                  aria-label="Sort books"
+                  value={sort}
+                  onChange={(e) => update({ sort: e.target.value as typeof sort })}
+                >
+                  {Object.entries({
+                    shelf: "Shelf order / title",
+                    title: "Title A–Z",
+                    author: "Author A–Z",
+                    newest: "Recently added",
+                    oldest: "Oldest added",
+                    finished: "Recently finished",
+                    pages: "Longest books",
+                  }).map(([value, label]) => (
+                    <option value={value} key={value}>
+                      {label}
+                    </option>
+                  ))}
+                </select>
+                <select
+                  className={control}
+                  aria-label="Format"
+                  value={format}
+                  onChange={(e) => update({ format: e.target.value })}
+                >
+                  {Object.entries({
+                    all: "All formats",
+                    book: "Print",
+                    ebook: "Ebook",
+                    audiobook: "Audiobook",
+                    unknown: "Unspecified",
+                  }).map(([value, label]) => (
+                    <option value={value} key={value}>
+                      {label}
+                    </option>
+                  ))}
+                </select>
+                <select
+                  className={control}
+                  aria-label="Author"
+                  value={author}
+                  onChange={(e) => update({ author: e.target.value })}
+                >
+                  <option value="">All authors</option>
+                  {authors.map((name) => (
+                    <option key={name}>{name}</option>
+                  ))}
+                </select>
+                <select
+                  className={control}
+                  aria-label="Completion year (UTC)"
+                  value={year}
+                  onChange={(e) => update({ year: e.target.value })}
+                >
+                  <option value="">All completion years</option>
+                  {years.map((value) => (
+                    <option key={value}>{value}</option>
+                  ))}
+                </select>
+                <button
+                  className={control}
+                  aria-pressed={favorite}
+                  onClick={() => update({ favorite: !favorite })}
+                >
+                  <Heart size={16} aria-hidden="true" />
+                  Favorites
+                </button>
+                <button
+                  className={control}
+                  aria-pressed={read}
+                  onClick={() => update({ read: !read })}
+                >
+                  <BookCheck size={16} aria-hidden="true" />
+                  Previously read
+                </button>
+                <button
+                  className={control}
+                  onClick={() =>
+                    update({
+                      query: "",
+                      status: "all",
+                      shelf: "",
+                      format: "all",
+                      author: "",
+                      year: "",
+                      favorite: false,
+                      read: false,
+                    })
+                  }
+                >
+                  <X size={16} aria-hidden="true" />
+                  Clear filters
+                </button>
+              </div>
+              <div className="reader-shelf-toolbar">
+                <select
+                  className={control}
+                  aria-label="Reading status"
+                  value={status}
+                  onChange={(e) => setStatus(e.target.value)}
+                >
+                  {Object.entries(statuses).map(([key, label]) => (
+                    <option value={key} key={key}>
+                      {label}
+                    </option>
+                  ))}
+                </select>
+                <select
+                  className={control}
+                  aria-label="Shelf"
+                  value={selectedShelf}
+                  onChange={(e) => setSelectedShelf(e.target.value)}
+                >
+                  <option value="">All shelves</option>
+                  {shelves.data?.map((s) => (
+                    <option key={s.id} value={s.id}>
+                      {s.name}
+                    </option>
+                  ))}
+                  <option value="unfiled">Unfiled books</option>
+                </select>
+              </div>
+            </div>
+          )}
+          <p role="status" className="text-sm text-muted-foreground">
+            {listBooks.length} of {allBooks.length} books{filterCount ? " · Filters applied" : ""}
+          </p>
           <div className="reader-shelf-toolbar">
             <div
               className="reader-shelf-view-switch reader-view-slider"
@@ -290,12 +340,21 @@ export function LibraryPage() {
                   key={mode}
                   onClick={() => setView(mode)}
                 >
+                  {mode === "shelves" ? (
+                    <Library size={16} aria-hidden="true" />
+                  ) : mode === "grid" ? (
+                    <LayoutGrid size={16} aria-hidden="true" />
+                  ) : (
+                    <List size={16} aria-hidden="true" />
+                  )}
                   {mode === "shelves" ? "Shelves" : mode === "grid" ? "Grid" : "List"}
                 </button>
               ))}
             </div>
             <details>
-              <summary>New shelf</summary>
+              <summary>
+                <Plus size={16} className="inline" aria-hidden="true" /> New shelf
+              </summary>
               <form
                 className="reader-shelf-toolbar"
                 onSubmit={(e) => {

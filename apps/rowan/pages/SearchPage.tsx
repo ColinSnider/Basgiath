@@ -1,19 +1,14 @@
 import { BookCover } from "@/components/rowan/BookCover";
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { rowanSearch, rowanStatus } from "@/lib/rowan-fns";
+import { rowanSearch } from "@/lib/rowan-fns";
+import { Search, SearchCheck, Plus, BookOpen } from "lucide-react";
 import { ManualBook } from "@/components/rowan/ManualBook";
 import { control, useReader, useReadingCommands } from "../components/reader";
 export function SearchPage() {
   const { sessionId } = useReader();
   const { run, busy, feedback } = useReadingCommands();
-  const { data: configuration } = useQuery({
-    queryKey: ["rowan-configuration"],
-    queryFn: () => rowanStatus(),
-    staleTime: Infinity,
-  });
-  const googleBooksEnabled = configuration?.googleBooksEnabled ?? false;
-  const [catalogSource, setCatalogSource] = useState<"openlibrary" | "googlebooks">("openlibrary");
+  const [catalogSource, setCatalogSource] = useState<"openlibrary" | "googlebooks">("googlebooks");
   const [searchText, setSearchText] = useState("");
   const [catalogQuery, setCatalogQuery] = useState("");
   const [includeExtras, setIncludeExtras] = useState(false);
@@ -35,7 +30,10 @@ export function SearchPage() {
         className="rounded-2xl border border-border bg-card p-5 space-y-4"
         aria-label="Find a book"
       >
-        <h2 className="font-display text-2xl">Your next good book</h2>
+        <h2 className="font-display text-2xl flex items-center gap-2">
+          <BookOpen size={24} aria-hidden="true" />
+          Your next good book
+        </h2>
         <label className="flex items-center gap-2 text-sm">
           <input
             type="checkbox"
@@ -44,26 +42,14 @@ export function SearchPage() {
           />
           Include companion books, collections and activities
         </label>
-        {googleBooksEnabled && (
-          <label className="text-sm">
-            Search source{" "}
-            <select
-              className={control}
-              value={catalogSource}
-              onChange={(event) => setCatalogSource(event.target.value as typeof catalogSource)}
-            >
-              <option value="googlebooks">Google Books</option>
-              <option value="openlibrary">Open Library</option>
-            </select>
-          </label>
-        )}
         <form
           className="flex gap-2"
           onSubmit={(e) => {
             e.preventDefault();
             const query = searchText.trim();
-            if (query === catalogQuery) void catalog.refetch();
-            else setCatalogQuery(query);
+            if (query === catalogQuery && catalogSource === "googlebooks") void catalog.refetch();
+            setCatalogSource("googlebooks");
+            setCatalogQuery(query);
           }}
         >
           <input
@@ -75,9 +61,29 @@ export function SearchPage() {
             onChange={(e) => setSearchText(e.target.value)}
           />
           <button className={control} disabled={!searchText.trim() || catalog.isFetching}>
+            <Search size={16} className="inline mr-1" aria-hidden="true" />
             Search
           </button>
         </form>
+        {!!catalogQuery && (
+          <div className="flex flex-wrap items-center gap-2 text-sm">
+            <span className="text-muted-foreground">
+              Results from {catalogSource === "googlebooks" ? "Google Books" : "Open Library"}
+            </span>
+            <button
+              type="button"
+              className={control}
+              onClick={() =>
+                setCatalogSource(catalogSource === "googlebooks" ? "openlibrary" : "googlebooks")
+              }
+            >
+              <SearchCheck size={16} className="inline mr-1" aria-hidden="true" />
+              {catalogSource === "googlebooks"
+                ? "Search more on Open Library"
+                : "Back to Google Books"}
+            </button>
+          </div>
+        )}
         {catalog.isFetching && (
           <p role="status">
             Searching {catalogSource === "googlebooks" ? "Google Books" : "Open Library"}…
@@ -110,7 +116,12 @@ export function SearchPage() {
                 key={`${book.ref.provider}:${book.ref.externalId}`}
                 className="flex items-center gap-3 py-3"
               >
-                <BookCover title={book.title} authors={book.authors} src={book.coverUrl} className="rowan-cover-small" />
+                <BookCover
+                  title={book.title}
+                  authors={book.authors}
+                  src={book.coverUrl}
+                  className="rowan-cover-small"
+                />
                 <div className="min-w-0 flex-1">
                   <p className="font-medium">{book.title}</p>
                   <p className="text-sm text-muted-foreground">
@@ -132,6 +143,7 @@ export function SearchPage() {
                   disabled={busy}
                   onClick={() => run({ type: "save", key: crypto.randomUUID(), ref: book.ref })}
                 >
+                  <Plus size={16} className="inline mr-1" aria-hidden="true" />
                   Save book
                 </button>
               </li>

@@ -29,7 +29,10 @@ export function createOpenLibraryProvider(options: {
   fetchImpl?: typeof fetch;
   intervalMs?: number;
   ttlMs?: number;
-}): CatalogProvider & { search(query: string): Promise<WorkSearchResult[]> } {
+}): CatalogProvider & {
+  search(query: string): Promise<WorkSearchResult[]>;
+  fetchMetadata: NonNullable<CatalogProvider["fetchMetadata"]>;
+} {
   if (!options.userAgent.trim()) throw new Error("Open Library requires an application identity.");
   const fetchImpl = options.fetchImpl ?? fetch;
   const intervalMs = Math.max(0, options.intervalMs ?? 1100);
@@ -40,9 +43,9 @@ export function createOpenLibraryProvider(options: {
   let queue: Promise<unknown> = Promise.resolve();
   let nextRequestAt = 0;
 
-  function get(path: string): Promise<unknown> {
+  function get(path: string, fresh = false): Promise<unknown> {
     const hit = cache.get(path);
-    if (hit && hit.expires > Date.now()) return Promise.resolve(hit.value);
+    if (!fresh && hit && hit.expires > Date.now()) return Promise.resolve(hit.value);
     const existing = pending.get(path);
     if (existing) return existing;
     const request = queue
@@ -88,6 +91,39 @@ export function createOpenLibraryProvider(options: {
   }
   const fields = "key,title,author_name,cover_i,subject";
   return {
+    async fetchMetadata(ref) {
+      if (ref.provider !== "openlibrary") throw new Error("Unsupported catalog provider.");
+      const key = workKey.parse(ref.externalId);
+      const work = z
+        .object({
+          title: z.string().min(1),
+          description: z.union([z.string(), z.object({ value: z.string() })]).optional(),
+          covers: z.array(z.number()).optional(),
+          authors: z
+            .array(z.object({ author: z.object({ key: z.string().regex(/^\/authors\/OL\d+A$/) }) }))
+            .optional(),
+        })
+        .parse(await get(`${key}.json`, true));
+      const authors = await Promise.all(
+        (work.authors ?? []).slice(0, 20).map(async ({ author }) => {
+          try {
+            return z.object({ name: z.string() }).parse(await get(`${author.key}.json`)).name;
+          } catch {
+            return "";
+          }
+        }),
+      );
+      const cover = work.covers?.find((id) => id > 0);
+      const description =
+        typeof work.description === "string" ? work.description : work.description?.value;
+      return {
+        title: work.title,
+        authors: authors.filter(Boolean),
+        coverUrl: cover ? `https://covers.openlibrary.org/b/id/${cover}-L.jpg` : null,
+        description: description?.slice(0, 10000),
+        edition: null,
+      };
+    },
     async search(query) {
       const trimmed = query.trim();
       if (!trimmed) return [];

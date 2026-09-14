@@ -37,11 +37,11 @@ export function useRowanTheme(sessionId: string) {
     root.dataset.rowanCompact = String(settings.compactMode);
     if (settings.darkMode) {
       for (const [name, value] of Object.entries({
-        background: theme.darkSurfaces.bg,
-        card: theme.darkSurfaces.card,
+        background: settings.blackBackground ? "#000" : theme.darkSurfaces.bg,
+        card: settings.blackBackground ? "#0b0b0b" : theme.darkSurfaces.card,
         border: theme.darkSurfaces.border,
         muted: theme.darkSurfaces.muted,
-        popover: theme.darkSurfaces.card,
+        popover: settings.blackBackground ? "#0b0b0b" : theme.darkSurfaces.card,
         input: theme.darkSurfaces.border,
         secondary: theme.darkSurfaces.muted,
         accent: theme.darkSurfaces.muted,

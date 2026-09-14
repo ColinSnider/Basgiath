@@ -31,7 +31,9 @@ const moment = z.string().datetime({ offset: true });
 const command = z.discriminatedUnion("type", [
   z
     .object({
-      type: z.literal("syncOpenLibrary"),
+      type: z.literal("syncCatalog"),
+      source: z.enum(["googlebooks", "openlibrary"]),
+      externalId: z.string().min(1).max(128),
       key,
       userBookId: key,
       expectedVersion: z.number().int().nonnegative(),
@@ -242,7 +244,7 @@ async function context(sessionId: string, importLibrary = true) {
 export const rowanStatus = createServerFn({ method: "GET" }).handler(() => ({
   enabled: rowanEnabled(),
   googleBooksEnabled:
-    process.env.GOOGLE_BOOKS_ENABLED === "true" && !!process.env.GOOGLE_BOOKS_API_KEY?.trim(),
+    !!process.env.GOOGLE_BOOKS_API_KEY?.trim(),
 }));
 const accountCommand = z.discriminatedUnion("type", [
   z.object({ type: z.literal("settings"), key, settings: settingsSchema }).strict(),
@@ -483,7 +485,7 @@ export const rowanSearch = createServerFn({ method: "POST" })
       .object({
         sessionId: key,
         query: z.string().trim().min(1).max(200),
-        source: z.enum(["openlibrary", "googlebooks"]).default("openlibrary"),
+        source: z.enum(["openlibrary", "googlebooks"]).default("googlebooks"),
         includeExtras: z.boolean().default(false),
       })
       .strict(),
@@ -636,9 +638,9 @@ export const rowanMutate = createServerFn({ method: "POST" })
     try {
       // Narrow the discriminated union before passing validated commands to the domain.
       switch (data.command.type) {
-        case "syncOpenLibrary": {
+        case "syncCatalog": {
           const { type, ...value } = data.command;
-          await library.syncOpenLibrary(actor, value);
+          await library.syncCatalog(actor, value);
           break;
         }
         case "history": {

@@ -24,6 +24,7 @@ export const accountState = v2.table("account_state", {
     .references(() => users.id, { onDelete: "restrict" }),
   mirrorPaused: boolean("mirror_paused").notNull().default(false),
   settingsEdited: boolean("settings_edited").notNull().default(false),
+  blackBackground: boolean("black_background").notNull().default(false),
   excludedWorkIds: jsonb("excluded_work_ids").$type<string[]>().notNull().default([]),
   excludedGoalIds: jsonb("excluded_goal_ids").$type<string[]>().notNull().default([]),
 });

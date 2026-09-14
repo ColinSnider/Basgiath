@@ -33,6 +33,7 @@ const rows = <T extends z.ZodTypeAny>(schema: T) => z.array(schema).max(100000);
 export const settingsSchema = z
   .object({
     darkMode: z.boolean(),
+    blackBackground: z.boolean().default(false),
     accentColor: z.string().min(1).max(40),
     compactMode: z.boolean(),
     fontScale: z.enum(["sm", "md", "lg"]),

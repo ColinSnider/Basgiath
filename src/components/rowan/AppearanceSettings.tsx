@@ -16,9 +16,11 @@ export function AppearanceSettings({
 }) {
   const saved: Extract<RowanAccountCommand, { type: "settings" }>["settings"] = {
     darkMode: settings.darkMode,
+    blackBackground: settings.blackBackground,
     accentColor: settings.accentColor,
     compactMode: settings.compactMode,
-    fontScale: settings.fontScale === "sm" || settings.fontScale === "lg" ? settings.fontScale : "md",
+    fontScale:
+      settings.fontScale === "sm" || settings.fontScale === "lg" ? settings.fontScale : "md",
   };
   const [draft, setDraft] = useState(saved);
   const dirty = JSON.stringify(draft) !== JSON.stringify(saved);
@@ -64,6 +66,17 @@ export function AppearanceSettings({
               ))}
             </div>
           </fieldset>
+          <label className="reader-option">
+            <input
+              type="checkbox"
+              checked={draft.blackBackground}
+              disabled={!draft.darkMode}
+              onChange={(event) => setDraft({ ...draft, blackBackground: event.target.checked })}
+            />
+            <Moon size={18} aria-hidden="true" />
+            Use Black background
+            <span className="text-sm text-muted-foreground">Pure black in dark mode</span>
+          </label>
           <fieldset className="reader-choice-group">
             <legend>Accent color</legend>
             <div className="reader-theme-options">
@@ -91,7 +104,11 @@ export function AppearanceSettings({
           <div
             className="reader-theme-preview"
             style={{
-              background: draft.darkMode ? theme.darkSurfaces.card : "oklch(0.98 0.01 80)",
+              background: draft.darkMode
+                ? draft.blackBackground
+                  ? "#000"
+                  : theme.darkSurfaces.card
+                : "oklch(0.98 0.01 80)",
               color: draft.darkMode ? "oklch(0.95 0.01 80)" : "oklch(0.22 0.04 20)",
               fontSize:
                 draft.fontScale === "sm"

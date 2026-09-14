@@ -86,7 +86,7 @@ export function createAccountService(database: Database) {
     // Prevent refresh from silently repopulating a cleared or restored account.
     await tx
       .update(s.accountState)
-      .set({ mirrorPaused: true, settingsEdited: true })
+      .set({ mirrorPaused: true, settingsEdited: true, blackBackground: false })
       .where(eq(s.accountState.userId, actor.userId));
   }
   return {
@@ -99,18 +99,19 @@ export function createAccountService(database: Database) {
         .select()
         .from(s.accountState)
         .where(eq(s.accountState.userId, actor.userId));
-      return { settings: settings ?? defaults, mirrorPaused: state?.mirrorPaused ?? false };
+      return { settings: {...(settings ?? defaults), blackBackground: state?.blackBackground ?? false}, mirrorPaused: state?.mirrorPaused ?? false };
     },
     saveSettings(actor: Actor, key: string, input: unknown) {
       const data = settingsSchema.parse(input);
+      const {blackBackground, ...legacySettings} = data;
       return mutate(actor, key, "settings", data, async (tx) => {
         await tx
           .insert(userSettings)
-          .values({ userId: actor.userId, ...data })
-          .onConflictDoUpdate({ target: userSettings.userId, set: data });
+          .values({ userId: actor.userId, ...legacySettings })
+          .onConflictDoUpdate({ target: userSettings.userId, set: legacySettings });
         await tx
           .update(s.accountState)
-          .set({ settingsEdited: true })
+          .set({ settingsEdited: true, blackBackground })
           .where(eq(s.accountState.userId, actor.userId));
       });
     },
@@ -326,8 +327,9 @@ export function createAccountService(database: Database) {
             userId: actor.userId,
             createdAt: new Date(r.createdAt),
           });
-        const restoredSettings = data.settings[0] ?? defaults;
+        const {blackBackground, ...restoredSettings} = data.settings[0] ?? {...defaults,blackBackground:false};
         await tx.insert(userSettings).values({ ...restoredSettings, userId: actor.userId });
+        await tx.update(s.accountState).set({blackBackground}).where(eq(s.accountState.userId,actor.userId));
       });
     },
   };

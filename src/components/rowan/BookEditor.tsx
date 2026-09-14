@@ -1,5 +1,8 @@
 import { useState } from "react";
-import type { rowanHistory } from "@/lib/rowan-fns";
+import { rowanSearch, type rowanHistory } from "@/lib/rowan-fns";
+import { useQuery } from "@tanstack/react-query";
+import { RefreshCw, Search, Pencil, Trash2 } from "lucide-react";
+import { BookCover } from "./BookCover";
 import { metadataSchema } from "../../../shared/rowan-archive";
 import { useAccountMutation } from "./useAccountMutation";
 import { useReadingCommands } from "../../../apps/rowan/components/reader";
@@ -21,10 +24,26 @@ export function BookEditor({
   const deletion = useAccountMutation(sessionId, close);
   const { run: runSync, busy: syncing, feedback: syncFeedback } = useReadingCommands();
   const [error, setError] = useState("");
+  const [lookup, setLookup] = useState(false);
+  const [searchText, setSearchText] = useState(
+    `${book.title} ${book.authors[0] ?? ""}`.trim().slice(0, 200),
+  );
+  const [searchTerm, setSearchTerm] = useState(searchText);
+  const [source, setSource] = useState<"googlebooks" | "openlibrary">("googlebooks");
+  const matches = useQuery({
+    queryKey: ["rowan", sessionId, "sync-matches", source, searchTerm],
+    enabled: lookup && !!searchTerm,
+    retry: false,
+    queryFn: () =>
+      rowanSearch({ data: { sessionId, query: searchTerm, source, includeExtras: true } }),
+  });
   const busy = edit.busy || deletion.busy || syncing;
   return (
     <details className="rounded-xl border border-border p-4">
-      <summary className="cursor-pointer">Edit book details</summary>
+      <summary className="cursor-pointer">
+        <Pencil className="inline mr-2" size={16} aria-hidden="true" />
+        Edit book details
+      </summary>
       <form
         className="mt-4 grid gap-3"
         onSubmit={(event) => {
@@ -95,24 +114,107 @@ export function BookEditor({
       <div className="mt-4 rounded-lg border border-border bg-muted/30 p-3">
         <h4 className="font-medium">Catalog details</h4>
         <p className="text-sm text-muted-foreground">
-          Refresh title, author, cover, and synopsis from Open Library. Your saved page count and
-          reading history stay unchanged.
+          Refresh title, author, cover, and synopsis from Google Books or Open Library. Your saved
+          page count and reading history stay unchanged.
         </p>
         <button
           type="button"
           className={control}
           disabled={busy}
-          onClick={() =>
-            runSync({
-              type: "syncOpenLibrary",
-              key: crypto.randomUUID(),
-              userBookId: book.id,
-              expectedVersion: history.userBookVersion,
-            })
-          }
+          onClick={() => setLookup(!lookup)}
         >
-          Sync with Open Library
+          <RefreshCw size={16} className="inline mr-2" aria-hidden="true" />
+          Find updated book details
         </button>
+        {lookup && (
+          <div className="mt-3 space-y-3">
+            <p className="text-sm">
+              Choose the matching book to refresh its details. Try just the title if no matches
+              appear.
+            </p>
+            <form
+              className="flex gap-2"
+              onSubmit={(e) => {
+                e.preventDefault();
+                setSearchTerm(searchText.trim());
+                setSource("googlebooks");
+                if (source === "googlebooks" && searchTerm === searchText.trim())
+                  void matches.refetch();
+              }}
+            >
+              <input
+                className={`${control} min-w-0 flex-1`}
+                aria-label="Book title or author"
+                value={searchText}
+                maxLength={200}
+                onChange={(e) => setSearchText(e.target.value)}
+              />
+              <button
+                className={control}
+                disabled={!searchText.trim() || matches.isFetching || busy}
+              >
+                <Search size={16} aria-hidden="true" />
+                <span className="sr-only">Search Google Books</span>
+              </button>
+            </form>
+            <p className="text-sm text-muted-foreground">
+              Matches from {source === "googlebooks" ? "Google Books" : "Open Library"}
+            </p>
+            <button
+              type="button"
+              className={control}
+              disabled={busy}
+              onClick={() => setSource(source === "googlebooks" ? "openlibrary" : "googlebooks")}
+            >
+              {source === "googlebooks" ? "Search more on Open Library" : "Back to Google Books"}
+            </button>
+            {matches.isFetching && <p role="status">Finding matches…</p>}
+            {matches.isError && (
+              <p role="alert">
+                {matches.error.message || "Matches could not load."}{" "}
+                <button onClick={() => void matches.refetch()}>Retry</button>
+              </p>
+            )}
+            {matches.data?.length === 0 && (
+              <p>No matches. Try a shorter title or remove the author.</p>
+            )}
+            <ul className="space-y-2 max-h-80 overflow-auto">
+              {matches.data?.map((result) => (
+                <li key={result.ref.externalId}>
+                  <button
+                    type="button"
+                    className="flex w-full items-center gap-3 rounded-xl border border-border p-3 text-left disabled:opacity-50"
+                    disabled={busy}
+                    onClick={() =>
+                      runSync({
+                        type: "syncCatalog",
+                        key: crypto.randomUUID(),
+                        userBookId: book.id,
+                        expectedVersion: history.userBookVersion,
+                        source: result.ref.provider,
+                        externalId: result.ref.externalId,
+                      })
+                    }
+                  >
+                    <BookCover
+                      title={result.title}
+                      authors={result.authors}
+                      src={result.coverUrl}
+                      className="rowan-cover-small"
+                    />
+                    <span className="min-w-0">
+                      <strong className="block">{result.title}</strong>
+                      <span className="block text-sm text-muted-foreground">
+                        {result.authors.join(", ")}
+                      </span>
+                      <span className="text-sm text-primary">Use this match</span>
+                    </span>
+                  </button>
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
         {syncFeedback}
       </div>
       <p role="status">{error || edit.message || deletion.message}</p>
@@ -143,6 +245,7 @@ export function BookEditor({
             });
         }}
       >
+        <Trash2 size={16} className="inline mr-2" aria-hidden="true" />
         Delete book permanently
       </button>
     </details>

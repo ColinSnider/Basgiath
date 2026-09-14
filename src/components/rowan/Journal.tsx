@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { NotebookPen, Download, Plus, Pencil, X } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { rowanJournal, rowanLibrary, rowanHistory } from "@/lib/rowan-fns";
 import { MarginCard, MarginEditor } from "./Margins";
@@ -96,14 +97,18 @@ export function Journal({
     }
   }
   return (
-    <section id="journal" className="space-y-4">
+    <section id="journal" className="reader-card reader-card-body space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h2 className="font-display text-3xl">Your margins</h2>
+          <h2 className="font-display text-3xl flex items-center gap-2">
+            <NotebookPen size={24} aria-hidden="true" />
+            Your margins
+          </h2>
           <p className="text-muted-foreground">Your private reading memories, newest first.</p>
         </div>
         <div className="flex gap-2">
           <button className={control} onClick={() => setComposing(!composing)}>
+            <Pencil size={16} className="inline mr-1" aria-hidden="true" />
             {composing ? "Hide draft" : "Write a margin"}
           </button>
           <button
@@ -111,6 +116,7 @@ export function Journal({
             disabled={exporting || invalidDates || term !== search}
             onClick={() => void download()}
           >
+            <Download size={16} className="inline mr-1" aria-hidden="true" />
             {exporting ? "Exporting…" : "Export Markdown"}
           </button>
         </div>

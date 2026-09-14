@@ -17,16 +17,23 @@ function createRuntime() {
     schema,
   });
   const openLibrary = createOpenLibraryProvider({
-    userAgent: process.env.OPEN_LIBRARY_USER_AGENT!,
+    userAgent: process.env.OPEN_LIBRARY_USER_AGENT?.trim() || "Rowan/1.1 (personal reading library)",
   });
   const google =
-    process.env.GOOGLE_BOOKS_ENABLED === "true" && process.env.GOOGLE_BOOKS_API_KEY?.trim()
+    process.env.GOOGLE_BOOKS_API_KEY?.trim()
       ? createGoogleBooksProvider({ apiKey: process.env.GOOGLE_BOOKS_API_KEY })
       : null;
   const provider = {
-    async search(query: string, source: "openlibrary" | "googlebooks" = "openlibrary") {
+    fetchMetadata(ref: {provider:string;externalId:string}) {
+      if (ref.provider === "googlebooks") {
+        if (!google) throw new Error("Google Books needs an API key. Search more on Open Library.");
+        return google.fetchWork(ref);
+      }
+      return openLibrary.fetchMetadata(ref);
+    },
+    async search(query: string, source: "openlibrary" | "googlebooks" = "googlebooks") {
       if (source === "googlebooks") {
-        if (!google) throw new Error("Google Books is not configured.");
+        if (!google) throw new Error("Google Books needs an API key. Search more on Open Library.");
         return google.search(query);
       }
       return openLibrary.search(query);

@@ -51,6 +51,7 @@ const catalogRecordSchema = z
     title: z.string().trim().min(1),
     authors: z.array(z.string().min(1)),
     coverUrl: z.string().url().nullable(),
+    description: z.string().max(10000).optional(),
     edition: z
       .object({
         externalId: z.string().min(1),
@@ -67,6 +68,7 @@ const catalogRecordSchema = z
 export interface CatalogProvider {
   // The implementation fetches this work from the provider. Never trust client metadata here.
   fetchWork(ref: z.infer<typeof providerRefSchema>): Promise<z.infer<typeof catalogRecordSchema>>;
+  fetchMetadata?(ref: z.infer<typeof providerRefSchema>): Promise<z.infer<typeof catalogRecordSchema>>;
 }
 const saveSchema = z.object({ key: id, ref: providerRefSchema }).strict();
 const startSchema = z
@@ -206,53 +208,55 @@ export function createLibraryService(database: Database, provider: CatalogProvid
   }
 
   return {
-    async syncOpenLibrary(
+    async syncCatalog(
       actor: Actor,
-      input: { key: string; userBookId: string; expectedVersion: number },
+      input: { key: string; userBookId: string; expectedVersion: number; externalId: string; source: "googlebooks" | "openlibrary" },
     ) {
       const data = z
-        .object({ key: id, userBookId: id, expectedVersion: version })
+        .object({ key: id, userBookId: id, expectedVersion: version, externalId: z.string().min(1).max(128), source: z.enum(["googlebooks","openlibrary"]) })
         .strict()
+        .refine(d => d.source === "openlibrary" ? /^\/works\/OL\d+W$/.test(d.externalId) : /^[A-Za-z0-9_-]+$/.test(d.externalId), "Invalid catalog ID.")
         .parse(input);
       const book = await database
-        .select({ book: userBooks, mapping: externalMappings })
+        .select({ book: userBooks })
         .from(userBooks)
-        .leftJoin(
-          externalMappings,
-          and(
-            eq(externalMappings.workId, userBooks.workId),
-            eq(externalMappings.provider, "openlibrary"),
-          ),
-        )
         .where(and(eq(userBooks.id, data.userBookId), eq(userBooks.userId, actor.userId)))
         .limit(1);
       if (!book[0]) throw new DomainError("NOT_FOUND", "Book not found.");
-      if (!book[0].mapping)
-        throw new DomainError("NOT_FOUND", "This book has no Open Library link to sync.");
+      const hash = fingerprint("syncCatalog", data);
+      const [receipt] = await database.select().from(mutationReceipts).where(and(eq(mutationReceipts.userId, actor.userId), eq(mutationReceipts.key, data.key)));
+      if (receipt) {
+        if (receipt.fingerprint !== hash) throw new DomainError("IDEMPOTENCY_CONFLICT", "Request key already used for another change.");
+        return receipt.result as MutationResult;
+      }
+      expectVersion(book[0].book.version, data.expectedVersion);
       let fetched: z.infer<typeof catalogRecordSchema>;
       try {
         fetched = catalogRecordSchema.parse(
-          await provider.fetchWork({
-            provider: "openlibrary",
-            externalId: book[0].mapping.externalId,
+          await (provider.fetchMetadata ?? provider.fetchWork)({
+            provider: data.source,
+            externalId: data.externalId,
           }),
         );
       } catch {
         throw new DomainError(
           "PROVIDER_UNAVAILABLE",
-          "Open Library could not be reached. Try again.",
+          "Book details could not be fetched. Try again or choose another source.",
         );
       }
-      return mutate(actor, data.key, fingerprint("syncOpenLibrary", data), async (tx) => {
+      return mutate(actor, data.key, hash, async (tx) => {
         const owned = await ownedBook(tx, actor, data.userBookId);
         expectVersion(owned.version, data.expectedVersion);
-        await tx
-          .update(works)
-          .set({ title: fetched.title, authors: fetched.authors, coverUrl: fetched.coverUrl })
-          .where(eq(works.id, owned.workId));
+        const details = owned.legacyMetadata.rowanDetails;
+        const oldDetails = details && typeof details === "object" && !Array.isArray(details) ? details : {};
         await tx
           .update(userBooks)
-          .set({ version: owned.version + 1 })
+          .set({ version: owned.version + 1, legacyMetadata: {
+            ...owned.legacyMetadata,
+            rowanDetails: {...oldDetails, title: fetched.title, ...(fetched.authors.length ? {authors: fetched.authors} : {}), ...(fetched.coverUrl ? {coverUrl: fetched.coverUrl} : {})},
+            ...(fetched.description ? {description: fetched.description} : {}),
+            catalogSource: {provider: data.source, externalId: data.externalId},
+          } })
           .where(eq(userBooks.id, owned.id));
         return {
           workId: owned.workId,
@@ -551,7 +555,7 @@ export function createLibraryService(database: Database, provider: CatalogProvid
                 .where(eq(readingQueue.userId, actor.userId)),
               goals: await tx.select().from(goals).where(eq(goals.userId, actor.userId)),
               settings: await tx
-                .select()
+                .select({userId:userSettings.userId,darkMode:userSettings.darkMode,accentColor:userSettings.accentColor,compactMode:userSettings.compactMode,fontScale:userSettings.fontScale,blackBackground:sql<boolean>`coalesce((select black_background from v2.account_state where user_id = ${actor.userId}), false)`})
                 .from(userSettings)
                 .where(eq(userSettings.userId, actor.userId)),
             },

@@ -1,6 +1,15 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { createOpenLibraryProvider } from "./open-library-provider.ts";
+test("metadata lookup uses the work endpoint and fetches author and synopsis without search mappings", async () => {
+  const paths:string[] = [];
+  const provider = createOpenLibraryProvider({userAgent:"Rowan tests",intervalMs:0,fetchImpl:async url => {paths.push(String(url));return String(url).includes("authors") ? Response.json({name:"An Author"}) : Response.json({title:"A book",description:{value:"Synopsis"},covers:[-1,123],authors:[{author:{key:"/authors/OL1A"}}]});}});
+  const data = await provider.fetchMetadata({provider:"openlibrary",externalId:"/works/OL1W"});
+  assert.equal(data.description,"Synopsis");
+  assert.deepEqual(data.authors,["An Author"]);
+  assert.equal(data.coverUrl,"https://covers.openlibrary.org/b/id/123-L.jpg");
+  assert.ok(paths.every(path=>!path.includes("search.json")));
+});
 
 test("saving a search result survives a subsequent work lookup outage", async () => {
   let searchRequests = 0;

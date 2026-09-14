@@ -12,6 +12,7 @@ const volume = z.object({
     pageCount: z.number().int().positive().optional(),
     language: z.string().optional(),
     categories: z.array(z.string()).optional(),
+    description: z.string().optional(),
     imageLinks: z.object({ thumbnail: z.string().optional() }).optional(),
   }),
 });
@@ -107,6 +108,7 @@ export function createGoogleBooksProvider(options: {
           durationSeconds: null,
           language: info.language ?? null,
         },
+        description: info.description?.replace(/<br\s*\/?\s*>/gi,"\n").replace(/<\/(p|div)>/gi,"\n").replace(/<[^>]+>/g, "").replace(/&amp;/g,"&").replace(/&quot;/g,'"').replace(/&#39;/g,"'").replace(/&lt;/g,"<").replace(/&gt;/g,">").slice(0,10000),
       };
     },
   };

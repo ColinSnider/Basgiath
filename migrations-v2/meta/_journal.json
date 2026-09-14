@@ -64,6 +64,7 @@
       "when": 1789200000000,
       "tag": "0008_shelf_management",
       "breakpoints": true
-    }
+    },
+    { "idx": 9, "version": "7", "when": 1789400000000, "tag": "0009_black_background", "breakpoints": true }
   ]
 }
