@@ -21,6 +21,11 @@ export type WorkSearchResult = {
   authors: string[];
   coverUrl: string | null;
   categories?: string[];
+  publisher?: string;
+  publishedDate?: string;
+  language?: string;
+  pageCount?: number;
+  isbns?: string[];
 };
 
 /** Create once per server process; keeps requests bounded and caches public metadata only. */

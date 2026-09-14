@@ -11,6 +11,10 @@ test("Google volumes retain edition identity, deduplicate requests and preserve 
       subtitle: "Poster Book",
       authors: ["Author"],
       pageCount: 40,
+      publisher: "Example Press",
+      publishedDate: "2024-05-01",
+      language: "en",
+      industryIdentifiers: [{ type: "ISBN_13", identifier: "9781234567890" }, { type: "OTHER", identifier: "internal" }],
       imageLinks: { thumbnail: "http://books.google.com/cover" },
     },
   };
@@ -36,6 +40,11 @@ test("Google volumes retain edition identity, deduplicate requests and preserve 
   assert.equal(first.length, 1);
   assert.equal(first[0].title, "Harry Potter: Poster Book");
   assert.equal(first[0].ref.provider, "googlebooks");
+  assert.equal(first[0].publisher, "Example Press");
+  assert.equal(first[0].publishedDate, "2024-05-01");
+  assert.equal(first[0].language, "en");
+  assert.equal(first[0].pageCount, 40);
+  assert.deepEqual(first[0].isbns, ["9781234567890"]);
   assert.ok(first[0].coverUrl?.startsWith("https:"));
   const details = await provider.fetchWork(first[0].ref);
   assert.equal(details.edition?.externalId, "abc_123");

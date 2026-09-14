@@ -11,6 +11,9 @@ const volume = z.object({
     authors: z.array(z.string()).optional(),
     pageCount: z.number().int().positive().optional(),
     language: z.string().optional(),
+    publisher: z.string().optional(),
+    publishedDate: z.string().optional(),
+    industryIdentifiers: z.array(z.object({ type: z.string(), identifier: z.string() })).optional(),
     categories: z.array(z.string()).optional(),
     description: z.string().optional(),
     imageLinks: z.object({ thumbnail: z.string().optional() }).optional(),
@@ -86,6 +89,11 @@ export function createGoogleBooksProvider(options: {
           title: info.subtitle ? `${info.title}: ${info.subtitle}` : info.title,
           authors: info.authors ?? [],
           categories: info.categories ?? [],
+          publisher: info.publisher,
+          publishedDate: info.publishedDate,
+          language: info.language,
+          pageCount: info.pageCount,
+          isbns: info.industryIdentifiers?.filter((item) => item.type === "ISBN_13" || item.type === "ISBN_10").map((item) => item.identifier),
           coverUrl: cover(info.imageLinks?.thumbnail),
         });
       }

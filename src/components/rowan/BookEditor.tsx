@@ -30,6 +30,8 @@ export function BookEditor({
   );
   const [searchTerm, setSearchTerm] = useState(searchText);
   const [source, setSource] = useState<"googlebooks" | "openlibrary">("googlebooks");
+  const [selected, setSelected] = useState<string | null>(null);
+  const [language, setLanguage] = useState("");
   const matches = useQuery({
     queryKey: ["rowan", sessionId, "sync-matches", source, searchTerm],
     enabled: lookup && !!searchTerm,
@@ -137,6 +139,8 @@ export function BookEditor({
               onSubmit={(e) => {
                 e.preventDefault();
                 setSearchTerm(searchText.trim());
+                setSelected(null);
+                setLanguage("");
                 setSource("googlebooks");
                 if (source === "googlebooks" && searchTerm === searchText.trim())
                   void matches.refetch();
@@ -144,7 +148,8 @@ export function BookEditor({
             >
               <input
                 className={`${control} min-w-0 flex-1`}
-                aria-label="Book title or author"
+                aria-label="Book title, author, or ISBN"
+                placeholder="Search title, author, or ISBN"
                 value={searchText}
                 maxLength={200}
                 onChange={(e) => setSearchText(e.target.value)}
@@ -164,7 +169,7 @@ export function BookEditor({
               type="button"
               className={control}
               disabled={busy}
-              onClick={() => setSource(source === "googlebooks" ? "openlibrary" : "googlebooks")}
+              onClick={() => { setSource(source === "googlebooks" ? "openlibrary" : "googlebooks"); setSelected(null); setLanguage(""); }}
             >
               {source === "googlebooks" ? "Search more on Open Library" : "Back to Google Books"}
             </button>
@@ -178,23 +183,23 @@ export function BookEditor({
             {matches.data?.length === 0 && (
               <p>No matches. Try a shorter title or remove the author.</p>
             )}
-            <ul className="space-y-2 max-h-80 overflow-auto">
-              {matches.data?.map((result) => (
-                <li key={result.ref.externalId}>
+            {!!matches.data?.length && <label className="flex items-center gap-2 text-sm">
+              Language
+              <select className={control} value={language} onChange={(e) => { setLanguage(e.target.value); setSelected(null); }}>
+                <option value="">All languages</option>
+                {[...new Set(matches.data.map((result) => result.language).filter((value): value is string => !!value))].sort().map((value) => <option key={value} value={value}>{value}</option>)}
+              </select>
+              <span className="text-muted-foreground">{matches.data.filter((result) => !language || result.language === language).length} matches</span>
+            </label>}
+            <ul className="grid gap-3">
+              {matches.data?.filter((result) => !language || result.language === language).map((result) => (
+                <li key={result.ref.externalId} className="rounded-xl border border-border overflow-hidden">
                   <button
                     type="button"
-                    className="flex w-full items-center gap-3 rounded-xl border border-border p-3 text-left disabled:opacity-50"
+                    className="flex w-full items-start gap-4 p-4 text-left disabled:opacity-50"
                     disabled={busy}
-                    onClick={() =>
-                      runSync({
-                        type: "syncCatalog",
-                        key: crypto.randomUUID(),
-                        userBookId: book.id,
-                        expectedVersion: history.userBookVersion,
-                        source: result.ref.provider,
-                        externalId: result.ref.externalId,
-                      })
-                    }
+                    aria-expanded={selected === result.ref.externalId}
+                    onClick={() => setSelected(selected === result.ref.externalId ? null : result.ref.externalId)}
                   >
                     <BookCover
                       title={result.title}
@@ -207,9 +212,23 @@ export function BookEditor({
                       <span className="block text-sm text-muted-foreground">
                         {result.authors.join(", ")}
                       </span>
-                      <span className="text-sm text-primary">Use this match</span>
+                      <span className="block mt-2 text-sm text-muted-foreground">
+                        {[result.publisher, result.publishedDate, result.language?.toUpperCase(), result.pageCount ? `${result.pageCount} pages` : null].filter(Boolean).join(" · ") || "Publication details unavailable"}
+                      </span>
+                      {!!result.isbns?.length && <span className="block text-xs text-muted-foreground break-all">ISBN {result.isbns.join(" / ")}</span>}
+                      <span className="block mt-2 text-sm text-primary">{selected === result.ref.externalId ? "Hide edition" : "Review this edition"}</span>
                     </span>
                   </button>
+                  {selected === result.ref.externalId && <div className="border-t border-border bg-muted/30 p-4 space-y-3">
+                    <p className="text-sm">Use this edition’s title, author, cover, and available synopsis. Your saved page count, dates, and reading history will stay unchanged.</p>
+                    <div className="flex flex-wrap gap-2">
+                      <button type="button" className={control} disabled={busy} onClick={() => runSync({ type: "syncCatalog", key: crypto.randomUUID(), userBookId: book.id, expectedVersion: history.userBookVersion, source: result.ref.provider, externalId: result.ref.externalId })}>{syncing ? "Updating…" : "Use this edition"}</button>
+                      <button type="button" className={control} disabled={busy || matches.isFetching} onClick={() => {
+                        const query = `intitle:"${result.title.split(":")[0].replaceAll('"', '')}"${result.authors[0] ? ` inauthor:"${result.authors[0].replaceAll('"', '')}"` : ""}`.slice(0, 200);
+                        setSearchText(query); setSearchTerm(query); setSource("googlebooks"); setLanguage(""); setSelected(null);
+                      }}>Find other editions</button>
+                    </div>
+                  </div>}
                 </li>
               ))}
             </ul>
