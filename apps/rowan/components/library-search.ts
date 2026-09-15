@@ -1,7 +1,9 @@
 import { z } from "zod";
 export const librarySearch = z.object({
   view: z.enum(["grid", "shelves", "list"]).catch("grid"),
-  section: z.enum(["books", "series"]).catch("books"),
+  section: z.enum(["books", "series", "collections"]).catch("books"),
+  collection: z.enum(["", "shelf", "series", "queue"]).catch(""),
+  collectionId: z.string().catch(""),
   query: z.string().catch(""),
   status: z.string().catch("all"),
   shelf: z.string().catch(""),

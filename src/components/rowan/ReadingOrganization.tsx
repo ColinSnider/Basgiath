@@ -12,10 +12,14 @@ export function ReadingOrganization({
   sessionId,
   bookId,
   openBook,
+  mode,
+  seriesId,
 }: {
   sessionId: string;
   bookId?: string;
   openBook: (book: { id: string }) => void;
+  mode?: "series" | "queue";
+  seriesId?: string;
 }) {
   const cache = useQueryClient();
   const query = useQuery({
@@ -44,6 +48,7 @@ export function ReadingOrganization({
     mutation.mutate(pending.current);
   }
   const [tab, setTab] = useState<"series" | "queue">("series");
+  const activeTab = mode ?? tab;
   if (query.isPending) return <p role="status">Loading series and reading queue…</p>;
   if (query.isError)
     return (
@@ -58,17 +63,16 @@ export function ReadingOrganization({
     ? data.series.filter((s) =>
         data.members.some((m) => m.seriesId === s.id && m.userBookId === bookId),
       )
-    : data.series;
+    : data.series.filter((s) => !seriesId || s.id === seriesId);
   return (
     <section className="rowan-organization space-y-5" aria-label="Series and reading queue">
       <header className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <p className="rowan-eyebrow">The next chapter</p>
           <h2 className="font-display text-2xl">
-            {bookId ? "In your reading life" : "Series & reading queue"}
+            {bookId ? "In your reading life" : mode === "queue" ? "Manage reading queue" : mode === "series" ? "Manage series" : "Series & reading queue"}
           </h2>
         </div>
-        {!bookId && (
+        {!bookId && !mode && (
           <div className="flex gap-2" aria-label="Reading organization views">
             <button
               className={control}
@@ -123,7 +127,7 @@ export function ReadingOrganization({
           <MembershipForm data={data} bookId={bookId} busy={busy} run={run} />
         </div>
       )}
-      {(bookId || tab === "series") && (
+      {(bookId || activeTab === "series") && (
         <>
           {!groups.length && (
             <p className="text-muted-foreground">
@@ -148,7 +152,7 @@ export function ReadingOrganization({
           </details>
         </>
       )}
-      {!bookId && tab === "queue" && (
+      {!bookId && activeTab === "queue" && (
         <>
           <p className="text-muted-foreground">
             Your chosen reading order. Pin one book for Home’s next read. Started and finished books

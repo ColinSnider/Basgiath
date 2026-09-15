@@ -14,7 +14,7 @@ import {
 import { useNavigate, useSearch } from "@tanstack/react-router";
 import { librarySearch } from "../components/library-search";
 import { useQuery } from "@tanstack/react-query";
-import { rowanLibrary, rowanShelves } from "@/lib/rowan-fns";
+import { rowanLibrary, rowanShelves, rowanOrganization } from "@/lib/rowan-fns";
 import { ShelfBooks } from "@/components/rowan/PhysicalShelf";
 import { BookCover } from "@/components/rowan/BookCover";
 import { ReadingOrganization } from "@/components/rowan/ReadingOrganization";
@@ -41,7 +41,11 @@ export function LibraryPage() {
     favorite,
     read,
     sort,
+    collection,
+    collectionId,
   } = browsing;
+  const inCollections = section !== "books";
+  const collectionType = section === "series" ? "" : collection;
   const filterCount = [
     status !== "all",
     !!selectedShelf,
@@ -60,7 +64,6 @@ export function LibraryPage() {
       resetScroll: false,
     });
   const setView = (view: typeof browsing.view) => update({ view });
-  const setSection = (section: typeof browsing.section) => update({ section });
   const setQuery = (query: string) => update({ query });
   const setStatus = (status: string) => update({ status });
   const setSelectedShelf = (shelf: string) => update({ shelf });
@@ -69,6 +72,15 @@ export function LibraryPage() {
   const shelves = useQuery({
     queryKey: ["rowan", sessionId, "shelves"],
     queryFn: () => rowanShelves({ data: { sessionId } }),
+  });
+  const organization = useQuery({
+    queryKey: ["rowan", sessionId, "organization"],
+    queryFn: () => rowanOrganization({ data: { sessionId } }),
+    enabled: inCollections,
+  });
+  const chooseCollection = (collection: typeof browsing.collection, collectionId = "") => update({
+    section: "collections", collection, collectionId, shelf: collection === "shelf" ? collectionId : "",
+    query: "", status: "all", format: "all", author: "", year: "", favorite: false, read: false, sort: "shelf",
   });
   const library = useQuery({
     queryKey: ["rowan", sessionId, "shelf-library"],
@@ -94,6 +106,19 @@ export function LibraryPage() {
     (status === "all" || book.status === status) &&
     `${book.title} ${book.authors.join(" ")}`.toLowerCase().includes(query.toLowerCase());
   const allBooks = library.data ?? [];
+  const collectionName = collectionType === "shelf"
+    ? shelves.data?.find((s) => s.id === collectionId)?.name
+    : collectionType === "series"
+      ? organization.data?.series.find((s) => s.id === collectionId)?.name
+      : "Reading queue";
+  const collectionBookIds = !inCollections || !collectionType ? null
+    : collectionType === "shelf" ? shelves.data?.find((s) => s.id === collectionId)?.bookIds ?? []
+    : collectionType === "queue" ? organization.data?.queue.map((entry) => entry.userBookId) ?? []
+    : organization.data?.members.filter((m) => m.seriesId === collectionId).map((m) => m.userBookId) ?? [];
+  const collectionBooks = collectionBookIds === null ? allBooks : collectionBookIds.flatMap((id) => {
+    const book = allBooks.find((b) => b.id === id);
+    return book ? [book] : [];
+  });
   const authors = [...new Set(allBooks.flatMap((book) => book.authors))].sort();
   const years = [...new Set(allBooks.flatMap((book) => book.readYears))].sort().reverse();
   const ordered = (books: Book[]) =>
@@ -135,11 +160,12 @@ export function LibraryPage() {
     },
   ].filter(
     (g) =>
+      (!inCollections || collectionType !== "shelf" || g.id === collectionId) &&
       (!selectedShelf || selectedShelf === g.id) &&
       (g.id !== "unfiled" || g.books.length > 0 || !shelves.data?.length),
   );
   const listBooks = ordered(
-    allBooks.filter(
+    collectionBooks.filter(
       (b) =>
         matches(b) &&
         (!selectedShelf ||
@@ -151,26 +177,47 @@ export function LibraryPage() {
       {feedback}
       <nav className="reader-library-switch" aria-label="Library sections">
         <button
-          className={section === "books" ? "is-selected" : ""}
+          className={!inCollections ? "is-selected" : ""}
           aria-pressed={section === "books"}
-          onClick={() => setSection("books")}
+          onClick={() => update({ section: "books", shelf: "", collection: "", collectionId: "" })}
         >
           <Library size={18} className="inline mr-2" aria-hidden="true" />
           Library <span>{allBooks.length} books</span>
         </button>
         <button
-          className={section === "series" ? "is-selected" : ""}
-          aria-pressed={section === "series"}
-          onClick={() => setSection("series")}
+          className={inCollections ? "is-selected" : ""}
+          aria-pressed={inCollections}
+          onClick={() => chooseCollection("")}
         >
           <Layers size={18} className="inline mr-2" aria-hidden="true" />
-          Series & queue
+          Collections
         </button>
       </nav>
-      {section === "series" ? (
-        <ReadingOrganization sessionId={sessionId} openBook={openBook} />
+      {inCollections && !collectionType ? (
+        <section className="reader-card reader-card-body space-y-5">
+          <header><h2>Collections</h2><p className="text-muted-foreground">Your shelves, series, and reading queue. Each groups the books already in your library.</p></header>
+          {(shelves.isPending || organization.isPending) && <p role="status">Loading collections…</p>}
+          {(shelves.isError || organization.isError) && <p role="alert">Collections could not load. <button onClick={() => { void shelves.refetch(); void organization.refetch(); }}>Retry</button></p>}
+          <h3>Shelves</h3>
+          <div className="grid gap-3 sm:grid-cols-2">
+            {shelves.data?.map((shelf) => <button key={shelf.id} className={`${control} text-left`} onClick={() => chooseCollection("shelf", shelf.id)}><Library size={20} aria-hidden="true" /><strong className="block">{shelf.name}</strong><span className="block text-sm text-muted-foreground">{shelf.bookIds.length} books{ shelf.description ? ` · ${shelf.description}` : ""}</span></button>)}
+          </div>
+          {!shelves.data?.length && !shelves.isPending && <p>No shelves yet. Create a group for any books you want to keep together.</p>}
+          <form className="reader-shelf-toolbar" onSubmit={(e) => { e.preventDefault(); run({ type: "shelfCreate", key: crypto.randomUUID(), name: name.trim() }); }}>
+            <input className={control} aria-label="New shelf name" placeholder="New shelf name" value={name} onChange={(e) => setName(e.target.value)} required maxLength={120} />
+            <button className={control} disabled={busy || !name.trim()}><Plus size={16} aria-hidden="true" /> Create shelf</button>
+          </form>
+          <h3>Series</h3>
+          <div className="grid gap-3 sm:grid-cols-2">
+            {organization.data?.series.map((series) => <button className={`${control} text-left`} key={series.id} onClick={() => chooseCollection("series", series.id)}><Layers size={20} aria-hidden="true" /><strong className="block">{series.name}</strong><span className="block text-sm text-muted-foreground">{organization.data.members.filter((m) => m.seriesId === series.id).length} books · Series order</span></button>)}
+          </div>
+          <details><summary>Create or manage series</summary><ReadingOrganization sessionId={sessionId} openBook={openBook} mode="series" /></details>
+          <h3>Reading queue</h3>
+          <button className={`${control} text-left`} onClick={() => chooseCollection("queue")}><List size={20} aria-hidden="true" /><strong className="block">Up next</strong><span className="block text-sm text-muted-foreground">{organization.data?.queue.length ?? 0} books · Your reading priorities</span></button>
+        </section>
       ) : (
         <section className="reader-shelf-library">
+          {inCollections && <header className="space-y-3"><button className={control} onClick={() => chooseCollection("")}>← All collections</button><h2>{collectionName ?? "Collection unavailable"}</h2><p className="text-sm text-muted-foreground">{collectionType === "series" ? "Books in series order" : collectionType === "queue" ? "Your next reads, in priority order" : "Your personal shelf"}</p></header>}
           <div className="reader-library-searchbar">
             <label className="reader-library-search">
               <Search size={18} aria-hidden="true" />
@@ -202,7 +249,7 @@ export function LibraryPage() {
                   onChange={(e) => update({ sort: e.target.value as typeof sort })}
                 >
                   {Object.entries({
-                    shelf: "Shelf order / title",
+                    shelf: inCollections ? "Collection order" : "Shelf order / title",
                     title: "Title A–Z",
                     author: "Author A–Z",
                     newest: "Recently added",
@@ -303,7 +350,7 @@ export function LibraryPage() {
                     </option>
                   ))}
                 </select>
-                <select
+                {!inCollections && <select
                   className={control}
                   aria-label="Shelf"
                   value={selectedShelf}
@@ -316,12 +363,12 @@ export function LibraryPage() {
                     </option>
                   ))}
                   <option value="unfiled">Unfiled books</option>
-                </select>
+                </select>}
               </div>
             </div>
           )}
           <p role="status" className="text-sm text-muted-foreground">
-            {listBooks.length} of {allBooks.length} books{filterCount ? " · Filters applied" : ""}
+            {listBooks.length} of {collectionBooks.length} books{filterCount ? " · Filters applied" : ""}
           </p>
           <div className="reader-shelf-toolbar">
             <div
@@ -351,7 +398,7 @@ export function LibraryPage() {
                 </button>
               ))}
             </div>
-            <details>
+            {!inCollections && <details>
               <summary>
                 <Plus size={16} className="inline" aria-hidden="true" /> New shelf
               </summary>
@@ -374,18 +421,19 @@ export function LibraryPage() {
                   Create shelf
                 </button>
               </form>
-            </details>
+            </details>}
           </div>
-          {(library.isPending || shelves.isPending) && (
+          {(library.isPending || shelves.isPending || (inCollections && organization.isPending)) && (
             <p role="status">Placing your books on their shelves…</p>
           )}
-          {(library.isError || shelves.isError) && (
+          {(library.isError || shelves.isError || (inCollections && organization.isError)) && (
             <p role="alert">
               Your shelves could not load.{" "}
               <button
                 onClick={() => {
                   void library.refetch();
                   void shelves.refetch();
+                  if (inCollections) void organization.refetch();
                 }}
               >
                 Retry
@@ -417,7 +465,10 @@ export function LibraryPage() {
                     </li>
                   ))}
                 </ul>
-              ) : (
+              ) : inCollections && collectionType !== "shelf" ? (
+                <article className="reader-physical-shelf"><ShelfBooks books={listBooks} view="shelves" openBook={openBook} /></article>
+              ) : null}
+              {(view === "shelves" || (inCollections && collectionType === "shelf")) && (!inCollections || collectionType === "shelf") && (
                 groups.map((group) => (
                   <article className="reader-physical-shelf" key={group.id}>
                     <header>
@@ -457,11 +508,11 @@ export function LibraryPage() {
                         ))}
                       </div>
                     )}
-                    <ShelfBooks
+                    {view === "shelves" && <ShelfBooks
                       books={ordered(group.books.filter(matches))}
                       view={view}
                       openBook={openBook}
-                    />
+                    />}
                     <details className="reader-shelf-organize">
                       <summary>Organize this shelf</summary>
                       {group.shelf && (
@@ -628,6 +679,7 @@ export function LibraryPage() {
                   </article>
                 ))
               )}
+              {inCollections && (collectionType === "series" || collectionType === "queue") && <details className="reader-card reader-card-body"><summary>Manage {collectionType === "queue" ? "reading queue" : "series & books"}</summary><ReadingOrganization sessionId={sessionId} openBook={openBook} mode={collectionType} seriesId={collectionType === "series" ? collectionId : undefined} /></details>}
               {!listBooks.length && (
                 <p>
                   {allBooks.length
