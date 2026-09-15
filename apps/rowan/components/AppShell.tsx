@@ -96,7 +96,7 @@ export function AppShell() {
       </a>
       <aside className="reader-sidebar">
         <Link to="/" className="reader-brand">
-          <img className="reader-brand-mark" src="/rowan-mark.svg" alt="" />
+          <img className="reader-brand-mark" src="/rowan-mark.png" alt="" />
           <span>Rowan</span>
         </Link>
         <p className="reader-caption">A reader’s companion</p>
@@ -124,7 +124,7 @@ export function AppShell() {
       <div className="reader-main">
         <header className="reader-topbar">
           <Link to="/" className="reader-wordmark">
-            <img className="reader-wordmark-mark" src="/rowan-mark.svg" alt="" />
+            <img className="reader-wordmark-mark" src="/rowan-mark.png" alt="" />
             <span>Rowan</span>
           </Link>
           <div className="reader-topbar-actions">
