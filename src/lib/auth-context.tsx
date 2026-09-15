@@ -2,7 +2,6 @@ import { createContext, useContext, useState, useEffect, useCallback, type React
 import { login as loginFn, register as registerFn, logout as logoutFn, getMe } from "./auth-fns";
 import { createGuestSessionId, guestUser, isGuestSessionId } from "./session-auth.js";
 
-const SESSION_KEY = "basgiath:session";
 
 export type AuthUser = {
   id: number;
@@ -32,13 +31,13 @@ type AuthCtx = {
 
 const AuthContext = createContext<AuthCtx | null>(null);
 
-export function AuthProvider({ children }: { children: ReactNode }) {
+export function AuthProvider({ children, sessionKey = "basgiath:session" }: { children: ReactNode; sessionKey?: string }) {
   const [user, setUser] = useState<AuthUser | null>(null);
   const [sessionId, setSessionId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const stored = localStorage.getItem(SESSION_KEY);
+    const stored = localStorage.getItem(sessionKey);
     if (!stored) {
       setLoading(false);
       return;
@@ -49,50 +48,50 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           setUser(u as AuthUser);
           setSessionId(stored);
         } else {
-          localStorage.removeItem(SESSION_KEY);
+          localStorage.removeItem(sessionKey);
         }
       })
       .catch(() => {
-        localStorage.removeItem(SESSION_KEY);
+        localStorage.removeItem(sessionKey);
       })
       .finally(() => setLoading(false));
-  }, []);
+  }, [sessionKey]);
 
   const login = useCallback(async (username: string, password: string) => {
     const res = await loginFn({ data: { username, password } });
-    localStorage.setItem(SESSION_KEY, res.sessionId);
+    localStorage.setItem(sessionKey, res.sessionId);
     setSessionId(res.sessionId);
     setUser(res.user as AuthUser);
-  }, []);
+  }, [sessionKey]);
 
   const register = useCallback(
     async (username: string, password: string, displayName: string, email?: string) => {
       const res = await registerFn({ data: { username, password, displayName, email } });
-      localStorage.setItem(SESSION_KEY, res.sessionId);
+      localStorage.setItem(sessionKey, res.sessionId);
       setSessionId(res.sessionId);
       setUser(res.user as AuthUser);
     },
-    [],
+    [sessionKey],
   );
 
   const continueAsGuest = useCallback(async () => {
     const sid = createGuestSessionId();
-    localStorage.setItem(SESSION_KEY, sid);
+    localStorage.setItem(sessionKey, sid);
     setSessionId(sid);
     setUser(guestUser() as AuthUser);
-  }, []);
+  }, [sessionKey]);
 
   const logout = useCallback(async () => {
-    const sid = localStorage.getItem(SESSION_KEY);
+    const sid = localStorage.getItem(sessionKey);
     if (sid && !isGuestSessionId(sid)) {
       await logoutFn({ data: { sessionId: sid } }).catch(() => {
         console.warn("Failed to clear session on the server during logout.");
       });
     }
-    localStorage.removeItem(SESSION_KEY);
+    localStorage.removeItem(sessionKey);
     setSessionId(null);
     setUser(null);
-  }, []);
+  }, [sessionKey]);
 
   const updateDisplayName = useCallback((name: string) => {
     setUser((u) => (u ? { ...u, displayName: name } : u));

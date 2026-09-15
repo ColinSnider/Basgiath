@@ -1,0 +1,70 @@
+{
+  "version": "7",
+  "dialect": "postgresql",
+  "entries": [
+    {
+      "idx": 0,
+      "version": "7",
+      "when": 1788654531643,
+      "tag": "0000_catalog_reading_foundation",
+      "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1788791605291,
+      "tag": "0001_personal_library",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1788791996724,
+      "tag": "0002_book_margins",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1788800000000,
+      "tag": "0003_legacy_sync_snapshots",
+      "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1788800000001,
+      "tag": "0004_account_state",
+      "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1788912694870,
+      "tag": "0005_progress_corrections",
+      "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1788913167430,
+      "tag": "0006_reading_organization",
+      "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1789100000000,
+      "tag": "0007_reading_timer",
+      "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1789200000000,
+      "tag": "0008_shelf_management",
+      "breakpoints": true
+    },
+    { "idx": 9, "version": "7", "when": 1789400000000, "tag": "0009_black_background", "breakpoints": true }
+  ]
+}
