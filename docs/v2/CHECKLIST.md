@@ -1,6 +1,6 @@
 # Rowan v2 scaffold checklist
 
-Current status: [September 15 refinement report](REFINEMENT_STATUS.md). Treat the historical checklist below as background, not the current backlog.
+Current status: [September 16 refinement report](REFINEMENT_STATUS.md). Treat the historical checklist below as background, not the current backlog.
 
 This checklist tracks architecture work before production implementation. It is intentionally separate from the v1.1 release checklist.
 

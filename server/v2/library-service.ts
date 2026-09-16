@@ -1,4 +1,5 @@
 import { effectiveProgress, loggedProgress } from "../../shared/reading-progress.ts";
+import { goalProgress } from "../../shared/goal-progress.ts";
 import { browseSchema, browseFields, browseSort } from "../../shared/library-browse.ts";
 import { backlogImport, historyChange } from "../../shared/backlog.ts";
 import { goalTimeframeSchema } from "../../shared/rowan-archive.ts";
@@ -418,13 +419,29 @@ export function createLibraryService(database: Database, provider: CatalogProvid
       });
     },
 
-    async goals(actor: Actor) {
+    async goals(actor: Actor, timeZone = "UTC", now = new Date()) {
       z.number().int().positive().parse(actor.userId);
-      return database
+      browseFields.timeZone.parse(timeZone);
+      const saved = await database
         .select()
         .from(goals)
         .where(eq(goals.userId, actor.userId))
         .orderBy(desc(goals.createdAt));
+      if (!saved.length) return [];
+      const reads = await database
+        .select({
+          userBookId: userBooks.id,
+          title: personalTitle,
+          finishedAt: readingSessions.finishedAt,
+          unit: readingSessions.unit,
+          total: readingSessions.total,
+        })
+        .from(readingSessions)
+        .innerJoin(userBooks, eq(userBooks.id, readingSessions.userBookId))
+        .innerJoin(works, eq(works.id, readingSessions.workId))
+        .where(and(eq(userBooks.userId, actor.userId), eq(readingSessions.state, "completed")))
+        .orderBy(desc(readingSessions.finishedAt));
+      return saved.map((goal) => ({ ...goal, progress: goalProgress(goal, reads, timeZone, now) }));
     },
     async saveGoal(
       actor: Actor,
@@ -883,9 +900,9 @@ export function createLibraryService(database: Database, provider: CatalogProvid
       return { count: counts.count, authors: authors.map((a) => a.name).sort(), years: years.map((y) => y.year).sort().reverse() };
     },
 
-    async insights(actor: Actor, year: number, timeZone = "UTC") {
+    async insights(actor: Actor, year: number | null, timeZone = "UTC") {
       z.number().int().positive().parse(actor.userId);
-      z.number().int().min(1900).max(9998).parse(year);
+      z.number().int().min(1900).max(9998).nullable().parse(year);
       browseFields.timeZone.parse(timeZone);
       const books = await database
         .select({
@@ -910,9 +927,9 @@ export function createLibraryService(database: Database, provider: CatalogProvid
           and(
             eq(userBooks.userId, actor.userId),
             eq(readingSessions.state, "completed"),
-            sql`extract(year from ${readingSessions.finishedAt} at time zone ${timeZone}) = ${year}`,
+            year === null ? undefined : sql`extract(year from ${readingSessions.finishedAt} at time zone ${timeZone}) = ${year}`,
           ),
-        ).orderBy(desc(readingSessions.finishedAt), readingSessions.id);
+        ).orderBy(sql`${readingSessions.finishedAt} desc nulls last`, readingSessions.id);
       const authorsRead = new Map<string, Set<string>>();
       for (const read of finished) for (const author of read.authors) {
         const works = authorsRead.get(author) ?? new Set<string>();
@@ -941,7 +958,9 @@ export function createLibraryService(database: Database, provider: CatalogProvid
       return {
         year,
         lifetime,
-        recentFinishes: finished.slice(0, 6),
+        recentFinishes: finished.filter((read) => read.finishedAt).slice(0, 6),
+        undatedInPeriod: finished.filter((read) => !read.finishedAt).length,
+        rereads: finished.length - new Set(finished.map((read) => read.workId)).size,
         longestFinished,
         authorsRead: [...authorsRead].map(([name, works]) => ({ name, books: works.size })).sort((a, b) => b.books - a.books || a.name.localeCompare(b.name)),
         longest: longest ?? null,
@@ -1001,10 +1020,11 @@ export function createLibraryService(database: Database, provider: CatalogProvid
         column:
           | typeof progressEntries.occurredAt
           | typeof readingSessions.startedAt
-          | typeof readingSessions.finishedAt,
+          | typeof readingSessions.finishedAt
+          | typeof margins.createdAt,
       ) =>
         and(sql`${column} >= ${from}`, sql`${column} < ${to}`, eq(userBooks.userId, actor.userId));
-      const [observations, starts, finishes] = await Promise.all([
+      const [observations, starts, finishes, memories] = await Promise.all([
         database
           .select({
             id: progressEntries.id,
@@ -1055,6 +1075,15 @@ export function createLibraryService(database: Database, provider: CatalogProvid
           )
           .orderBy(readingSessions.finishedAt, readingSessions.id)
           .limit(1001),
+        database
+          .select({ id: margins.id, at: margins.createdAt, kind: margins.kind, book })
+          .from(margins)
+          .innerJoin(userBooks, eq(userBooks.id, margins.userBookId))
+          .innerJoin(works, eq(works.id, userBooks.workId))
+          .leftJoin(ratings, eq(ratings.userBookId, userBooks.id))
+          .where(and(inRange(margins.createdAt), sql`${margins.deletedAt} is null`))
+          .orderBy(margins.createdAt, margins.id)
+          .limit(1001),
       ]);
       const events = [
         ...observations.slice(0, 1000).map((e) => ({
@@ -1081,10 +1110,15 @@ export function createLibraryService(database: Database, provider: CatalogProvid
           unit: null,
           book: e.book,
         })),
+        ...memories.slice(0, 1000).map((e) => ({
+          id: `margin:${e.id}`, at: e.at.toISOString(),
+          kind: e.kind === "quote" ? "quote" as const : "note" as const,
+          position: null, unit: null, book: e.book,
+        })),
       ].sort((a, b) => a.at.localeCompare(b.at) || a.id.localeCompare(b.id));
       return {
         events,
-        truncated: [observations, starts, finishes].some((rows) => rows.length > 1000),
+        truncated: [observations, starts, finishes, memories].some((rows) => rows.length > 1000),
       };
     },
 

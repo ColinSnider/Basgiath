@@ -1,6 +1,6 @@
 # Rowan build status
 
-Current status: [September 15 refinement report](REFINEMENT_STATUS.md). Sections below are historical checkpoints and must not be treated as the current feature backlog.
+Current status: [September 16 refinement report](REFINEMENT_STATUS.md). Sections below are historical checkpoints and must not be treated as the current feature backlog.
 
 ## Latest: richer Rowan styling and book detail
 

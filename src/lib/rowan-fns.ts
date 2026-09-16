@@ -501,7 +501,7 @@ export const rowanSearch = createServerFn({ method: "POST" })
     );
   });
 export const rowanInsights = createServerFn({ method: "POST" })
-  .inputValidator(z.object({ sessionId: key, year: z.number().int().min(1900).max(9998), timeZone: browseFields.timeZone }).strict())
+  .inputValidator(z.object({ sessionId: key, year: z.number().int().min(1900).max(9998).nullable(), timeZone: browseFields.timeZone }).strict())
   .handler(async ({ data }) => {
     const { library, actor } = await context(data.sessionId);
     return library.insights(actor, data.year, data.timeZone);
@@ -513,10 +513,10 @@ export const rowanLibraryFacets = createServerFn({ method: "POST" })
     return library.browseFacets(actor, data.timeZone);
   });
 export const rowanGoals = createServerFn({ method: "POST" })
-  .inputValidator(z.object({ sessionId: key }).strict())
+  .inputValidator(z.object({ sessionId: key, timeZone: browseFields.timeZone }).strict())
   .handler(async ({ data }) => {
     const { library, actor } = await context(data.sessionId);
-    return library.goals(actor);
+    return library.goals(actor, data.timeZone);
   });
 export const rowanSaveGoal = createServerFn({ method: "POST" })
   .inputValidator(

@@ -25,7 +25,7 @@ export function ReadingCalendar({
       <div>
         <h2 className="font-display text-3xl">Reading calendar</h2>
         <p className="text-sm text-muted-foreground">
-          Recorded starts, progress updates, and finishes. Dates use your device’s time zone.
+          Recorded starts, progress, finishes, notes, and quotes. Dates use your device’s time zone.
         </p>
       </div>
       {month ? (
@@ -189,6 +189,8 @@ function Month({
 }
 
 function eventLabel(event: Event) {
+  if (event.kind === "note") return "Wrote a margin";
+  if (event.kind === "quote") return "Saved a quote";
   if (event.kind === "start") return "Started reading";
   if (event.kind === "finish") return "Finished reading";
   if (event.kind === "dnf") return "Stopped without finishing";

@@ -1,7 +1,8 @@
 import { useEffect, useState } from "react";
 import { NotebookPen, Download, Plus, Pencil, X } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
-import { rowanJournal, rowanLibrary, rowanHistory } from "@/lib/rowan-fns";
+import { rowanJournal, rowanHistory } from "@/lib/rowan-fns";
+import { LibraryBookPicker } from "./LibraryBookPicker";
 import { MarginCard, MarginEditor } from "./Margins";
 import { useReadingCommands } from "../../../apps/rowan/components/reader";
 import { marginsMarkdown } from "./margins-markdown";
@@ -48,21 +49,6 @@ export function Journal({
     queryKey: ["rowan", sessionId, "journal", filters, offset],
     queryFn: () => rowanJournal({ data: { sessionId, ...filters, offset } }),
     enabled: !invalidDates,
-  });
-  const books = useQuery({
-    queryKey: ["rowan", sessionId, "margin-books"],
-    queryFn: async () => {
-      const items: Awaited<ReturnType<typeof rowanLibrary>>["items"] = [];
-      let offset: number | null = 0;
-      while (offset !== null) {
-        const page: Awaited<ReturnType<typeof rowanLibrary>> = await rowanLibrary({
-          data: { sessionId, offset, query: "", status: "all", sort: "title" },
-        });
-        items.push(...page.items);
-        offset = page.nextOffset;
-      }
-      return items;
-    },
   });
   const draftHistory = useQuery({
     queryKey: ["rowan", sessionId, "history", draftBook],
@@ -124,22 +110,14 @@ export function Journal({
       {feedback}
       {exportError && <p role="alert">{exportError}</p>}
       <div hidden={!composing} className="rounded-xl border border-border bg-card p-4 space-y-3">
-        <label className="block text-sm">
-          Book
-          <select
-            className={`${control} block w-full`}
-            value={draftBook}
-            disabled={busy || !!draftBook}
-            onChange={(e) => setDraftBook(e.target.value)}
-          >
-            <option value="">Choose a book</option>
-            {books.data?.map((book) => (
-              <option key={book.id} value={book.id}>
-                {book.title}
-              </option>
-            ))}
-          </select>
-        </label>
+        <LibraryBookPicker
+          sessionId={sessionId}
+          value={draftBook}
+          onChange={setDraftBook}
+          label="Book for your margin"
+          emptyLabel="Choose a book"
+          disabled={busy || !!draftBook}
+        />
         {draftBook && (
           <>
             <MarginEditor
@@ -166,11 +144,6 @@ export function Journal({
           </p>
         )}
       </div>
-      {books.isError && (
-        <p role="alert">
-          Book choices could not load. <button onClick={() => void books.refetch()}>Retry</button>
-        </p>
-      )}
       <div className="flex flex-wrap gap-2">
         <input
           aria-label="Search margins"
@@ -180,22 +153,16 @@ export function Journal({
           value={search}
           onChange={(e) => setSearch(e.target.value)}
         />
-        <select
-          aria-label="Filter by book"
-          className={`${control} max-w-full`}
+        <LibraryBookPicker
+          sessionId={sessionId}
           value={bookId}
-          onChange={(e) => {
-            setBookId(e.target.value);
+          onChange={(id) => {
+            setBookId(id);
             setOffset(0);
           }}
-        >
-          <option value="">All books</option>
-          {books.data?.map((book) => (
-            <option key={book.id} value={book.id}>
-              {book.title}
-            </option>
-          ))}
-        </select>
+          label="Filter by book"
+          emptyLabel="All books"
+        />
         <select
           aria-label="Filter by type"
           className={control}

@@ -3,7 +3,7 @@ import test from "node:test";
 import { readFile, readdir } from "node:fs/promises";
 import { PGlite } from "@electric-sql/pglite";
 import { drizzle } from "drizzle-orm/pglite";
-import { users } from "../../shared/schema.ts";
+import { users, goals } from "../../shared/schema.ts";
 import * as schema from "../../shared/schema-v2.ts";
 import { createLibraryService } from "./library-service.ts";
 
@@ -67,11 +67,20 @@ test("paged browsing filters the whole library, isolates owners, and shares loca
     { shelfId, userId: 1, userBookId: books[0].id, sortOrder: 1 },
   ]);
   const shelf = await service.libraryPage({ userId: 1 }, { shelfId, sort: "shelf" });
+  assert.equal(shelf.total, 2);
   assert.deepEqual(
     shelf.items.map((b) => b.id),
     [books[999].id, books[0].id],
   );
   assert.equal((await service.libraryPage({ userId: 2 }, { shelfId })).total, 0);
+  // Opening a collection must include both members, even on opposite ends of
+  // the globally paginated library; never intersect with its first 24 books.
+  const collection = await service.libraryPage(
+    { userId: 1 },
+    { collection: "shelf", collectionId: shelfId, shelfId },
+  );
+  assert.equal(collection.total, 2);
+  assert.equal(collection.items.length, 2);
   await db.insert(schema.readingQueue).values([
     { userId: 1, userBookId: books[999].id, sortOrder: 5, pinned: true },
     { userId: 1, userBookId: books[0].id, sortOrder: 0, pinned: false },
@@ -104,4 +113,78 @@ test("paged browsing filters the whole library, isolates owners, and shares loca
   const facets = await service.browseFacets({ userId: 1 }, input.timeZone);
   assert.ok(facets.authors.includes("Last Author"));
   assert.deepEqual(facets.years, ["2025"]);
+  await db.insert(goals).values([
+    { id: crypto.randomUUID(), userId: 1, metric: "pages", target: 500, timeframe: "2025" },
+    { id: crypto.randomUUID(), userId: 2, metric: "books", target: 12, timeframe: "2025" },
+  ]);
+  const date = new Date("2026-01-02T12:00:00Z");
+  const mine = await service.goals({ userId: 1 }, "America/Chicago", date);
+  assert.equal(mine.length, 1);
+  assert.equal(mine[0].progress.current, 450);
+  assert.equal(mine[0].progress.contributions[0].userBookId, books[999].id);
+  const other = await service.goals({ userId: 2 }, "America/Chicago", date);
+  assert.equal(other.length, 1);
+  assert.equal(other[0].progress.current, 0);
+  assert.deepEqual(other[0].progress.contributions, []);
+  await db.insert(schema.readingSessions).values({
+    userBookId: books[999].id,
+    workId: works[999].id,
+    state: "completed",
+    unit: "page",
+    total: 400,
+    finishedAt: null,
+  });
+  const allTime = await service.insights({ userId: 1 }, null, input.timeZone);
+  assert.equal(allTime.finishedReads, 2);
+  assert.equal(allTime.uniqueWorks, 1);
+  assert.equal(allTime.rereads, 1);
+  assert.equal(allTime.undatedInPeriod, 1);
+  assert.equal(
+    allTime.months.reduce((sum, count) => sum + count, 0),
+    1,
+  );
+  assert.equal(allTime.recentFinishes.length, 1);
+  assert.equal((await service.insights({ userId: 2 }, null)).finishedReads, 0);
+
+  const noteId = crypto.randomUUID(),
+    quoteId = crypto.randomUUID();
+  await db.insert(schema.margins).values([
+    {
+      id: noteId,
+      userBookId: books[999].id,
+      kind: "note",
+      body: "Private note",
+      createdAt: new Date("2026-01-03T00:00:00Z"),
+    },
+    {
+      id: quoteId,
+      userBookId: books[999].id,
+      kind: "quote",
+      body: "Private quote",
+      createdAt: new Date("2026-01-04T00:00:00Z"),
+    },
+    {
+      id: crypto.randomUUID(),
+      userBookId: books[999].id,
+      body: "Deleted note",
+      createdAt: new Date("2026-01-03T00:00:00Z"),
+      deletedAt: new Date("2026-01-04T00:00:00Z"),
+    },
+    {
+      id: crypto.randomUUID(),
+      userBookId: books[999].id,
+      body: "Outside range",
+      createdAt: new Date("2026-02-01T00:00:00Z"),
+    },
+  ]);
+  const range = { from: "2026-01-01T00:00:00Z", to: "2026-02-01T00:00:00Z" };
+  const diary = await service.calendar({ userId: 1 }, range);
+  assert.deepEqual(
+    diary.events
+      .filter((event) => event.kind === "note" || event.kind === "quote")
+      .map((event) => event.id),
+    [`margin:${noteId}`, `margin:${quoteId}`],
+  );
+  assert.ok(!JSON.stringify(diary).includes("Private note"));
+  assert.deepEqual((await service.calendar({ userId: 2 }, range)).events, []);
 });

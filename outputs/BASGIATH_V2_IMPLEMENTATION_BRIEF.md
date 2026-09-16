@@ -8,6 +8,10 @@
 
 ## 0. How to use this brief
 
+### Current implementation checkpoint — September 16, 2026
+
+Use [the current refinement report](../docs/v2/REFINEMENT_STATUS.md) for implemented features, verification and remaining deployment work. The original unchecked lists below are historical acceptance criteria, not a list of features to rebuild. Latest code refinements cover full shelf membership, direct Series/Queue/Shelves tabs, mobile filters and active-filter chips, goal progress and editing, all-time insights, calendar margins and bounded book selection. Home remains unchanged. Railway recovery verification, native iOS, offline sync and public API work are not claimed complete.
+
 ### Current scope decision — September 12, 2026
 
 This decision supersedes the larger original scope below wherever they conflict. Rowan is a personal reading app for the current users. The remaining book record, history, and catalog work should be modest improvements to the working app, not another rebuild.

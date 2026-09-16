@@ -16,10 +16,11 @@ const control =
 export function Insights({ sessionId }: { sessionId: string }) {
   const currentYear = new Date().getFullYear();
   const [year, setYear] = useState(currentYear);
+  const [allTime, setAllTime] = useState(false);
   const timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone;
   const query = useQuery({
-    queryKey: ["rowan", sessionId, "insights", year, timeZone],
-    queryFn: () => rowanInsights({ data: { sessionId, year, timeZone } }),
+    queryKey: ["rowan", sessionId, "insights", allTime ? null : year, timeZone],
+    queryFn: () => rowanInsights({ data: { sessionId, year: allTime ? null : year, timeZone } }),
   });
   const data = query.data;
   const peak = Math.max(0, ...(data?.months ?? []));
@@ -32,33 +33,52 @@ export function Insights({ sessionId }: { sessionId: string }) {
       <header className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h2 className="font-display text-2xl flex items-center gap-2">
-            <Sparkles size={21} aria-hidden="true" /> Your year in books
+            <Sparkles size={21} aria-hidden="true" />{" "}
+            {allTime ? "Your life in books" : "Your year in books"}
           </h2>
           <p className="text-sm text-muted-foreground">
             The stories you finished and the patterns along the way.
           </p>
         </div>
-        <div className="flex items-center gap-3">
+        <div className="reader-library-switch" aria-label="Insights period">
           <button
-            className={control}
-            aria-label="Previous year"
-            disabled={year <= 1900}
-            onClick={() => setYear(year - 1)}
+            className={!allTime ? "is-selected" : ""}
+            aria-pressed={!allTime}
+            onClick={() => setAllTime(false)}
           >
-            <ArrowLeft size={18} />
+            By year
           </button>
-          <span aria-live="polite" className="font-medium">
-            {year}
-          </span>
           <button
-            className={control}
-            aria-label="Next year"
-            disabled={year >= currentYear}
-            onClick={() => setYear(year + 1)}
+            className={allTime ? "is-selected" : ""}
+            aria-pressed={allTime}
+            onClick={() => setAllTime(true)}
           >
-            <ArrowRight size={18} />
+            All time
           </button>
         </div>
+        {!allTime && (
+          <div className="flex items-center gap-3">
+            <button
+              className={control}
+              aria-label="Previous year"
+              disabled={year <= 1900}
+              onClick={() => setYear(year - 1)}
+            >
+              <ArrowLeft size={18} />
+            </button>
+            <span aria-live="polite" className="font-medium">
+              {year}
+            </span>
+            <button
+              className={control}
+              aria-label="Next year"
+              disabled={year >= currentYear}
+              onClick={() => setYear(year + 1)}
+            >
+              <ArrowRight size={18} />
+            </button>
+          </div>
+        )}
       </header>
       {query.isPending && <p role="status">Looking back through your reading…</p>}
       {query.isError && (
@@ -74,8 +94,8 @@ export function Insights({ sessionId }: { sessionId: string }) {
               { label: "Different books", value: data.uniqueWorks, icon: Sparkles },
               { label: "Authors read", value: data.authorsRead.length, icon: Feather },
               {
-                label: "Months with a finish",
-                value: data.months.filter(Boolean).length,
+                label: allTime ? "Rereads" : "Months with a finish",
+                value: allTime ? data.rereads : data.months.filter(Boolean).length,
                 icon: CalendarDays,
               },
             ].map(({ label, value, icon: Icon }) => (
@@ -88,29 +108,42 @@ export function Insights({ sessionId }: { sessionId: string }) {
           </dl>
           {!data.finishedReads ? (
             <p className="text-muted-foreground">
-              No dated finishes in {year} yet. Your completed books will tell the story here.
+              No finishes {allTime ? "recorded" : `dated in ${year}`} yet. Your completed books will
+              tell the story here.
             </p>
           ) : (
             <>
-              <div>
-                <h3 className="font-display text-xl">Your reading rhythm</h3>
-                <p className="text-sm text-muted-foreground">
-                  {peakMonths.join(", ")} {peakMonths.length === 1 ? "had" : "each had"} the most
-                  finishes: {peak}
-                  {peakMonths.length > 1 ? " each" : ""}.
-                </p>
-              </div>
-              <ol className="reader-month-chart" aria-label={`Completed reads by month in ${year}`}>
-                {data.months.map((count, month) => (
-                  <li key={month} aria-label={`${monthName(month)}: ${count} completed reads`}>
-                    <span className="reader-month-count">{count}</span>
-                    <span className="reader-month-track" aria-hidden="true">
-                      <span style={{ height: `${(count / Math.max(1, peak)) * 100}%` }} />
-                    </span>
-                    <span>{monthName(month, true)}</span>
-                  </li>
-                ))}
-              </ol>
+              {peak > 0 && (
+                <>
+                  <div>
+                    <h3 className="font-display text-xl">Your reading rhythm</h3>
+                    <p className="text-sm text-muted-foreground">
+                      {allTime && "Across all recorded years, "}
+                      {peakMonths.join(", ")} {peakMonths.length === 1 ? "had" : "each had"} the
+                      most finishes: {peak}
+                      {peakMonths.length > 1 ? " each" : ""}.
+                    </p>
+                  </div>
+                  <ol
+                    className="reader-month-chart"
+                    aria-label={
+                      allTime
+                        ? "Dated completed reads by month across all years"
+                        : `Completed reads by month in ${year}`
+                    }
+                  >
+                    {data.months.map((count, month) => (
+                      <li key={month} aria-label={`${monthName(month)}: ${count} completed reads`}>
+                        <span className="reader-month-count">{count}</span>
+                        <span className="reader-month-track" aria-hidden="true">
+                          <span style={{ height: `${(count / Math.max(1, peak)) * 100}%` }} />
+                        </span>
+                        <span>{monthName(month, true)}</span>
+                      </li>
+                    ))}
+                  </ol>
+                </>
+              )}
               <div className="grid gap-4 sm:grid-cols-2">
                 {data.longestFinished && (
                   <article className="reader-insight-highlight">
@@ -140,7 +173,9 @@ export function Insights({ sessionId }: { sessionId: string }) {
                 )}
               </div>
               <div>
-                <h3 className="font-display text-xl mb-3">Recently finished in {year}</h3>
+                <h3 className="font-display text-xl mb-3">
+                  Recently finished{!allTime && ` in ${year}`}
+                </h3>
                 <ul className="reader-insight-finishes">
                   {data.recentFinishes.map((book, index) => (
                     <li key={`${book.userBookId}:${index}`}>
@@ -159,6 +194,7 @@ export function Insights({ sessionId }: { sessionId: string }) {
                                 timeZone,
                                 month: "short",
                                 day: "numeric",
+                                year: allTime ? "numeric" : undefined,
                               })}{" "}
                             · {book.authors.join(", ")}
                           </small>
@@ -170,11 +206,23 @@ export function Insights({ sessionId }: { sessionId: string }) {
               </div>
             </>
           )}
+          {allTime && (
+            <article className="reader-insight-highlight">
+              <h3>Time spent reading</h3>
+              <p>
+                {Math.floor(data.lifetime.seconds / 3600)}h{" "}
+                {Math.floor((data.lifetime.seconds % 3600) / 60)}m recorded with your reading timer.
+              </p>
+              <p className="text-sm text-muted-foreground">
+                Saved timer sessions only. Imported finishes do not imply reading time.
+              </p>
+            </article>
+          )}
           <p className="text-xs text-muted-foreground">
             Finishes include rereads; different-book and author counts count each book once. Dates
             follow your device’s time zone.
             {data.lifetime.undated > 0 &&
-              ` ${data.lifetime.undated} undated ${data.lifetime.undated === 1 ? "read is" : "reads are"} preserved in your book histories and excluded from this yearly view.`}
+              ` ${data.lifetime.undated} undated ${data.lifetime.undated === 1 ? "read is" : "reads are"} ${allTime ? "included in all-time totals, but excluded from the monthly chart and recent finishes" : "preserved in your book histories and excluded from this yearly view"}.`}
           </p>
         </>
       )}
