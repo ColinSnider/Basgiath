@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   Search,
   SlidersHorizontal,
@@ -13,7 +13,7 @@ import {
 } from "lucide-react";
 import { useNavigate, useSearch } from "@tanstack/react-router";
 import { librarySearch } from "../components/library-search";
-import { useInfiniteQuery, useQuery } from "@tanstack/react-query";
+import { useQuery } from "@tanstack/react-query";
 import { rowanLibrary, rowanShelves, rowanOrganization, rowanLibraryFacets } from "@/lib/rowan-fns";
 import { ShelfBooks } from "@/components/rowan/PhysicalShelf";
 import { BookCover } from "@/components/rowan/BookCover";
@@ -23,22 +23,90 @@ import { control, statuses, useReader, useReadingCommands } from "../components/
 
 type Book = Awaited<ReturnType<typeof rowanLibrary>>["items"][number];
 type Shelf = Awaited<ReturnType<typeof rowanShelves>>[number];
-function AddShelfBook({ sessionId, shelf, busy, run }: { sessionId: string; shelf: Shelf; busy: boolean; run: ReturnType<typeof useReadingCommands>["run"] }) {
+function AddShelfBook({
+  sessionId,
+  shelf,
+  busy,
+  run,
+}: {
+  sessionId: string;
+  shelf: Shelf;
+  busy: boolean;
+  run: ReturnType<typeof useReadingCommands>["run"];
+}) {
   const [term, setTerm] = useState("");
   const [offset, setOffset] = useState(0);
   const candidates = useQuery({
     queryKey: ["rowan", sessionId, "shelf-candidates", term, offset],
     enabled: !!term.trim(),
-    queryFn: () => rowanLibrary({ data: { sessionId, query: term, offset, status: "all", sort: "title" } }),
+    queryFn: () =>
+      rowanLibrary({ data: { sessionId, query: term, offset, status: "all", sort: "title" } }),
   });
-  return <div className="space-y-2 py-3">
-    <label className="block">Add books from your library<input className={control} value={term} maxLength={200} placeholder="Search title or author…" onChange={(e) => { setTerm(e.target.value); setOffset(0); }} /></label>
-    {candidates.isFetching && <p role="status">Finding books…</p>}
-    {candidates.isError && <p role="alert">Books could not load. <button onClick={() => void candidates.refetch()}>Retry</button></p>}
-    {candidates.data?.items.map((book) => <div key={book.id} className="reader-shelf-toolbar"><span>{book.title} · {book.authors.join(", ")}</span><button className={control} disabled={busy || shelf.bookIds.includes(book.id)} onClick={() => run({ type: "shelfItem", key: crypto.randomUUID(), shelfId: shelf.id, userBookId: book.id, expectedVersion: shelf.version, present: true })}>{shelf.bookIds.includes(book.id) ? "On shelf" : "Add"}</button></div>)}
-    {candidates.data?.total === 0 && <p>No matching books.</p>}
-    {!!term && <div className="reader-shelf-toolbar"><button className={control} disabled={!offset || candidates.isFetching} onClick={() => setOffset(Math.max(0, offset - 24))}>Previous</button><button className={control} disabled={!candidates.data?.nextOffset || candidates.isFetching} onClick={() => setOffset(candidates.data!.nextOffset!)}>Next</button></div>}
-  </div>;
+  return (
+    <div className="space-y-2 py-3">
+      <label className="block">
+        Add books from your library
+        <input
+          className={control}
+          value={term}
+          maxLength={200}
+          placeholder="Search title or author…"
+          onChange={(e) => {
+            setTerm(e.target.value);
+            setOffset(0);
+          }}
+        />
+      </label>
+      {candidates.isFetching && <p role="status">Finding books…</p>}
+      {candidates.isError && (
+        <p role="alert">
+          Books could not load. <button onClick={() => void candidates.refetch()}>Retry</button>
+        </p>
+      )}
+      {candidates.data?.items.map((book) => (
+        <div key={book.id} className="reader-shelf-toolbar">
+          <span>
+            {book.title} · {book.authors.join(", ")}
+          </span>
+          <button
+            className={control}
+            disabled={busy || shelf.bookIds.includes(book.id)}
+            onClick={() =>
+              run({
+                type: "shelfItem",
+                key: crypto.randomUUID(),
+                shelfId: shelf.id,
+                userBookId: book.id,
+                expectedVersion: shelf.version,
+                present: true,
+              })
+            }
+          >
+            {shelf.bookIds.includes(book.id) ? "On shelf" : "Add"}
+          </button>
+        </div>
+      ))}
+      {candidates.data?.total === 0 && <p>No matching books.</p>}
+      {!!term && (
+        <div className="reader-shelf-toolbar">
+          <button
+            className={control}
+            disabled={!offset || candidates.isFetching}
+            onClick={() => setOffset(Math.max(0, offset - 24))}
+          >
+            Previous
+          </button>
+          <button
+            className={control}
+            disabled={!candidates.data?.nextOffset || candidates.isFetching}
+            onClick={() => setOffset(candidates.data!.nextOffset!)}
+          >
+            Next
+          </button>
+        </div>
+      )}
+    </div>
+  );
 }
 export function LibraryPage() {
   const { sessionId, openBook } = useReader();
@@ -60,6 +128,7 @@ export function LibraryPage() {
     sort,
     collection,
     collectionId,
+    page,
   } = browsing;
   const inCollections = section !== "books";
   const collectionType = section === "series" ? "" : collection;
@@ -76,9 +145,13 @@ export function LibraryPage() {
   const update = (patch: Partial<typeof browsing>) =>
     void navigate({
       to: "/library",
-      search: { ...browsing, ...patch },
-      replace: true,
-      resetScroll: false,
+      search: {
+        ...browsing,
+        page: Object.keys(patch).some((key) => key !== "view" && key !== "page") ? 1 : page,
+        ...patch,
+      },
+      replace: patch.page === undefined,
+      resetScroll: patch.page !== undefined,
     });
   const setView = (view: typeof browsing.view) => update({ view });
   const setQuery = (query: string) => update({ query });
@@ -115,11 +188,12 @@ export function LibraryPage() {
     queryKey: ["rowan", sessionId, "library-facets", timeZone],
     queryFn: () => rowanLibraryFacets({ data: { sessionId, timeZone } }),
   });
-  const library = useInfiniteQuery({
+  const library = useQuery({
     queryKey: [
       "rowan",
       sessionId,
-      "shelf-library",
+      "library-page",
+      page,
       query,
       status,
       selectedShelf,
@@ -134,12 +208,11 @@ export function LibraryPage() {
       collectionId,
       timeZone,
     ],
-    initialPageParam: 0,
-    queryFn: ({ pageParam }) =>
+    queryFn: () =>
       rowanLibrary({
         data: {
           sessionId,
-          offset: pageParam,
+          offset: (page - 1) * 24,
           query,
           status,
           sort,
@@ -155,15 +228,21 @@ export function LibraryPage() {
           collectionId: inCollections && collectionId ? collectionId : undefined,
         },
       }),
-    getNextPageParam: (page) => page.nextOffset ?? undefined,
   });
+  const total = library.data?.total ?? 0;
+  const pageCount = Math.max(1, Math.ceil(total / 24));
+  useEffect(() => {
+    if (library.data && page > pageCount)
+      void navigate({
+        to: "/library",
+        search: { ...browsing, page: pageCount },
+        replace: true,
+        resetScroll: false,
+      });
+  }, [library.data, page, pageCount, navigate]);
   // The server applies all filters before pagination; views only arrange those results.
   const matches = (_book: Book) => true;
-  const allBooks = [
-    ...new Map(
-      (library.data?.pages.flatMap((page) => page.items) ?? []).map((book) => [book.id, book]),
-    ).values(),
-  ];
+  const allBooks = library.data?.items ?? [];
   const bookById = new Map(allBooks.map((book) => [book.id, book]));
   const rank = new Map(allBooks.map((book, index) => [book.id, index]));
   const collectionName =
@@ -214,6 +293,7 @@ export function LibraryPage() {
     (g) =>
       (!inCollections || collectionType !== "shelf" || g.id === collectionId) &&
       (!selectedShelf || selectedShelf === g.id) &&
+      (g.books.length > 0 || g.id === selectedShelf || (inCollections && g.id === collectionId)) &&
       (g.id !== "unfiled" || g.books.length > 0 || !shelves.data?.length),
   );
   const listBooks = ordered(
@@ -508,7 +588,9 @@ export function LibraryPage() {
             </div>
           )}
           <p role="status" className="text-sm text-muted-foreground">
-            {listBooks.length} of {library.data?.pages[0]?.total ?? 0} matching books
+            {total
+              ? `${(page - 1) * 24 + 1}–${Math.min(page * 24, total)} of ${total} books`
+              : "No matching books"}
             {filterCount ? " · Filters applied" : ""}
           </p>
           <div className="reader-shelf-toolbar">
@@ -621,9 +703,7 @@ export function LibraryPage() {
                   <article className="reader-physical-shelf" key={group.id}>
                     <header>
                       <h2>{group.name}</h2>
-                      <span>
-                      {group.shelf?.bookIds.length ?? group.books.length} books
-                      </span>
+                      <span>{group.shelf?.bookIds.length ?? group.books.length} books</span>
                     </header>
                     {group.shelf?.description && (
                       <p className="reader-muted">{group.shelf.description}</p>
@@ -665,7 +745,14 @@ export function LibraryPage() {
                     )}
                     <details className="reader-shelf-organize">
                       <summary>Organize this shelf</summary>
-                      {group.shelf && <AddShelfBook sessionId={sessionId} shelf={group.shelf} busy={busy} run={run} />}
+                      {group.shelf && (
+                        <AddShelfBook
+                          sessionId={sessionId}
+                          shelf={group.shelf}
+                          busy={busy}
+                          run={run}
+                        />
+                      )}
                       {group.shelf && (
                         <form
                           className="reader-shelf-toolbar"
@@ -842,14 +929,49 @@ export function LibraryPage() {
                   />
                 </details>
               )}
-              {library.hasNextPage && (
-                <button
-                  className={control}
-                  disabled={library.isFetchingNextPage}
-                  onClick={() => void library.fetchNextPage()}
-                >
-                  {library.isFetchingNextPage ? "Loading…" : "Load more books"}
-                </button>
+              {pageCount > 1 && (
+                <nav className="reader-pagination" aria-label="Library pages">
+                  <button
+                    className={control}
+                    disabled={page === 1 || library.isFetching}
+                    onClick={() => update({ page: page - 1 })}
+                  >
+                    Previous
+                  </button>
+                  {[
+                    ...new Set([
+                      1,
+                      Math.max(1, page - 1),
+                      page,
+                      Math.min(pageCount, page + 1),
+                      pageCount,
+                    ]),
+                  ]
+                    .sort((a, b) => a - b)
+                    .map((number, index, pages) => (
+                      <span key={number} className="reader-pagination-step">
+                        {index > 0 && number - pages[index - 1] > 1 && (
+                          <span aria-hidden="true">…</span>
+                        )}
+                        <button
+                          className={control}
+                          aria-label={`Page ${number}`}
+                          aria-current={page === number ? "page" : undefined}
+                          disabled={library.isFetching}
+                          onClick={() => update({ page: number })}
+                        >
+                          {number}
+                        </button>
+                      </span>
+                    ))}
+                  <button
+                    className={control}
+                    disabled={page === pageCount || library.isFetching}
+                    onClick={() => update({ page: page + 1 })}
+                  >
+                    Next
+                  </button>
+                </nav>
               )}
               {!listBooks.length && (
                 <p>

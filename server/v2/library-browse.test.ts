@@ -44,6 +44,18 @@ test("paged browsing filters the whole library, isolates owners, and shares loca
   assert.equal(first.total, 1000);
   assert.equal(first.items.length, 24);
   assert.equal(first.nextOffset, 24);
+  const second = await service.libraryPage({ userId: 1 }, { sort: "title", offset: 24 });
+  assert.equal(second.items[0].title, "Book 0024");
+  assert.equal(second.total, 1000);
+  assert.ok(second.items.every((book) => !first.items.some((earlier) => earlier.id === book.id)));
+  const pastLast = await service.libraryPage({ userId: 1 }, { offset: 1008 });
+  assert.equal(pastLast.total, 1000);
+  assert.deepEqual(pastLast.items, []);
+  const filteredPastLast = await service.libraryPage(
+    { userId: 1 },
+    { author: "Last Author", offset: 24 },
+  );
+  assert.equal(filteredPastLast.total, 1);
   const last = await service.libraryPage({ userId: 1 }, { author: "Last Author" });
   assert.equal(last.total, 1);
   assert.equal(last.items[0].id, books[999].id);
@@ -55,26 +67,40 @@ test("paged browsing filters the whole library, isolates owners, and shares loca
     { shelfId, userId: 1, userBookId: books[0].id, sortOrder: 1 },
   ]);
   const shelf = await service.libraryPage({ userId: 1 }, { shelfId, sort: "shelf" });
-  assert.deepEqual(shelf.items.map((b) => b.id), [books[999].id, books[0].id]);
+  assert.deepEqual(
+    shelf.items.map((b) => b.id),
+    [books[999].id, books[0].id],
+  );
   assert.equal((await service.libraryPage({ userId: 2 }, { shelfId })).total, 0);
   await db.insert(schema.readingQueue).values([
     { userId: 1, userBookId: books[999].id, sortOrder: 5, pinned: true },
     { userId: 1, userBookId: books[0].id, sortOrder: 0, pinned: false },
   ]);
-  assert.deepEqual((await service.libraryPage({ userId: 1 }, { collection: "queue", sort: "shelf" })).items.map((b) => b.id), [books[999].id, books[0].id]);
-  await db
-    .insert(schema.readingSessions)
-    .values({
-      userBookId: books[999].id,
-      workId: works[999].id,
-      state: "completed",
-      unit: "page",
-      finishedAt: new Date("2026-01-01T02:00:00Z"),
-    });
+  assert.deepEqual(
+    (await service.libraryPage({ userId: 1 }, { collection: "queue", sort: "shelf" })).items.map(
+      (b) => b.id,
+    ),
+    [books[999].id, books[0].id],
+  );
+  await db.insert(schema.readingSessions).values({
+    userBookId: books[999].id,
+    workId: works[999].id,
+    state: "completed",
+    unit: "page",
+    total: 450,
+    finishedAt: new Date("2026-01-01T02:00:00Z"),
+  });
   const input = { year: "2025", timeZone: "America/Chicago" };
   assert.equal((await service.libraryPage({ userId: 1 }, input)).total, 1);
   assert.equal((await service.libraryPage({ userId: 1 }, { ...input, year: "2026" })).total, 0);
-  assert.equal((await service.insights({ userId: 1 }, 2025, input.timeZone)).months[11], 1);
+  const insight = await service.insights({ userId: 1 }, 2025, input.timeZone);
+  assert.equal(insight.months[11], 1);
+  assert.equal(insight.longestFinished?.total, 450);
+  assert.equal(insight.recentFinishes[0].userBookId, books[999].id);
+  assert.deepEqual(insight.authorsRead, [{ name: "Last Author", books: 1 }]);
+  const privateInsight = await service.insights({ userId: 2 }, 2025, input.timeZone);
+  assert.equal(privateInsight.longestFinished, null);
+  assert.deepEqual(privateInsight.recentFinishes, []);
   const facets = await service.browseFacets({ userId: 1 }, input.timeZone);
   assert.ok(facets.authors.includes("Last Author"));
   assert.deepEqual(facets.years, ["2025"]);

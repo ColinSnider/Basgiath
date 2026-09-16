@@ -902,16 +902,24 @@ export function createLibraryService(database: Database, provider: CatalogProvid
         .leftJoin(ratings, eq(ratings.userBookId, userBooks.id))
         .where(eq(userBooks.userId, actor.userId));
       const finished = await database
-        .select({ workId: readingSessions.workId, finishedAt: readingSessions.finishedAt })
+        .select({ workId: readingSessions.workId, userBookId: userBooks.id, title: personalTitle, authors: personalAuthors, coverUrl: personalCover, finishedAt: readingSessions.finishedAt, total: readingSessions.total, unit: readingSessions.unit })
         .from(readingSessions)
         .innerJoin(userBooks, eq(userBooks.id, readingSessions.userBookId))
+        .innerJoin(works, eq(works.id, userBooks.workId))
         .where(
           and(
             eq(userBooks.userId, actor.userId),
             eq(readingSessions.state, "completed"),
             sql`extract(year from ${readingSessions.finishedAt} at time zone ${timeZone}) = ${year}`,
           ),
-        );
+        ).orderBy(desc(readingSessions.finishedAt), readingSessions.id);
+      const authorsRead = new Map<string, Set<string>>();
+      for (const read of finished) for (const author of read.authors) {
+        const works = authorsRead.get(author) ?? new Set<string>();
+        works.add(read.workId);
+        authorsRead.set(author, works);
+      }
+      const longestFinished = finished.filter((read) => read.unit === "page" && read.total !== null).sort((a, b) => b.total! - a.total!)[0] ?? null;
       const months = Array.from({ length: 12 }, () => 0);
       const monthFormat = new Intl.DateTimeFormat("en", { timeZone, month: "numeric" });
       for (const read of finished) if (read.finishedAt) months[Number(monthFormat.format(read.finishedAt)) - 1]++;
@@ -933,6 +941,9 @@ export function createLibraryService(database: Database, provider: CatalogProvid
       return {
         year,
         lifetime,
+        recentFinishes: finished.slice(0, 6),
+        longestFinished,
+        authorsRead: [...authorsRead].map(([name, works]) => ({ name, books: works.size })).sort((a, b) => b.books - a.books || a.name.localeCompare(b.name)),
         longest: longest ?? null,
         favoriteAuthors: [...favoriteAuthors].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0])).slice(0, 5),
         goal: goal?.target ?? null,
@@ -1219,9 +1230,9 @@ export function createLibraryService(database: Database, provider: CatalogProvid
         : data.collection === "queue"
           ? sql`(select case when q.pinned then -1 else q.sort_order end from v2.reading_queue q where q.user_id = ${actor.userId} and q.user_book_id = ${userBooks.id})`
           : data.shelfId ? sql`(select si.sort_order from v2.shelf_items si where si.shelf_id = ${data.shelfId} and si.user_book_id = ${userBooks.id})` : personalTitle;
-      const rows = await database
+      const matching = database
         .select({
-          matchCount: sql<number>`count(*) over()::int`,
+          matchCount: sql<number>`count(*) over()::int`.as("match_count"),
           id: userBooks.id,
           version: userBooks.version,
           status: userBooks.status,
@@ -1300,8 +1311,8 @@ export function createLibraryService(database: Database, provider: CatalogProvid
                 )
               : undefined,
           ),
-        )
-        .orderBy(
+        );
+      const rows = await matching.orderBy(
           data.sort === "shelf" ? collectionOrder
           : data.sort === "author" ? sql`${personalAuthors}::text`
           : data.sort === "finished" ? sql`(select max(rs.finished_at) from v2.reading_sessions rs where rs.user_book_id = ${userBooks.id} and rs.state = 'completed') desc nulls last`
@@ -1317,8 +1328,16 @@ export function createLibraryService(database: Database, provider: CatalogProvid
         )
         .limit(25)
         .offset(data.offset);
+      // A bookmark can point past the last page after deletions. Preserve the
+      // true filtered total so the client can return to the new last page.
+      let total = rows[0]?.matchCount ?? 0;
+      if (!rows.length && data.offset > 0) {
+        const firstMatch = matching.limit(1).offset(0).as("first_match");
+        const [count] = await database.select({ total: firstMatch.matchCount }).from(firstMatch);
+        total = count?.total ?? 0;
+      }
       return {
-        total: rows[0]?.matchCount ?? 0,
+        total,
         items: rows.slice(0, 24).map((row) => ({
           ...row,
           progress:

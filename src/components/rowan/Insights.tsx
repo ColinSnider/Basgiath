@@ -1,121 +1,180 @@
 import { useState } from "react";
+import { Link } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
-import { rowanInsights, type RowanCommand } from "@/lib/rowan-fns";
+import { ArrowLeft, ArrowRight, BookOpen, CalendarDays, Feather, Sparkles } from "lucide-react";
+import { rowanInsights } from "@/lib/rowan-fns";
+import { BookCover } from "./BookCover";
 
-export function Insights({
-  sessionId,
-  run,
-  busy,
-}: {
-  sessionId: string;
-  run: (command: RowanCommand) => void;
-  busy: boolean;
-}) {
-  const [year, setYear] = useState(new Date().getFullYear());
+const monthName = (month: number, short = false) =>
+  new Date(Date.UTC(2020, month, 1)).toLocaleString(undefined, {
+    month: short ? "short" : "long",
+    timeZone: "UTC",
+  });
+const control =
+  "rounded-lg border border-border bg-background px-3 py-2 text-sm disabled:opacity-50";
+
+export function Insights({ sessionId }: { sessionId: string }) {
+  const currentYear = new Date().getFullYear();
+  const [year, setYear] = useState(currentYear);
   const timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone;
   const query = useQuery({
     queryKey: ["rowan", sessionId, "insights", year, timeZone],
     queryFn: () => rowanInsights({ data: { sessionId, year, timeZone } }),
   });
+  const data = query.data;
+  const peak = Math.max(0, ...(data?.months ?? []));
+  const peakMonths =
+    data?.months.flatMap((count, month) =>
+      count > 0 && count === peak ? [monthName(month)] : [],
+    ) ?? [];
   return (
-    <section id="insights" className="rounded-2xl border border-border bg-card p-5 space-y-5">
-      <div className="flex items-center justify-between gap-3">
-        <h2 className="font-display text-2xl">Your reading insights</h2>
+    <section id="insights" className="reader-card reader-card-body space-y-6">
+      <header className="flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <h2 className="font-display text-2xl flex items-center gap-2">
+            <Sparkles size={21} aria-hidden="true" /> Your year in books
+          </h2>
+          <p className="text-sm text-muted-foreground">
+            The stories you finished and the patterns along the way.
+          </p>
+        </div>
         <div className="flex items-center gap-3">
           <button
+            className={control}
             aria-label="Previous year"
             disabled={year <= 1900}
             onClick={() => setYear(year - 1)}
           >
-            ←
+            <ArrowLeft size={18} />
           </button>
-          <span>{year}</span>
-          <button aria-label="Next year" disabled={year >= 9998} onClick={() => setYear(year + 1)}>
-            →
+          <span aria-live="polite" className="font-medium">
+            {year}
+          </span>
+          <button
+            className={control}
+            aria-label="Next year"
+            disabled={year >= currentYear}
+            onClick={() => setYear(year + 1)}
+          >
+            <ArrowRight size={18} />
           </button>
         </div>
-      </div>
-      {query.isPending && <p role="status">Loading your insights…</p>}
+      </header>
+      {query.isPending && <p role="status">Looking back through your reading…</p>}
       {query.isError && (
         <p role="alert">
           Insights could not load. <button onClick={() => void query.refetch()}>Retry</button>
         </p>
       )}
-      {query.data && (
+      {data && (
         <>
-          <form
-            key={`${year}:${query.data.goal}`}
-            className="flex flex-wrap items-end gap-3"
-            onSubmit={(event) => {
-              event.preventDefault();
-              const data = new FormData(event.currentTarget);
-              run({
-                type: "annualGoal",
-                key: crypto.randomUUID(),
-                year,
-                target: Number(data.get("target")),
-              });
-            }}
-          >
-            <label className="grid gap-1 text-sm">
-              Books to finish in {year}
-              <input
-                className="rounded-lg border border-border bg-background p-2"
-                name="target"
-                type="number"
-                min={1}
-                max={10000}
-                required
-                defaultValue={query.data.goal ?? ""}
-              />
-            </label>
-            <button className="rounded-lg border border-border px-3 py-2 text-sm" disabled={busy}>
-              Save goal
-            </button>
-            {query.data.goal !== null && (
-              <p>
-                {query.data.finishedReads} of {query.data.goal} reads ·{" "}
-                {Math.round((query.data.finishedReads / query.data.goal) * 100)}%
-              </p>
-            )}
-          </form>
-          <dl className="grid grid-cols-2 gap-4 md:grid-cols-4">
+          <dl className="reader-insight-totals">
             {[
-              ["Reads finished this year", query.data.finishedReads],
-              ["Distinct books finished", query.data.uniqueWorks],
-              ["Books in your library", query.data.libraryCount],
-              ["Repeat completions this year", query.data.finishedReads - query.data.uniqueWorks],
-              ["All-time completed reads", query.data.lifetime.reads],
-              ["Reads with unknown finish dates", query.data.lifetime.undated],
-              ["All-time tracked reading hours", Math.round(query.data.lifetime.seconds / 3600 * 10) / 10],
-              ["Favorite books", query.data.favorites],
-            ].map(([label, value]) => (
+              { label: "Reads finished", value: data.finishedReads, icon: BookOpen },
+              { label: "Different books", value: data.uniqueWorks, icon: Sparkles },
+              { label: "Authors read", value: data.authorsRead.length, icon: Feather },
+              {
+                label: "Months with a finish",
+                value: data.months.filter(Boolean).length,
+                icon: CalendarDays,
+              },
+            ].map(({ label, value, icon: Icon }) => (
               <div key={label}>
-                <dt className="text-sm text-muted-foreground">{label}</dt>
-                <dd className="font-display text-3xl">{value}</dd>
+                <Icon size={18} aria-hidden="true" />
+                <dt>{label}</dt>
+                <dd>{value}</dd>
               </div>
             ))}
           </dl>
-          {query.data.longest && <p>Longest book in your library: <strong>{query.data.longest.title}</strong> · {query.data.longest.pages} pages</p>}
-          {!!query.data.favoriteAuthors.length && <div><h3>Authors of your favorite books</h3><ul>{query.data.favoriteAuthors.map(([author, count]) => <li key={author}>{author} · {count} favorite {count === 1 ? "book" : "books"}</li>)}</ul></div>}
-          <div
-            className="grid grid-cols-6 gap-2 md:grid-cols-12"
-            aria-label="Completed reads by month"
-          >
-            {query.data.months.map((count, month) => (
-              <div className="rounded-lg bg-muted p-2 text-center" key={month}>
-                <p className="text-xs">
-                  {new Date(Date.UTC(2020, month, 1)).toLocaleString(undefined, {
-                    month: "short",
-                    timeZone: "UTC",
-                  })}
+          {!data.finishedReads ? (
+            <p className="text-muted-foreground">
+              No dated finishes in {year} yet. Your completed books will tell the story here.
+            </p>
+          ) : (
+            <>
+              <div>
+                <h3 className="font-display text-xl">Your reading rhythm</h3>
+                <p className="text-sm text-muted-foreground">
+                  {peakMonths.join(", ")} {peakMonths.length === 1 ? "had" : "each had"} the most
+                  finishes: {peak}
+                  {peakMonths.length > 1 ? " each" : ""}.
                 </p>
-                <p className="font-semibold">{count}</p>
               </div>
-            ))}
-          </div>
-          <p className="text-sm text-muted-foreground">
-            Annual counts include rereads and use your device’s time zone ({timeZone}). Undated reads appear only in all-time totals. Reading time includes saved timer activity, not estimated time or audiobook length.
+              <ol className="reader-month-chart" aria-label={`Completed reads by month in ${year}`}>
+                {data.months.map((count, month) => (
+                  <li key={month} aria-label={`${monthName(month)}: ${count} completed reads`}>
+                    <span className="reader-month-count">{count}</span>
+                    <span className="reader-month-track" aria-hidden="true">
+                      <span style={{ height: `${(count / Math.max(1, peak)) * 100}%` }} />
+                    </span>
+                    <span>{monthName(month, true)}</span>
+                  </li>
+                ))}
+              </ol>
+              <div className="grid gap-4 sm:grid-cols-2">
+                {data.longestFinished && (
+                  <article className="reader-insight-highlight">
+                    <BookOpen size={20} aria-hidden="true" />
+                    <h3>Longest book finished</h3>
+                    <Link to="/books/$bookId" params={{ bookId: data.longestFinished.userBookId }}>
+                      {data.longestFinished.title}
+                    </Link>
+                    <p>{data.longestFinished.total} pages · length recorded for that read</p>
+                  </article>
+                )}
+                {!!data.authorsRead.length && (
+                  <article className="reader-insight-highlight">
+                    <Feather size={20} aria-hidden="true" />
+                    <h3>Authors you spent time with</h3>
+                    <ul>
+                      {data.authorsRead.slice(0, 3).map((author) => (
+                        <li key={author.name}>
+                          {author.name}{" "}
+                          <span>
+                            · {author.books} {author.books === 1 ? "book" : "books"}
+                          </span>
+                        </li>
+                      ))}
+                    </ul>
+                  </article>
+                )}
+              </div>
+              <div>
+                <h3 className="font-display text-xl mb-3">Recently finished in {year}</h3>
+                <ul className="reader-insight-finishes">
+                  {data.recentFinishes.map((book, index) => (
+                    <li key={`${book.userBookId}:${index}`}>
+                      <Link to="/books/$bookId" params={{ bookId: book.userBookId }}>
+                        <BookCover
+                          title={book.title}
+                          authors={book.authors}
+                          src={book.coverUrl}
+                          className="rowan-cover-small"
+                        />
+                        <span>
+                          <strong>{book.title}</strong>
+                          <small>
+                            {book.finishedAt &&
+                              new Date(book.finishedAt).toLocaleDateString(undefined, {
+                                timeZone,
+                                month: "short",
+                                day: "numeric",
+                              })}{" "}
+                            · {book.authors.join(", ")}
+                          </small>
+                        </span>
+                      </Link>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            </>
+          )}
+          <p className="text-xs text-muted-foreground">
+            Finishes include rereads; different-book and author counts count each book once. Dates
+            follow your device’s time zone.
+            {data.lifetime.undated > 0 &&
+              ` ${data.lifetime.undated} undated ${data.lifetime.undated === 1 ? "read is" : "reads are"} preserved in your book histories and excluded from this yearly view.`}
           </p>
         </>
       )}

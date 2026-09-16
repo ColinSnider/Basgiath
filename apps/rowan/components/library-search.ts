@@ -1,5 +1,6 @@
 import { z } from "zod";
 export const librarySearch = z.object({
+  page: z.number().int().min(1).max(4167).catch(1),
   view: z.enum(["grid", "shelves", "list"]).catch("grid"),
   section: z.enum(["books", "series", "collections"]).catch("books"),
   collection: z.enum(["", "shelf", "series", "queue"]).catch(""),
