@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { useUnsavedChanges } from "./useUnsavedChanges";
 import type { rowanHistory, RowanCommand } from "@/lib/rowan-fns";
 
 type Margin = Awaited<ReturnType<typeof rowanHistory>>["margins"][number];
@@ -96,6 +97,8 @@ export function MarginEditor({
   const [locator, setLocator] = useState(margin?.locator ?? "");
   const [submittedId, setSubmittedId] = useState<string | null>(null);
   const [submittedVersion, setSubmittedVersion] = useState<number | null>(null);
+  const saved = (submittedId !== null && !!savedIds?.includes(submittedId)) || (submittedVersion !== null && !!margin && margin.version > submittedVersion);
+  useUnsavedChanges(!saved && (body !== (margin?.body ?? "") || locator !== (margin?.locator ?? "") || kind !== (margin?.kind ?? "note")));
   useEffect(() => {
     if (margin && submittedVersion !== null && margin.version > submittedVersion) cancel?.();
   }, [margin, submittedVersion, cancel]);

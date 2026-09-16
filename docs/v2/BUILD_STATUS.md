@@ -1,5 +1,7 @@
 # Rowan build status
 
+Current status: [September 15 refinement report](REFINEMENT_STATUS.md). Sections below are historical checkpoints and must not be treated as the current feature backlog.
+
 ## Latest: richer Rowan styling and book detail
 
 Restored theme-aware burgundy/gold gradients, warm surfaces, display fonts, and active navigation accents. Opening a book in standalone Rowan now focuses the content on a cover-led detail view, with author, status, personal rating, progress, and grouped reading controls. Existing edit, edition, margins, and history controls remain available. Added the Rowan app directory to Tailwind source scanning. Build and TypeScript checks passed; authenticated desktop/mobile visual review remains pending.

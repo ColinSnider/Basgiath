@@ -1,6 +1,3 @@
-import "./lib/error-capture";
-
-import { consumeLastCapturedError } from "./lib/error-capture";
 import { renderErrorPage } from "./lib/error-page";
 
 type ServerEntry = {
@@ -62,19 +59,26 @@ async function normalizeCatastrophicSsrResponse(response: Response): Promise<Res
     return response;
   }
 
-  console.error(consumeLastCapturedError() ?? new Error(`h3 swallowed SSR error: ${body}`));
   return brandedErrorResponse();
 }
 
 export default {
   async fetch(request: Request, env: unknown, ctx: unknown) {
+    const requestId = crypto.randomUUID();
+    const startedAt = Date.now();
     try {
       const handler = await getServerEntry();
       const response = await handler.fetch(request, env, ctx);
-      return await normalizeCatastrophicSsrResponse(response);
+      const normalized = await normalizeCatastrophicSsrResponse(response);
+      if (normalized.status >= 500) console.error(JSON.stringify({ requestId, operation: "request", status: normalized.status, durationMs: Date.now() - startedAt }));
+      const headers = new Headers(normalized.headers);
+      headers.set("X-Request-ID", requestId);
+      return new Response(normalized.body, { status: normalized.status, statusText: normalized.statusText, headers });
     } catch (error) {
-      console.error(error);
-      return brandedErrorResponse();
+      console.error(JSON.stringify({ requestId, operation: "request", status: 500, durationMs: Date.now() - startedAt, errorType: error instanceof Error ? error.name : "UnknownError" }));
+      const response = brandedErrorResponse();
+      response.headers.set("X-Request-ID", requestId);
+      return response;
     }
   },
 };

@@ -12,9 +12,10 @@ export function Insights({
   busy: boolean;
 }) {
   const [year, setYear] = useState(new Date().getFullYear());
+  const timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone;
   const query = useQuery({
-    queryKey: ["rowan", sessionId, "insights", year],
-    queryFn: () => rowanInsights({ data: { sessionId, year } }),
+    queryKey: ["rowan", sessionId, "insights", year, timeZone],
+    queryFn: () => rowanInsights({ data: { sessionId, year, timeZone } }),
   });
   return (
     <section id="insights" className="rounded-2xl border border-border bg-card p-5 space-y-5">
@@ -83,6 +84,11 @@ export function Insights({
               ["Reads finished this year", query.data.finishedReads],
               ["Distinct books finished", query.data.uniqueWorks],
               ["Books in your library", query.data.libraryCount],
+              ["Repeat completions this year", query.data.finishedReads - query.data.uniqueWorks],
+              ["All-time completed reads", query.data.lifetime.reads],
+              ["Reads with unknown finish dates", query.data.lifetime.undated],
+              ["All-time tracked reading hours", Math.round(query.data.lifetime.seconds / 3600 * 10) / 10],
+              ["Favorite books", query.data.favorites],
             ].map(([label, value]) => (
               <div key={label}>
                 <dt className="text-sm text-muted-foreground">{label}</dt>
@@ -90,6 +96,8 @@ export function Insights({
               </div>
             ))}
           </dl>
+          {query.data.longest && <p>Longest book in your library: <strong>{query.data.longest.title}</strong> · {query.data.longest.pages} pages</p>}
+          {!!query.data.favoriteAuthors.length && <div><h3>Authors of your favorite books</h3><ul>{query.data.favoriteAuthors.map(([author, count]) => <li key={author}>{author} · {count} favorite {count === 1 ? "book" : "books"}</li>)}</ul></div>}
           <div
             className="grid grid-cols-6 gap-2 md:grid-cols-12"
             aria-label="Completed reads by month"
@@ -107,8 +115,7 @@ export function Insights({
             ))}
           </div>
           <p className="text-sm text-muted-foreground">
-            Completion counts include rereads and use recorded finish dates in UTC. Undated reads
-            are excluded. Ratings cover your entire library.
+            Annual counts include rereads and use your device’s time zone ({timeZone}). Undated reads appear only in all-time totals. Reading time includes saved timer activity, not estimated time or audiobook length.
           </p>
         </>
       )}

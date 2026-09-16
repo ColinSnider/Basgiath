@@ -1,4 +1,5 @@
 import { createOrganizationService } from "../../server/v2/organization-service";
+import { browseFields, browseSort } from "../../shared/library-browse";
 import { backlogImport, historyChange } from "../../shared/backlog";
 import { organizationCommand } from "../../shared/reading-organization";
 import { createAccountService } from "../../server/v2/account-service";
@@ -463,7 +464,8 @@ export const rowanLibrary = createServerFn({ method: "POST" })
         status: z.string(),
         favoritesOnly: z.boolean().optional(),
         shelfId: key.optional(),
-        sort: z.enum(["newest", "oldest", "title", "rating"]).optional(),
+        sort: browseSort.optional(),
+        ...browseFields,
       })
       .strict(),
   )
@@ -499,10 +501,16 @@ export const rowanSearch = createServerFn({ method: "POST" })
     );
   });
 export const rowanInsights = createServerFn({ method: "POST" })
-  .inputValidator(z.object({ sessionId: key, year: z.number().int().min(1900).max(9998) }).strict())
+  .inputValidator(z.object({ sessionId: key, year: z.number().int().min(1900).max(9998), timeZone: browseFields.timeZone }).strict())
   .handler(async ({ data }) => {
     const { library, actor } = await context(data.sessionId);
-    return library.insights(actor, data.year);
+    return library.insights(actor, data.year, data.timeZone);
+  });
+export const rowanLibraryFacets = createServerFn({ method: "POST" })
+  .inputValidator(z.object({ sessionId: key, timeZone: browseFields.timeZone }).strict())
+  .handler(async ({ data }) => {
+    const { library, actor } = await context(data.sessionId);
+    return library.browseFacets(actor, data.timeZone);
   });
 export const rowanGoals = createServerFn({ method: "POST" })
   .inputValidator(z.object({ sessionId: key }).strict())

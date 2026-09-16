@@ -1,4 +1,5 @@
 import { effectiveProgress, loggedProgress } from "../../shared/reading-progress.ts";
+import { browseSchema, browseFields, browseSort } from "../../shared/library-browse.ts";
 import { backlogImport, historyChange } from "../../shared/backlog.ts";
 import { goalTimeframeSchema } from "../../shared/rowan-archive.ts";
 import { createHash } from "node:crypto";
@@ -874,11 +875,18 @@ export function createLibraryService(database: Database, provider: CatalogProvid
       });
     },
 
-    async insights(actor: Actor, year: number) {
+    async browseFacets(actor: Actor, timeZone = "UTC") {
+      browseFields.timeZone.parse(timeZone);
+      const [counts] = await database.select({ count: sql<number>`count(*)::int` }).from(userBooks).where(eq(userBooks.userId, actor.userId));
+      const authors = await database.selectDistinct({ name: sql<string>`jsonb_array_elements_text(${personalAuthors})` }).from(userBooks).innerJoin(works, eq(works.id, userBooks.workId)).where(eq(userBooks.userId, actor.userId));
+      const years = await database.selectDistinct({ year: sql<string>`extract(year from ${readingSessions.finishedAt} at time zone ${timeZone})::text` }).from(readingSessions).innerJoin(userBooks, eq(userBooks.id, readingSessions.userBookId)).where(and(eq(userBooks.userId, actor.userId), eq(readingSessions.state, "completed"), sql`${readingSessions.finishedAt} is not null`));
+      return { count: counts.count, authors: authors.map((a) => a.name).sort(), years: years.map((y) => y.year).sort().reverse() };
+    },
+
+    async insights(actor: Actor, year: number, timeZone = "UTC") {
       z.number().int().positive().parse(actor.userId);
       z.number().int().min(1900).max(9998).parse(year);
-      const from = new Date(Date.UTC(year, 0, 1));
-      const to = new Date(Date.UTC(year + 1, 0, 1));
+      browseFields.timeZone.parse(timeZone);
       const books = await database
         .select({
           status: userBooks.status,
@@ -887,8 +895,10 @@ export function createLibraryService(database: Database, provider: CatalogProvid
             string[]
           >`(select coalesce(jsonb_agg(value), '[]'::jsonb) from jsonb_array_elements(case when jsonb_typeof(${userBooks.legacyMetadata}->'tags') = 'array' then ${userBooks.legacyMetadata}->'tags' else '[]'::jsonb end) where jsonb_typeof(value) = 'string')`,
           favorite: userBooks.isFavorite,
+          authors: personalAuthors,
         })
         .from(userBooks)
+        .innerJoin(works, eq(works.id, userBooks.workId))
         .leftJoin(ratings, eq(ratings.userBookId, userBooks.id))
         .where(eq(userBooks.userId, actor.userId));
       const finished = await database
@@ -899,12 +909,21 @@ export function createLibraryService(database: Database, provider: CatalogProvid
           and(
             eq(userBooks.userId, actor.userId),
             eq(readingSessions.state, "completed"),
-            sql`${readingSessions.finishedAt} >= ${from} and ${readingSessions.finishedAt} < ${to}`,
+            sql`extract(year from ${readingSessions.finishedAt} at time zone ${timeZone}) = ${year}`,
           ),
         );
       const months = Array.from({ length: 12 }, () => 0);
-      for (const read of finished) if (read.finishedAt) months[read.finishedAt.getUTCMonth()]++;
+      const monthFormat = new Intl.DateTimeFormat("en", { timeZone, month: "numeric" });
+      for (const read of finished) if (read.finishedAt) months[Number(monthFormat.format(read.finishedAt)) - 1]++;
+      const [lifetime] = await database.select({
+        reads: sql<number>`count(*) filter (where ${readingSessions.state} = 'completed')::int`,
+        undated: sql<number>`count(*) filter (where ${readingSessions.state} = 'completed' and ${readingSessions.finishedAt} is null)::int`,
+        seconds: sql<number>`coalesce(sum(${readingSessions.readingSeconds}), 0)::int`,
+      }).from(readingSessions).innerJoin(userBooks, eq(userBooks.id, readingSessions.userBookId)).where(eq(userBooks.userId, actor.userId));
       const rated = books.filter((book) => book.halfStars !== null);
+      const favoriteAuthors = new Map<string, number>();
+      for (const book of books.filter((book) => book.favorite)) for (const author of book.authors) favoriteAuthors.set(author, (favoriteAuthors.get(author) ?? 0) + 1);
+      const [longest] = await database.select({ title: personalTitle, pages: editions.pageCount }).from(userBooks).innerJoin(works, eq(works.id, userBooks.workId)).innerJoin(editions, eq(editions.id, userBooks.selectedEditionId)).where(and(eq(userBooks.userId, actor.userId), sql`${editions.pageCount} is not null`, sql`${editions.format} <> 'audiobook'`)).orderBy(desc(editions.pageCount), userBooks.id).limit(1);
       const [goal] = await database
         .select({ target: goals.target })
         .from(goals)
@@ -913,6 +932,9 @@ export function createLibraryService(database: Database, provider: CatalogProvid
         );
       return {
         year,
+        lifetime,
+        longest: longest ?? null,
+        favoriteAuthors: [...favoriteAuthors].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0])).slice(0, 5),
         goal: goal?.target ?? null,
         libraryCount: books.length,
         finishedReads: finished.length,
@@ -1173,8 +1195,8 @@ export function createLibraryService(database: Database, provider: CatalogProvid
         status?: string;
         favoritesOnly?: boolean;
         shelfId?: string;
-        sort?: "newest" | "oldest" | "title" | "rating";
-      },
+        sort?: z.infer<typeof browseSort>;
+      } & Partial<z.infer<typeof browseSchema>>,
     ) {
       z.number().int().positive().parse(actor.userId);
       const data = z
@@ -1184,15 +1206,22 @@ export function createLibraryService(database: Database, provider: CatalogProvid
           query: z.string().trim().max(200).default(""),
           favoritesOnly: z.boolean().default(false),
           shelfId: id.optional(),
-          sort: z.enum(["newest", "oldest", "title", "rating"]).default("newest"),
+          sort: browseSort.default("newest"),
+          ...browseFields,
           status: z
             .enum(["all", "want_to_read", "reading", "paused", "read", "dnf"])
             .default("all"),
         })
         .parse(input);
       const term = `%${data.query.replace(/[\\%_]/g, "\\$&")}%`;
+      const collectionOrder = data.collection === "series"
+        ? sql`(select si.sort_order from v2.reader_series_items si where si.user_id = ${actor.userId} and si.user_book_id = ${userBooks.id} and si.series_id = ${data.collectionId ?? null})`
+        : data.collection === "queue"
+          ? sql`(select case when q.pinned then -1 else q.sort_order end from v2.reading_queue q where q.user_id = ${actor.userId} and q.user_book_id = ${userBooks.id})`
+          : data.shelfId ? sql`(select si.sort_order from v2.shelf_items si where si.shelf_id = ${data.shelfId} and si.user_book_id = ${userBooks.id})` : personalTitle;
       const rows = await database
         .select({
+          matchCount: sql<number>`count(*) over()::int`,
           id: userBooks.id,
           version: userBooks.version,
           status: userBooks.status,
@@ -1211,7 +1240,7 @@ export function createLibraryService(database: Database, provider: CatalogProvid
           hasRead: sql<boolean>`exists (select 1 from v2.reading_sessions rs where rs.user_book_id = ${userBooks.id} and rs.state = 'completed')`,
           readYears: sql<
             string[]
-          >`(select coalesce(jsonb_agg(distinct extract(year from rs.finished_at at time zone 'UTC')::text), '[]'::jsonb) from v2.reading_sessions rs where rs.user_book_id = ${userBooks.id} and rs.state = 'completed' and rs.finished_at is not null)`,
+          >`(select coalesce(jsonb_agg(distinct extract(year from rs.finished_at at time zone ${data.timeZone})::text), '[]'::jsonb) from v2.reading_sessions rs where rs.user_book_id = ${userBooks.id} and rs.state = 'completed' and rs.finished_at is not null)`,
           format: sql<
             string | null
           >`(select e.format from v2.editions e where e.id = ${userBooks.selectedEditionId})`,
@@ -1253,6 +1282,13 @@ export function createLibraryService(database: Database, provider: CatalogProvid
             eq(userBooks.userId, actor.userId),
             data.userBookId ? eq(userBooks.id, data.userBookId) : undefined,
             data.favoritesOnly ? eq(userBooks.isFavorite, true) : undefined,
+            data.read ? sql`exists (select 1 from v2.reading_sessions rs where rs.user_book_id = ${userBooks.id} and rs.state = 'completed')` : undefined,
+            data.format !== "all" ? sql`coalesce((select e.format from v2.editions e where e.id = ${userBooks.selectedEditionId}), 'unknown') = ${data.format}` : undefined,
+            data.author ? sql`${personalAuthors} @> ${JSON.stringify([data.author])}::jsonb` : undefined,
+            data.year ? sql`exists (select 1 from v2.reading_sessions rs where rs.user_book_id = ${userBooks.id} and rs.state = 'completed' and extract(year from rs.finished_at at time zone ${data.timeZone}) = ${Number(data.year)})` : undefined,
+            data.unfiled ? sql`not exists (select 1 from v2.shelf_items si where si.user_book_id = ${userBooks.id})` : undefined,
+            data.collection === "series" ? sql`exists (select 1 from v2.reader_series_items si where si.user_id = ${actor.userId} and si.user_book_id = ${userBooks.id} and si.series_id = ${data.collectionId ?? null})` : undefined,
+            data.collection === "queue" ? sql`exists (select 1 from v2.reading_queue q where q.user_id = ${actor.userId} and q.user_book_id = ${userBooks.id})` : undefined,
             data.shelfId
               ? sql`exists (select 1 from ${shelfItems} join ${shelves} on ${shelves.id} = ${shelfItems.shelfId} where ${shelfItems.userBookId} = ${userBooks.id} and ${shelves.id} = ${data.shelfId} and ${shelves.userId} = ${actor.userId})`
               : undefined,
@@ -1261,13 +1297,16 @@ export function createLibraryService(database: Database, provider: CatalogProvid
               ? or(
                   ilike(personalTitle, term),
                   ilike(sql`${personalAuthors}::text`, term),
-                  ilike(sql`${userBooks.legacyMetadata}->>'tags'`, term),
                 )
               : undefined,
           ),
         )
         .orderBy(
-          data.sort === "title"
+          data.sort === "shelf" ? collectionOrder
+          : data.sort === "author" ? sql`${personalAuthors}::text`
+          : data.sort === "finished" ? sql`(select max(rs.finished_at) from v2.reading_sessions rs where rs.user_book_id = ${userBooks.id} and rs.state = 'completed') desc nulls last`
+          : data.sort === "pages" ? sql`(select e.page_count from v2.editions e where e.id = ${userBooks.selectedEditionId} and e.format <> 'audiobook') desc nulls last`
+          : data.sort === "title"
             ? personalTitle
             : data.sort === "rating"
               ? sql`${ratings.halfStars} desc nulls last`
@@ -1279,6 +1318,7 @@ export function createLibraryService(database: Database, provider: CatalogProvid
         .limit(25)
         .offset(data.offset);
       return {
+        total: rows[0]?.matchCount ?? 0,
         items: rows.slice(0, 24).map((row) => ({
           ...row,
           progress:

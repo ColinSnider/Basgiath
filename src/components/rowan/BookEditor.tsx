@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useUnsavedChanges } from "./useUnsavedChanges";
 import { rowanSearch, type rowanHistory } from "@/lib/rowan-fns";
 import { useQuery } from "@tanstack/react-query";
 import { RefreshCw, Search, Pencil, Trash2 } from "lucide-react";
@@ -20,10 +21,12 @@ export function BookEditor({
   history: Awaited<ReturnType<typeof rowanHistory>>;
   close: () => void;
 }) {
-  const edit = useAccountMutation(sessionId);
+  const edit = useAccountMutation(sessionId, () => setDirty(false));
   const deletion = useAccountMutation(sessionId, close);
   const { run: runSync, busy: syncing, feedback: syncFeedback } = useReadingCommands();
   const [error, setError] = useState("");
+  const [dirty, setDirty] = useState(false);
+  useUnsavedChanges(dirty);
   const [lookup, setLookup] = useState(false);
   const [searchText, setSearchText] = useState(
     `${book.title} ${book.authors[0] ?? ""}`.trim().slice(0, 200),
@@ -48,6 +51,7 @@ export function BookEditor({
       </summary>
       <form
         className="mt-4 grid gap-3"
+        onChange={() => setDirty(true)}
         onSubmit={(event) => {
           event.preventDefault();
           setError("");

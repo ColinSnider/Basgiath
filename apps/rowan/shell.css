@@ -1942,5 +1942,14 @@
     gap: 12px;
   }
 }
-.reader-brand-mark { width: 2.25rem; height: 2.25rem; border-radius: .7rem; flex: none; }
-.reader-wordmark-mark { width: 1.45rem; height: 1.45rem; border-radius: .4rem; flex: none; }
+.reader-brand-mark,
+.reader-wordmark-mark {
+  display: block;
+  flex: none;
+  object-fit: contain;
+  background: #5a1a25;
+  border-radius: 24%;
+}
+.reader-brand-mark { width: 2.5rem; height: 2.5rem; }
+.reader-wordmark-mark { width: 1.875rem; height: 1.875rem; }
+.reader-wordmark { gap: .625rem; }
