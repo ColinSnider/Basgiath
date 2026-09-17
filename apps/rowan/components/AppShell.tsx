@@ -12,6 +12,7 @@ import {
 } from "lucide-react";
 import { useAuth } from "@/lib/auth-context";
 import { useRowanTheme } from "@/components/rowan/useRowanTheme";
+import { Welcome } from "./Welcome";
 import { AccountMenu } from "./AccountMenu";
 
 const primary = [
@@ -55,8 +56,12 @@ function Theme({ sessionId }: { sessionId: string }) {
 
 export function AppShell() {
   const { pathname } = useLocation();
-  const { user, sessionId } = useAuth();
+  const { user, sessionId, loading } = useAuth();
   if (pathname === "/login") return <Outlet />;
+  if (pathname === "/" && !user) {
+    if (loading) return <main className="reader-welcome" aria-busy="true">Loading Rowan…</main>;
+    return <Welcome initialRegistering />;
+  }
 
   const page =
     primary.find((item) => item.to === pathname) ??
@@ -131,7 +136,7 @@ export function AppShell() {
             {user && !user.isGuest ? <AccountMenu /> : <Link to="/login">Sign in</Link>}
           </div>
         </header>
-        <main id="page-content" className="reader-page" tabIndex={-1}>
+        <main id="page-content" className="reader-page" data-home={pathname === "/"} tabIndex={-1}>
           <header className={pathname === "/" ? "sr-only" : "reader-page-heading"}>
             <h1>
               {page?.label ?? (pathname.startsWith("/books/") ? "Book details" : "Page not found")}

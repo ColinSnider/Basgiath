@@ -660,15 +660,15 @@ export function LibraryPage() {
               </button>
             </div>
           )}
-          <p role="status" className="text-sm text-muted-foreground">
-            {shelfOverview
-              ? "Browse your shelves below"
-              : total
-                ? `${(page - 1) * 24 + 1}–${Math.min(page * 24, total)} of ${total} books`
-                : "No matching books"}
-            {filterCount ? " · Filters applied" : ""}
-          </p>
-          <div className="reader-shelf-toolbar">
+          <div className="reader-library-controls">
+            <p role="status" className="text-sm text-muted-foreground">
+              {shelfOverview
+                ? "Browse your shelves below"
+                : total
+                  ? `${(page - 1) * 24 + 1}–${Math.min(page * 24, total)} of ${total} books`
+                  : "No matching books"}
+              {filterCount ? " · Filters applied" : ""}
+            </p>
             <div
               className="reader-shelf-view-switch reader-view-slider"
               style={

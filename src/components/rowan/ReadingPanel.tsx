@@ -1,4 +1,4 @@
-import { BookCover } from "./BookCover";
+import { BookCover, generatedCoverHue } from "./BookCover";
 import { ReadingTimer } from "./ReadingTimer";
 import { HistoryEditor } from "./HistoryEditor";
 import { ArrowLeft, BookOpen, Heart, NotebookPen, History, Info } from "lucide-react";
@@ -20,20 +20,16 @@ const control =
 type Item = Awaited<ReturnType<typeof rowanLibrary>>["items"][number];
 
 type CoverPalette = { accent: string; deep: string; glow: string };
-const defaultPalette: CoverPalette = {
-  accent: "#5a1a25",
-  deep: "#241016",
-  glow: "rgba(183, 110, 121, .6)",
-};
-
-function useCoverPalette(coverUrl: string | null) {
-  const [palette, setPalette] = useState(defaultPalette);
+function useCoverPalette(coverUrl: string | null, title: string) {
+  const hue = generatedCoverHue(title);
+  const fallback: CoverPalette = {
+    accent: `hsl(${hue} 26% 25%)`,
+    deep: `hsl(${hue} 26% 14%)`,
+    glow: `hsl(${hue} 26% 40% / .4)`,
+  };
+  const [sampled, setSampled] = useState<{ url: string; palette: CoverPalette } | null>(null);
   useEffect(() => {
-    if (!coverUrl || typeof window === "undefined") {
-      setPalette(defaultPalette);
-      return;
-    }
-    setPalette(defaultPalette);
+    if (!coverUrl || typeof window === "undefined") return;
     const image = new Image();
     image.crossOrigin = "anonymous";
     image.onload = () => {
@@ -60,10 +56,13 @@ function useCoverPalette(coverUrl: string | null) {
         r = Math.round(r / count);
         g = Math.round(g / count);
         b = Math.round(b / count);
-        setPalette({
-          accent: `rgb(${r}, ${g}, ${b})`,
-          deep: `rgb(${Math.round(r * 0.38)}, ${Math.round(g * 0.38)}, ${Math.round(b * 0.38)})`,
-          glow: `rgba(${r}, ${g}, ${b}, .72)`,
+        setSampled({
+          url: coverUrl,
+          palette: {
+            accent: `rgb(${r}, ${g}, ${b})`,
+            deep: `rgb(${Math.round(r * 0.38)}, ${Math.round(g * 0.38)}, ${Math.round(b * 0.38)})`,
+            glow: `rgba(${r}, ${g}, ${b}, .72)`,
+          },
         });
       } catch {
         // Cover hosts may block canvas reads; the Rowan palette remains usable.
@@ -75,7 +74,7 @@ function useCoverPalette(coverUrl: string | null) {
       image.onerror = null;
     };
   }, [coverUrl]);
-  return palette;
+  return coverUrl && sampled?.url === coverUrl ? sampled.palette : fallback;
 }
 
 export function ReadingPanel({
@@ -109,7 +108,9 @@ export function ReadingPanel({
     retry: false,
   });
   const active = history.data?.sessions.find((s) => s.state === "active" || s.state === "paused");
-  const palette = useCoverPalette(book.coverUrl);
+  const [failedCover, setFailedCover] = useState<string | null>(null);
+  const coverUrl = book.coverUrl && book.coverUrl !== failedCover ? book.coverUrl : null;
+  const palette = useCoverPalette(coverUrl, book.title);
   const value = Number(position);
   return (
     <section
@@ -123,6 +124,7 @@ export function ReadingPanel({
       </button>
       <header
         className="rowan-book-hero"
+        data-generated-cover={!coverUrl}
         style={
           {
             "--book-accent": palette.accent,
@@ -131,10 +133,20 @@ export function ReadingPanel({
           } as CSSProperties
         }
       >
+        {coverUrl && (
+          <img
+            className="rowan-book-backdrop"
+            src={coverUrl}
+            alt=""
+            aria-hidden="true"
+            onError={() => setFailedCover(coverUrl)}
+          />
+        )}
         <BookCover
           title={book.title}
           authors={book.authors}
-          src={book.coverUrl}
+          src={coverUrl}
+          onImageError={() => setFailedCover(book.coverUrl)}
           className="rowan-cover-hero"
         />
         <div className="rowan-book-intro">

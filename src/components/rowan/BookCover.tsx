@@ -1,19 +1,24 @@
 import { useState, type CSSProperties } from "react";
 
+export const generatedCoverHue = (title: string) =>
+  Array.from(title).reduce((hash, char) => (hash * 31 + char.charCodeAt(0)) % 360, 0);
+
 /** One cover shape, including unavailable and broken provider images. */
 export function BookCover({
   title,
   authors = [],
   src,
   className = "",
+  onImageError,
 }: {
   title: string;
   authors?: string[];
   src: string | null;
   className?: string;
+  onImageError?: () => void;
 }) {
   const [failed, setFailed] = useState<string | null>(null);
-  const hue = Array.from(title).reduce((hash, char) => (hash * 31 + char.charCodeAt(0)) % 360, 0);
+  const hue = generatedCoverHue(title);
   return (
     <span
       className={`rowan-cover ${className}`}
@@ -27,7 +32,15 @@ export function BookCover({
         <span>◆</span>
       </span>
       {src && failed !== src && (
-        <img src={src} alt="" loading="lazy" onError={() => setFailed(src)} />
+        <img
+          src={src}
+          alt=""
+          loading="lazy"
+          onError={() => {
+            setFailed(src);
+            onImageError?.();
+          }}
+        />
       )}
     </span>
   );
