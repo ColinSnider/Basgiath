@@ -1,3 +1,4 @@
+import { CalendarDays } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { rowanCalendar } from "@/lib/rowan-fns";
@@ -23,7 +24,10 @@ export function ReadingCalendar({
       className="rounded-2xl border border-border bg-card p-5 space-y-4"
     >
       <div>
-        <h2 className="font-display text-3xl">Reading calendar</h2>
+        <h2 className="font-display text-3xl flex items-center gap-2">
+          <CalendarDays size={25} aria-hidden="true" />
+          Reading calendar
+        </h2>
         <p className="text-sm text-muted-foreground">
           Recorded starts, progress, finishes, notes, and quotes. Dates use your device’s time zone.
         </p>

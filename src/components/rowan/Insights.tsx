@@ -30,7 +30,7 @@ export function Insights({ sessionId }: { sessionId: string }) {
     ) ?? [];
   return (
     <section id="insights" className="reader-card reader-card-body space-y-6">
-      <header className="flex flex-wrap items-center justify-between gap-3">
+      <header className="reader-insights-header">
         <div>
           <h2 className="font-display text-2xl flex items-center gap-2">
             <Sparkles size={21} aria-hidden="true" />{" "}
@@ -40,28 +40,32 @@ export function Insights({ sessionId }: { sessionId: string }) {
             The stories you finished and the patterns along the way.
           </p>
         </div>
-        <div className="reader-library-switch" aria-label="Insights period">
-          <button
-            className={!allTime ? "is-selected" : ""}
-            aria-pressed={!allTime}
-            onClick={() => setAllTime(false)}
+        <div className="reader-insights-controls">
+          <div className="reader-library-switch" aria-label="Insights period">
+            <button
+              className={!allTime ? "is-selected" : ""}
+              aria-pressed={!allTime}
+              onClick={() => setAllTime(false)}
+            >
+              By year
+            </button>
+            <button
+              className={allTime ? "is-selected" : ""}
+              aria-pressed={allTime}
+              onClick={() => setAllTime(true)}
+            >
+              All time
+            </button>
+          </div>
+          <div
+            className="reader-insights-year"
+            style={{ visibility: allTime ? "hidden" : "visible" }}
+            aria-hidden={allTime}
           >
-            By year
-          </button>
-          <button
-            className={allTime ? "is-selected" : ""}
-            aria-pressed={allTime}
-            onClick={() => setAllTime(true)}
-          >
-            All time
-          </button>
-        </div>
-        {!allTime && (
-          <div className="flex items-center gap-3">
             <button
               className={control}
               aria-label="Previous year"
-              disabled={year <= 1900}
+              disabled={allTime || year <= 1900}
               onClick={() => setYear(year - 1)}
             >
               <ArrowLeft size={18} />
@@ -72,13 +76,13 @@ export function Insights({ sessionId }: { sessionId: string }) {
             <button
               className={control}
               aria-label="Next year"
-              disabled={year >= currentYear}
+              disabled={allTime || year >= currentYear}
               onClick={() => setYear(year + 1)}
             >
               <ArrowRight size={18} />
             </button>
           </div>
-        )}
+        </div>
       </header>
       {query.isPending && <p role="status">Looking back through your reading…</p>}
       {query.isError && (

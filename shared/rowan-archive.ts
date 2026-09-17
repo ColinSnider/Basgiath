@@ -1,3 +1,4 @@
+import { goalMetricSchema, goalSettingsSchema } from "./goal-settings.ts";
 import { z } from "zod";
 import type { JsonValue } from "./json.ts";
 
@@ -23,7 +24,7 @@ const date = z.string().datetime({ offset: true });
 const integer = z.number().int().nonnegative().max(2147483647);
 const owner = z.number().int().positive();
 export const goalTimeframeSchema = z.union([
-  z.enum(["week", "month", "year"]),
+  z.enum(["day", "week", "month", "year", "all_time"]),
   z
     .string()
     .regex(/^\d{4}$/)
@@ -56,7 +57,7 @@ export const bookEditSchema = z
 const archiveSchema = z
   .object({
     format: z.literal("rowan-archive"),
-    version: z.union([z.literal(2), z.literal(3), z.literal(4), z.literal(5), z.literal(6)]),
+    version: z.union([z.literal(2), z.literal(3), z.literal(4), z.literal(5), z.literal(6), z.literal(7)]),
     exportedAt: date,
     works: rows(
       z
@@ -218,7 +219,8 @@ const archiveSchema = z
         .object({
           id: z.string().min(1),
           userId: owner,
-          metric: z.enum(["books", "pages", "minutes"]),
+          metric: goalMetricSchema,
+          details: goalSettingsSchema.default({ title: "", unit: "", entries: [] }),
           target: integer.positive(),
           timeframe: goalTimeframeSchema,
           createdAt: date,

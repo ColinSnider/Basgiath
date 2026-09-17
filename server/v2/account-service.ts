@@ -318,15 +318,11 @@ export function createAccountService(database: Database) {
           await tx
             .insert(s.readingQueue)
             .values({ ...r, userId: actor.userId, userBookId: bookIds.get(r.userBookId)! });
-        for (const r of data.goals)
-          await tx.insert(goals).values({
-            ...r,
-            id: r.id.match(/^rowan:\d+:\d{4}:books$/)
-              ? r.id.replace(/^rowan:\d+:/, `rowan:${actor.userId}:`)
-              : crypto.randomUUID(),
-            userId: actor.userId,
-            createdAt: new Date(r.createdAt),
-          });
+        for (const { details, ...r } of data.goals) {
+          const goalId = r.id.match(/^rowan:\d+:\d{4}:books$/) ? r.id.replace(/^rowan:\d+:/, `rowan:${actor.userId}:`) : crypto.randomUUID();
+          await tx.insert(goals).values({ ...r, id: goalId, userId: actor.userId, createdAt: new Date(r.createdAt) });
+          await tx.insert(s.goalDetails).values({ goalId, details });
+        }
         const {blackBackground, ...restoredSettings} = data.settings[0] ?? {...defaults,blackBackground:false};
         await tx.insert(userSettings).values({ ...restoredSettings, userId: actor.userId });
         await tx.update(s.accountState).set({blackBackground}).where(eq(s.accountState.userId,actor.userId));

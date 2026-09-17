@@ -1519,10 +1519,10 @@
     display: grid;
     grid-template-columns: repeat(5, minmax(0, 1fr));
     position: fixed;
-    inset: auto 12px max(12px, env(safe-area-inset-bottom));
+    inset: auto 8px 4px;
     max-width: 520px;
     margin-inline: auto;
-    padding: 7px;
+    padding: 7px 7px max(7px, env(safe-area-inset-bottom));
     gap: 3px;
     border: 1px solid color-mix(in oklch, var(--gold) 35%, var(--border));
     border-radius: 24px;
@@ -2046,3 +2046,27 @@
   .reader-month-track { height: 72px; }
   .reader-insight-finishes { grid-template-columns: minmax(0, 1fr); }
 }
+
+/* Cover tint is decorative; text always uses the selected theme's contrast pair. */
+.reader-app .rowan-book-hero {
+  background: radial-gradient(ellipse at top right, color-mix(in srgb, var(--book-accent, var(--primary)) 12%, transparent), transparent 70%), var(--card);
+  color: var(--foreground);
+  border-bottom: 1px solid var(--border);
+}
+.reader-app .rowan-book-hero::after { display: none; }
+.reader-app .rowan-book-intro :is(h2, p, dt, dd) { color: inherit; opacity: 1; }
+.reader-app .rowan-book-badges span { color: var(--foreground); background: var(--background); border-color: var(--border); }
+.reader-insights-header { display: grid; gap: 18px; }
+.reader-insights-controls { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.reader-insights-year { display: flex; align-items: center; gap: 10px; flex-shrink: 0; }
+.reader-insights-controls .reader-library-switch { width: auto; }
+@media (max-width: 420px) {
+  .reader-insights-controls { gap: 8px; }
+  .reader-insights-year { gap: 5px; }
+  .reader-insights-year button { padding: 8px; }
+}
+
+.reader-new-shelf > summary { list-style: none; display: inline-flex; align-items: center; gap: 7px; padding: 10px 14px; border: 1px solid var(--border); border-radius: 10px; cursor: pointer; background: var(--card); }
+.reader-new-shelf > summary::-webkit-details-marker { display: none; }
+.reader-new-shelf > summary::marker { content: ""; }
+.reader-new-shelf[open] > summary { color: var(--primary); border-color: var(--primary); }

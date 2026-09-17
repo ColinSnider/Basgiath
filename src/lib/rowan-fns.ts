@@ -1,3 +1,4 @@
+import { goalMetricSchema, goalLogSchema } from "../../shared/goal-settings";
 import { createOrganizationService } from "../../server/v2/organization-service";
 import { browseFields, browseSort } from "../../shared/library-browse";
 import { backlogImport, historyChange } from "../../shared/backlog";
@@ -525,7 +526,9 @@ export const rowanSaveGoal = createServerFn({ method: "POST" })
         sessionId: key,
         key,
         id: z.string().min(1).max(200).optional(),
-        metric: z.enum(["books", "pages", "minutes"]),
+        metric: goalMetricSchema,
+        title: z.string().trim().max(100).optional(),
+        unit: z.string().trim().max(30).optional(),
         target: z.number().int().positive().max(10000000),
         timeframe: goalTimeframeSchema,
       })
@@ -534,6 +537,12 @@ export const rowanSaveGoal = createServerFn({ method: "POST" })
   .handler(async ({ data: { sessionId, ...input } }) => {
     const { library, actor } = await context(sessionId);
     return library.saveGoal(actor, input);
+  });
+export const rowanLogGoal = createServerFn({ method: "POST" })
+  .inputValidator(z.object({ sessionId: key, key, goalId: z.string().min(1).max(200), ...goalLogSchema.omit({ id: true }).shape }).strict())
+  .handler(async ({ data: { sessionId, ...input } }) => {
+    const { library, actor } = await context(sessionId);
+    return library.logGoal(actor, input);
   });
 export const rowanArchive = createServerFn({ method: "POST" })
   .inputValidator(z.object({ sessionId: key }).strict())

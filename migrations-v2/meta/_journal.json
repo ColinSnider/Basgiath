@@ -65,6 +65,19 @@
       "tag": "0008_shelf_management",
       "breakpoints": true
     },
-    { "idx": 9, "version": "7", "when": 1789400000000, "tag": "0009_black_background", "breakpoints": true }
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1789400000000,
+      "tag": "0009_black_background",
+      "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1789600000000,
+      "tag": "0010_flexible_goals",
+      "breakpoints": true
+    }
   ]
 }

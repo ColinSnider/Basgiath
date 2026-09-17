@@ -12,15 +12,43 @@ import {
 } from "lucide-react";
 import { Link } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { rowanGoals, rowanSaveGoal } from "@/lib/rowan-fns";
+import { rowanGoals, rowanSaveGoal, rowanLogGoal } from "@/lib/rowan-fns";
 import { useAccountMutation } from "./useAccountMutation";
 
 const metrics = {
   books: "Books finished",
   pages: "Pages in finished books",
   minutes: "Audiobook hours finished",
+  unique_books: "Different books finished",
+  authors: "Different authors read",
+  reading_minutes: "Reading time (timer minutes)",
+  reading_days: "Days with timed reading",
+  custom: "Custom goal",
 };
-const units = { books: "books", pages: "pages", minutes: "hours" };
+const units = {
+  books: "books",
+  pages: "pages",
+  minutes: "hours",
+  unique_books: "books",
+  authors: "authors",
+  reading_minutes: "minutes",
+  reading_days: "days",
+  custom: "units",
+};
+const explanations = {
+  books: "Each completed read counts, including rereads, on its finish date.",
+  pages: "Counts the full length of books finished in the period, not daily page logs.",
+  minutes:
+    "Counts finished audiobook duration in hours, preserving Basgiath targets. Separate from the reading timer.",
+  unique_books: "Counts each saved book once when finished in this period, regardless of rereads.",
+  authors: "Counts distinct recorded authors of books finished in this period.",
+  reading_minutes:
+    "Counts saved reading-timer minutes on the date each timer session ends. Works for any reading format.",
+  reading_days:
+    "Counts each day with a saved timer session once, even when you read multiple books that day.",
+  custom:
+    "Choose anything meaningful to you: chapters, new genres, book-club meetings, or another personal measure. Add dated progress below; negative entries correct mistakes.",
+};
 const number = (value: number) => value.toLocaleString(undefined, { maximumFractionDigits: 1 });
 const displayDate = (value: string) =>
   new Date(`${value}T12:00:00Z`).toLocaleDateString(undefined, {
@@ -41,6 +69,8 @@ export function Goals({ sessionId }: { sessionId: string }) {
   const [editing, setEditing] = useState<string | undefined>();
   const [adding, setAdding] = useState(false);
   const [target, setTarget] = useState("12");
+  const [title, setTitle] = useState("");
+  const [unit, setUnit] = useState("");
   const remove = useAccountMutation(sessionId);
   const query = useQuery({
     queryKey: ["rowan", sessionId, "goals", timeZone],
@@ -54,6 +84,8 @@ export function Goals({ sessionId }: { sessionId: string }) {
       target: number;
       metric: keyof typeof metrics;
       timeframe: string;
+      title?: string;
+      unit?: string;
     }) => rowanSaveGoal({ data: { sessionId, ...input } }),
     onSuccess: async () => {
       setEditing(undefined);
@@ -80,6 +112,8 @@ export function Goals({ sessionId }: { sessionId: string }) {
             setTarget("12");
             setMetric("books");
             setTimeframe("year");
+            setTitle("");
+            setUnit("");
           }}
         >
           <Plus size={16} aria-hidden="true" /> New goal
@@ -96,6 +130,8 @@ export function Goals({ sessionId }: { sessionId: string }) {
               id: editing,
               target: Number(target),
               metric,
+              title,
+              unit,
               timeframe: timeframe === "custom" ? fixedYear : timeframe,
             });
           }}
@@ -116,6 +152,36 @@ export function Goals({ sessionId }: { sessionId: string }) {
                 ))}
               </select>
             </label>
+            {metric === "custom" && (
+              <>
+                <label className="reader-filter-field">
+                  Goal name
+                  <input
+                    className={control}
+                    required
+                    maxLength={100}
+                    pattern={".*\\S.*"}
+                    title="Enter a goal name, not just spaces."
+                    value={title}
+                    onChange={(e) => setTitle(e.target.value)}
+                    placeholder="Explore new genres"
+                  />
+                </label>
+                <label className="reader-filter-field">
+                  Unit to count
+                  <input
+                    className={control}
+                    required
+                    maxLength={30}
+                    pattern={".*\\S.*"}
+                    title="Enter a unit, such as chapters or meetings."
+                    value={unit}
+                    onChange={(e) => setUnit(e.target.value)}
+                    placeholder="genres, chapters, meetings…"
+                  />
+                </label>
+              </>
+            )}
             <label className="reader-filter-field">
               Timeframe
               <select
@@ -123,10 +189,12 @@ export function Goals({ sessionId }: { sessionId: string }) {
                 value={timeframe}
                 onChange={(e) => setTimeframe(e.target.value)}
               >
+                <option value="day">Each day</option>
                 <option value="week">Each week</option>
                 <option value="month">Each month</option>
                 <option value="year">Each year</option>
                 <option value="custom">Specific year</option>
+                <option value="all_time">No deadline</option>
               </select>
             </label>
             {timeframe === "custom" && (
@@ -144,7 +212,7 @@ export function Goals({ sessionId }: { sessionId: string }) {
               </label>
             )}
             <label className="reader-filter-field">
-              Target ({units[metric]})
+              Target ({metric === "custom" ? unit || "units" : units[metric]})
               <input
                 className={control}
                 type="number"
@@ -157,13 +225,7 @@ export function Goals({ sessionId }: { sessionId: string }) {
               />
             </label>
           </fieldset>
-          <p className="text-sm text-muted-foreground">
-            {metric === "books"
-              ? "Each finished read counts, including rereads."
-              : metric === "pages"
-                ? "Counts the full length of books finished in this period, not daily page logs."
-                : "Counts the full duration of finished audiobooks in hours, as in Basgiath. This is separate from your reading timer."}
-          </p>
+          <p className="text-sm text-muted-foreground">{explanations[metric]}</p>
           <div className="reader-goal-actions">
             <span className="text-sm text-muted-foreground">Try a target:</span>
             {(metric === "books"
@@ -227,6 +289,9 @@ export function Goals({ sessionId }: { sessionId: string }) {
         {query.data?.map((goal) => {
           const metric = goal.metric as keyof typeof metrics;
           const progress = goal.progress;
+          const unitLabel = metric === "custom" ? goal.details.unit || "units" : units[metric];
+          const titleLabel =
+            metric === "custom" ? goal.details.title || "Custom goal" : metrics[metric];
           const Icon = metric === "books" ? BookOpen : metric === "pages" ? FileText : Clock;
           return (
             <article className="reader-goal-card" key={goal.id}>
@@ -235,15 +300,19 @@ export function Goals({ sessionId }: { sessionId: string }) {
                   <Icon size={22} aria-hidden="true" />
                 </span>
                 <div>
-                  <h3>{metrics[metric]}</h3>
+                  <h3>{titleLabel}</h3>
                   <p className="text-sm text-muted-foreground">
-                    {goal.timeframe === "week"
-                      ? "Weekly · Sunday–Saturday"
-                      : goal.timeframe === "month"
-                        ? "Monthly"
-                        : goal.timeframe === "year"
-                          ? "Yearly"
-                          : `${goal.timeframe} goal`}
+                    {goal.timeframe === "all_time"
+                      ? "No deadline"
+                      : goal.timeframe === "day"
+                        ? "Daily"
+                        : goal.timeframe === "week"
+                          ? "Weekly · Sunday–Saturday"
+                          : goal.timeframe === "month"
+                            ? "Monthly"
+                            : goal.timeframe === "year"
+                              ? "Yearly"
+                              : `${goal.timeframe} goal`}
                   </p>
                 </div>
                 {progress.achieved && (
@@ -255,17 +324,17 @@ export function Goals({ sessionId }: { sessionId: string }) {
               <p className="reader-goal-total">
                 <strong>{number(progress.current)}</strong>
                 <span>
-                  of {number(goal.target)} {units[metric]}
+                  of {number(goal.target)} {unitLabel}
                 </span>
               </p>
               <div
                 className="reader-goal-track"
                 role="progressbar"
-                aria-label={`${metrics[metric]} goal`}
+                aria-label={`${titleLabel} goal`}
                 aria-valuemin={0}
                 aria-valuemax={goal.target}
                 aria-valuenow={Math.min(goal.target, progress.current)}
-                aria-valuetext={`${number(progress.current)} of ${number(goal.target)} ${units[metric]}`}
+                aria-valuetext={`${number(progress.current)} of ${number(goal.target)} ${unitLabel}`}
               >
                 <span style={{ width: `${progress.percent}%` }} />
               </div>
@@ -275,20 +344,22 @@ export function Goals({ sessionId }: { sessionId: string }) {
                   : progress.upcoming
                     ? "Ready for the year ahead."
                     : progress.ended
-                      ? `${number(progress.current)} ${units[metric]} recorded. Every read counts.`
-                      : `${number(progress.remaining)} ${units[metric]} to go · ${progress.daysRemaining} days left`}
+                      ? `${number(progress.current)} ${unitLabel} recorded. Every read counts.`
+                      : `${number(progress.remaining)} ${unitLabel} to go${progress.unlimited ? "" : ` · ${progress.daysRemaining} days left`}`}
               </p>
               <p className="reader-goal-period">
                 <CalendarDays size={15} aria-hidden="true" />
-                {displayDate(progress.start)} – {displayDate(progress.end)}
+                {progress.unlimited
+                  ? "All your recorded progress"
+                  : `${displayDate(progress.start)} – ${displayDate(progress.end)}`}
               </p>
+              {metric === "custom" && (
+                <GoalLog sessionId={sessionId} goalId={goal.id} unit={unitLabel} />
+              )}
               <details className="reader-goal-detail">
                 <summary>What counts toward this goal</summary>
                 <p className="text-sm text-muted-foreground">
-                  {metric === "books"
-                    ? "Completed reads, including rereads, dated within this period."
-                    : "The saved length of each completed read in this period. In-progress reading and timer sessions are separate."}{" "}
-                  Dates follow {timeZone}.
+                  {explanations[metric]} Dates follow {timeZone}.
                 </p>
                 {!!progress.undated && (
                   <p className="text-sm">
@@ -306,11 +377,22 @@ export function Goals({ sessionId }: { sessionId: string }) {
                 <ul>
                   {progress.contributions.map((read, index) => (
                     <li key={`${read.userBookId}:${index}`}>
-                      <Link to="/books/$bookId" params={{ bookId: read.userBookId }}>
-                        {read.title}
-                      </Link>
                       <span>
-                        {number(read.amount)} {units[metric]}
+                        {read.userBookId ? (
+                          <Link to="/books/$bookId" params={{ bookId: read.userBookId }}>
+                            {read.title}
+                          </Link>
+                        ) : (
+                          read.title
+                        )}
+                        <small className="block text-muted-foreground">
+                          {new Date(read.finishedAt).toLocaleDateString(undefined, {
+                            timeZone: metric === "custom" ? "UTC" : timeZone,
+                          })}
+                        </small>
+                      </span>
+                      <span>
+                        {number(read.amount)} {unitLabel}
                       </span>
                     </li>
                   ))}
@@ -322,7 +404,7 @@ export function Goals({ sessionId }: { sessionId: string }) {
                 )}
                 {progress.contributionCount === 0 && (
                   <p className="text-sm text-muted-foreground">
-                    Your finished reads will appear here.
+                    Recorded progress for this period will appear here.
                   </p>
                 )}
               </details>
@@ -337,6 +419,8 @@ export function Goals({ sessionId }: { sessionId: string }) {
                     setTimeframe(/^\d{4}$/.test(goal.timeframe) ? "custom" : goal.timeframe);
                     if (/^\d{4}$/.test(goal.timeframe)) setFixedYear(goal.timeframe);
                     setTarget(String(goal.target));
+                    setTitle(goal.details.title);
+                    setUnit(goal.details.unit);
                     document
                       .getElementById("goals")
                       ?.scrollIntoView({ behavior: "smooth", block: "start" });
@@ -364,7 +448,8 @@ export function Goals({ sessionId }: { sessionId: string }) {
           <Target size={32} aria-hidden="true" />
           <h3>A goal is an invitation, not a deadline.</h3>
           <p>
-            Start with a few books, a page total, or audiobook hours. You can adjust it anytime.
+            Track books, authors, reading time, reading days, or a custom goal. You can adjust it
+            anytime.
           </p>
           <button className={control} onClick={() => setAdding(true)}>
             Create your first goal
@@ -372,5 +457,92 @@ export function Goals({ sessionId }: { sessionId: string }) {
         </div>
       )}
     </section>
+  );
+}
+
+function GoalLog({ sessionId, goalId, unit }: { sessionId: string; goalId: string; unit: string }) {
+  const cache = useQueryClient();
+  const now = new Date();
+  const today = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
+  const [date, setDate] = useState(today);
+  const [amount, setAmount] = useState("");
+  const [note, setNote] = useState("");
+  const mutation = useMutation({
+    mutationFn: (input: { key: string; date: string; amount: number; note: string }) =>
+      rowanLogGoal({ data: { sessionId, goalId, ...input } }),
+    onSuccess: async () => {
+      setAmount("");
+      setNote("");
+      await cache.invalidateQueries({ queryKey: ["rowan", sessionId] });
+    },
+  });
+  return (
+    <details className="reader-goal-detail">
+      <summary>Add or correct progress</summary>
+      <form
+        className="reader-goal-editor mt-3"
+        onSubmit={(e) => {
+          e.preventDefault();
+          if (!mutation.isPending && !mutation.isError && Number(amount) !== 0)
+            mutation.mutate({ key: crypto.randomUUID(), date, amount: Number(amount), note });
+        }}
+      >
+        <fieldset disabled={mutation.isPending || mutation.isError} className="grid gap-3">
+          <label className="reader-filter-field">
+            Amount ({unit})
+            <input
+              className={control}
+              type="number"
+              step="any"
+              min={-10000000}
+              max={10000000}
+              value={amount}
+              onChange={(e) => setAmount(e.target.value)}
+              required
+            />
+          </label>
+          <label className="reader-filter-field">
+            Date
+            <input
+              className={control}
+              type="date"
+              value={date}
+              max={today}
+              required
+              onChange={(e) => setDate(e.target.value)}
+            />
+          </label>
+          <label className="reader-filter-field">
+            Note (optional)
+            <input
+              className={control}
+              maxLength={200}
+              value={note}
+              onChange={(e) => setNote(e.target.value)}
+              placeholder="What did you work on?"
+            />
+          </label>
+          <p className="text-sm text-muted-foreground">
+            Use a negative amount to correct an earlier entry. Your entry history stays visible.
+          </p>
+          <button className={control} disabled={!amount || Number(amount) === 0}>
+            Save progress
+          </button>
+        </fieldset>
+        {mutation.isSuccess && <p role="status">Progress saved.</p>}
+        {mutation.isError && (
+          <p role="alert">
+            Save could not be confirmed.{" "}
+            <button
+              type="button"
+              className={control}
+              onClick={() => mutation.variables && mutation.mutate(mutation.variables)}
+            >
+              Retry same entry
+            </button>
+          </p>
+        )}
+      </form>
+    </details>
   );
 }

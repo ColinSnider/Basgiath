@@ -12,7 +12,7 @@ import {
   check,
   index,
 } from "drizzle-orm/pg-core";
-import { users } from "./schema.ts";
+import { users, goals } from "./schema.ts";
 import type { JsonValue } from "./json.ts";
 
 // Isolated from the legacy schema and its production migration entry point.
@@ -405,3 +405,8 @@ export const readingQueue = v2.table(
     check("queue_order", sql`${t.sortOrder} >= 0`),
   ],
 );
+
+export const goalDetails = v2.table("goal_details", {
+  goalId: text("goal_id").primaryKey().references(() => goals.id, { onDelete: "cascade" }),
+  details: jsonb("details").$type<import("./goal-settings.ts").GoalSettings>().notNull().default({ title: "", unit: "", entries: [] }),
+});

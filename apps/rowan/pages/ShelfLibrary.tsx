@@ -668,24 +668,6 @@ export function LibraryPage() {
                 : "No matching books"}
             {filterCount ? " · Filters applied" : ""}
           </p>
-          {view === "shelves" && !inCollections && (
-            <label className="reader-filter-field reader-shelf-selector">
-              <span>Browse a shelf</span>
-              <select
-                className={control}
-                value={selectedShelf}
-                onChange={(e) => setSelectedShelf(e.target.value)}
-              >
-                <option value="">All books</option>
-                {shelves.data?.map((shelf) => (
-                  <option key={shelf.id} value={shelf.id}>
-                    {shelf.name} · {shelf.bookIds.length} books
-                  </option>
-                ))}
-                <option value="unfiled">Unfiled books</option>
-              </select>
-            </label>
-          )}
           <div className="reader-shelf-toolbar">
             <div
               className="reader-shelf-view-switch reader-view-slider"
@@ -715,7 +697,7 @@ export function LibraryPage() {
               ))}
             </div>
             {!inCollections && (
-              <details>
+              <details className="reader-new-shelf">
                 <summary>
                   <Plus size={16} className="inline" aria-hidden="true" /> New shelf
                 </summary>

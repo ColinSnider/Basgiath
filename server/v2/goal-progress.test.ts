@@ -74,3 +74,47 @@ test("recurring weeks preserve Sunday start across DST and future years stay emp
   assert.equal(future.current, 0);
   assert.equal(future.daysRemaining, 366);
 });
+
+test("flexible goals count unique books, authors, and timed activity separately", () => {
+  const now = new Date("2026-09-16T12:00:00Z");
+  const finished = { ...read("2026-09-14T12:00:00Z"), authors: ["Author One"] };
+  const active = {
+    ...read(null),
+    userBookId: "book-2",
+    state: "active",
+    timedReads: [
+      { startedAt: "2026-09-15T10:00:00Z", endedAt: "2026-09-15T10:30:00Z", seconds: 1800 },
+      { startedAt: "2026-09-15T11:00:00Z", endedAt: "2026-09-15T11:30:00Z", seconds: 1800 },
+    ],
+  };
+  const progress = (metric: string) =>
+    goalProgress(
+      { metric, timeframe: "month", target: 100 },
+      [finished, finished, active],
+      "UTC",
+      now,
+    );
+  assert.equal(progress("books").current, 2);
+  assert.equal(progress("unique_books").current, 1);
+  assert.equal(progress("authors").current, 1);
+  assert.equal(progress("reading_minutes").current, 60);
+  assert.equal(progress("reading_days").current, 1);
+  assert.equal(progress("reading_minutes").undated, 0);
+});
+
+test("custom progress honors dates and corrections, with daily and no-deadline periods", () => {
+  const details = {
+    title: "Try new genres",
+    unit: "genres",
+    entries: [
+      { id: crypto.randomUUID(), date: "2026-09-15", amount: 3, note: "First genres" },
+      { id: crypto.randomUUID(), date: "2026-09-16", amount: -1, note: "Correction" },
+      { id: crypto.randomUUID(), date: "2026-09-17", amount: 20, note: "Future" },
+    ],
+  };
+  const now = new Date("2026-09-16T12:00:00Z");
+  const goal = { metric: "custom", timeframe: "all_time", target: 10, details };
+  assert.equal(goalProgress(goal, [], "UTC", now).current, 2);
+  assert.equal(goalProgress(goal, [], "UTC", now).unlimited, true);
+  assert.equal(goalProgress({ ...goal, timeframe: "day" }, [], "UTC", now).current, 0);
+});

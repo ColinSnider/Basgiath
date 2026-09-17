@@ -131,17 +131,6 @@ export function ReadingPanel({
           } as CSSProperties
         }
       >
-        {book.coverUrl && (
-          <img
-            className="rowan-book-backdrop"
-            src={book.coverUrl}
-            alt=""
-            aria-hidden="true"
-            onError={(event) => {
-              event.currentTarget.hidden = true;
-            }}
-          />
-        )}
         <BookCover
           title={book.title}
           authors={book.authors}

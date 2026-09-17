@@ -1,3 +1,4 @@
+import { goalMetricSchema, goalSettingsSchema, goalLogSchema } from "../../shared/goal-settings.ts";
 import { effectiveProgress, loggedProgress } from "../../shared/reading-progress.ts";
 import { goalProgress } from "../../shared/goal-progress.ts";
 import { browseSchema, browseFields, browseSort } from "../../shared/library-browse.ts";
@@ -9,6 +10,7 @@ import { z } from "zod";
 import type { db } from "../db.ts";
 import { goals, userSettings } from "../../shared/schema.ts";
 import {
+  goalDetails,
   works,
   editions,
   externalMappings,
@@ -423,8 +425,9 @@ export function createLibraryService(database: Database, provider: CatalogProvid
       z.number().int().positive().parse(actor.userId);
       browseFields.timeZone.parse(timeZone);
       const saved = await database
-        .select()
+        .select({ goal: goals, details: goalDetails.details })
         .from(goals)
+        .leftJoin(goalDetails, eq(goalDetails.goalId, goals.id))
         .where(eq(goals.userId, actor.userId))
         .orderBy(desc(goals.createdAt));
       if (!saved.length) return [];
@@ -432,6 +435,9 @@ export function createLibraryService(database: Database, provider: CatalogProvid
         .select({
           userBookId: userBooks.id,
           title: personalTitle,
+          authors: personalAuthors,
+          state: readingSessions.state,
+          timedReads: readingSessions.timedReads,
           finishedAt: readingSessions.finishedAt,
           unit: readingSessions.unit,
           total: readingSessions.total,
@@ -439,16 +445,21 @@ export function createLibraryService(database: Database, provider: CatalogProvid
         .from(readingSessions)
         .innerJoin(userBooks, eq(userBooks.id, readingSessions.userBookId))
         .innerJoin(works, eq(works.id, readingSessions.workId))
-        .where(and(eq(userBooks.userId, actor.userId), eq(readingSessions.state, "completed")))
+        .where(eq(userBooks.userId, actor.userId))
         .orderBy(desc(readingSessions.finishedAt));
-      return saved.map((goal) => ({ ...goal, progress: goalProgress(goal, reads, timeZone, now) }));
+      return saved.map(({goal, details}) => {
+        const settings = goalSettingsSchema.parse(details ?? {});
+        return { ...goal, details: settings, progress: goalProgress({ ...goal, details: settings }, reads, timeZone, now) };
+      });
     },
     async saveGoal(
       actor: Actor,
       input: {
         key: string;
         id?: string;
-        metric: "books" | "pages" | "minutes";
+        metric: z.infer<typeof goalMetricSchema>;
+        title?: string;
+        unit?: string;
         target: number;
         timeframe: string;
       },
@@ -457,12 +468,15 @@ export function createLibraryService(database: Database, provider: CatalogProvid
         .object({
           key: id,
           id: z.string().min(1).max(200).optional(),
-          metric: z.enum(["books", "pages", "minutes"]),
+          metric: goalMetricSchema,
+          title: z.string().trim().max(100).default(""),
+          unit: z.string().trim().max(30).default(""),
           target: z.number().int().positive().max(10000000),
           timeframe: goalTimeframeSchema,
         })
         .strict()
         .parse(input);
+      if (data.metric === "custom" && (!data.title || !data.unit)) throw new DomainError("INVALID_TRANSITION", "Give your custom goal a name and unit.");
       const result = await database.transaction(async (tx) => {
         await tx.execute(sql`select pg_advisory_xact_lock(21071, ${actor.userId})`);
         const hash = fingerprint("saveGoal", data);
@@ -494,6 +508,10 @@ export function createLibraryService(database: Database, provider: CatalogProvid
           })
           .returning();
         if (!saved) throw new DomainError("NOT_FOUND", "Goal not found.");
+        const [existingDetails] = await tx.select().from(goalDetails).where(eq(goalDetails.goalId, goalId));
+        const details = { ...goalSettingsSchema.parse(existingDetails?.details ?? {}), title: data.title, unit: data.unit };
+        await tx.insert(goalDetails).values({ goalId, details }).onConflictDoUpdate({ target: goalDetails.goalId, set: { details } });
+
         await tx.insert(accountState).values({ userId: actor.userId }).onConflictDoNothing();
         const [state] = await tx
           .select()
@@ -509,6 +527,28 @@ export function createLibraryService(database: Database, provider: CatalogProvid
       });
       return result;
     },
+    async logGoal(actor: Actor, input: { key: string; goalId: string; date: string; amount: number; note?: string }) {
+      z.number().int().positive().parse(actor.userId);
+      const { goalId, key, ...entry } = z.object({ key: id, goalId: z.string().min(1).max(200), ...goalLogSchema.omit({ id: true }).shape }).strict().parse(input);
+      await database.transaction(async (tx) => {
+        await tx.execute(sql`select pg_advisory_xact_lock(21071, ${actor.userId})`);
+        const hash = fingerprint("logGoal", { key, goalId, ...entry });
+        const [receipt] = await tx.select().from(mutationReceipts).where(and(eq(mutationReceipts.userId, actor.userId), eq(mutationReceipts.key, key)));
+        if (receipt) {
+          if (receipt.fingerprint !== hash) throw new DomainError("IDEMPOTENCY_CONFLICT", "Request key already used.");
+          return;
+        }
+        const [goal] = await tx.select().from(goals).where(and(eq(goals.id, goalId), eq(goals.userId, actor.userId)));
+        if (!goal || goal.metric !== "custom") throw new DomainError("NOT_FOUND", "Custom goal not found.");
+        const [stored] = await tx.select().from(goalDetails).where(eq(goalDetails.goalId, goalId));
+        const details = goalSettingsSchema.parse(stored?.details ?? {});
+        details.entries.push({ id: key, ...entry });
+        goalSettingsSchema.parse(details);
+        await tx.insert(goalDetails).values({ goalId, details }).onConflictDoUpdate({ target: goalDetails.goalId, set: { details } });
+        await tx.insert(mutationReceipts).values({ userId: actor.userId, key, fingerprint: hash, result: { ok: true } });
+      });
+    },
+
     async archive(actor: Actor) {
       z.number().int().positive().parse(actor.userId);
       return database.transaction(
@@ -519,7 +559,7 @@ export function createLibraryService(database: Database, provider: CatalogProvid
           return JSON.stringify(
             {
               format: "rowan-archive",
-              version: 6,
+              version: 7,
               exportedAt: new Date().toISOString(),
               userBooks: await tx
                 .select()
@@ -571,7 +611,7 @@ export function createLibraryService(database: Database, provider: CatalogProvid
                 .select()
                 .from(readingQueue)
                 .where(eq(readingQueue.userId, actor.userId)),
-              goals: await tx.select().from(goals).where(eq(goals.userId, actor.userId)),
+              goals: await tx.select({ goal: goals, details: goalDetails.details }).from(goals).leftJoin(goalDetails, eq(goals.id, goalDetails.goalId)).where(eq(goals.userId, actor.userId)).then((rows) => rows.map(({goal, details}) => ({...goal, details: goalSettingsSchema.parse(details ?? {})}))),
               settings: await tx
                 .select({userId:userSettings.userId,darkMode:userSettings.darkMode,accentColor:userSettings.accentColor,compactMode:userSettings.compactMode,fontScale:userSettings.fontScale,blackBackground:sql<boolean>`coalesce((select black_background from v2.account_state where user_id = ${actor.userId}), false)`})
                 .from(userSettings)
