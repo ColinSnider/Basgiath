@@ -83,6 +83,10 @@ const startSchema = z
     startedAt: instant.nullable(),
     unit: z.enum(["page", "second", "percent"]),
     position: z.number().int().nonnegative().default(0),
+    edition: z.object({
+      format: z.enum(["book", "ebook", "audiobook"]),
+      total: z.number().int().positive().max(2147483647).nullable(),
+    }).strict().optional(),
   })
   .strict();
 const progressSchema = z
@@ -1574,9 +1578,18 @@ export function createLibraryService(database: Database, provider: CatalogProvid
             "INVALID_TRANSITION",
             "This book already has an open reading attempt.",
           );
-        const [edition] = book.selectedEditionId
+        let [edition] = book.selectedEditionId
           ? await tx.select().from(editions).where(eq(editions.id, book.selectedEditionId))
           : [];
+        if (data.edition) {
+          // Each attempt keeps its own edition. Never rewrite a previous read.
+          [edition] = await tx.insert(editions).values({
+            workId: book.workId,
+            format: data.edition.format,
+            pageCount: data.edition.format === "audiobook" ? null : data.edition.total,
+            durationSeconds: data.edition.format === "audiobook" ? data.edition.total : null,
+          }).returning();
+        }
         if (
           edition &&
           ((data.unit === "second" && !["audiobook", "unknown"].includes(edition.format)) ||
@@ -1600,7 +1613,7 @@ export function createLibraryService(database: Database, provider: CatalogProvid
           .values({
             userBookId: book.id,
             workId: book.workId,
-            editionId: book.selectedEditionId,
+            editionId: edition?.id ?? null,
             startedAt: data.startedAt ? new Date(data.startedAt) : null,
             unit: data.unit,
             total,
@@ -1624,7 +1637,7 @@ export function createLibraryService(database: Database, provider: CatalogProvid
         });
         await tx
           .update(userBooks)
-          .set({ status: "reading", version: book.version + 1 })
+          .set({ status: "reading", selectedEditionId: edition?.id ?? null, version: book.version + 1 })
           .where(eq(userBooks.id, book.id));
         return {
           workId: book.workId,
@@ -1892,9 +1905,10 @@ export function createLibraryService(database: Database, provider: CatalogProvid
               .where(and(eq(editions.id, book.selectedEditionId), eq(editions.workId, book.workId)))
           : [];
         const [rating] = await tx.select().from(ratings).where(eq(ratings.userBookId, book.id));
-        const sessions = await tx
-          .select()
+        const sessionRows = await tx
+          .select({ session: readingSessions, format: editions.format })
           .from(readingSessions)
+          .leftJoin(editions, eq(editions.id, readingSessions.editionId))
           .where(eq(readingSessions.userBookId, userBookId))
           .orderBy(readingSessions.id);
         const entries = await tx
@@ -1931,8 +1945,9 @@ export function createLibraryService(database: Database, provider: CatalogProvid
           tags: Array.isArray(book.legacyMetadata?.tags)
             ? book.legacyMetadata.tags.filter((tag): tag is string => typeof tag === "string")
             : [],
-          sessions: sessions.map((session) => ({
+          sessions: sessionRows.map(({ session, format }) => ({
             ...session,
+            format: format ?? (session.unit === "second" ? "audiobook" : "unknown"),
             loggedProgress: loggedProgress(
               entries
                 .filter(({ entry }) => entry.readingSessionId === session.id)

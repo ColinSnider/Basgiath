@@ -1,6 +1,7 @@
 import { BookCover, generatedCoverHue } from "./BookCover";
 import { ReadingTimer } from "./ReadingTimer";
 import { HistoryEditor } from "./HistoryEditor";
+import { StartReadForm } from "./StartReadForm";
 import { ArrowLeft, BookOpen, Heart, NotebookPen, History, Info } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import type { CSSProperties } from "react";
@@ -94,7 +95,6 @@ export function ReadingPanel({
   close: () => void;
   shelves: Awaited<ReturnType<typeof rowanShelves>>;
 }) {
-  const [unit, setUnit] = useState<"page" | "second" | "percent">("page");
   const [position, setPosition] = useState("");
   const [tab, setTab] = useState<"reading" | "margins" | "history" | "details">("reading");
   const panel = useRef<HTMLElement>(null);
@@ -386,35 +386,8 @@ export function ReadingPanel({
                       </div>
                     </>
                   ) : (
-                    <div className="flex flex-wrap gap-2">
-                      <select
-                        className={control}
-                        aria-label="Progress unit"
-                        value={unit}
-                        onChange={(e) => setUnit(e.target.value as typeof unit)}
-                      >
-                        <option value="page">Pages</option>
-                        <option value="second">Audio seconds</option>
-                        <option value="percent">Percent</option>
-                      </select>
-                      <button
-                        className="reader-button"
-                        disabled={busy}
-                        onClick={() =>
-                          run({
-                            type: "start",
-                            key: crypto.randomUUID(),
-                            userBookId: book.id,
-                            expectedVersion: history.data!.userBookVersion,
-                            unit,
-                            position: 0,
-                            startedAt: new Date().toISOString(),
-                          })
-                        }
-                      >
-                        {history.data.sessions.length ? "Read again" : "Start reading"}
-                      </button>
-                    </div>
+                    <StartReadForm key={`${book.id}-${history.data.userBookVersion}`}
+                      userBookId={book.id} history={history.data} busy={busy} run={run} />
                   )}
                 </section>
                 <ReadingTimer sessions={history.data.sessions} run={run} busy={busy} />

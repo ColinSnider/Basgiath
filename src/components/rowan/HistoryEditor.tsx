@@ -47,6 +47,7 @@ export function HistoryEditor({
         return (
           <section key={session.id} className="space-y-3 rounded-xl border border-border p-4">
             <h4 className="font-medium">
+              {session.format === "audiobook" ? "Audiobook" : session.format === "ebook" ? "Ebook" : session.format === "book" ? "Print book" : "Read"} ·{" "}
               {session.state} ·{" "}
               {session.startedAt
                 ? new Date(session.startedAt).toLocaleDateString()

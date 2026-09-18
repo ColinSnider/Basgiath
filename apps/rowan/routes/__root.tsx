@@ -18,8 +18,8 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
     links: [
       { rel: "stylesheet", href: appCss },
       { rel: "stylesheet", href: shellCss },
-      { rel: "icon", type: "image/png", href: "/rowan-mark.png" },
-      { rel: "apple-touch-icon", href: "/rowan-mark.png" },
+      { rel: "icon", type: "image/png", sizes: "48x48", href: "/rowan-favicon-v2.png" },
+      { rel: "apple-touch-icon", sizes: "180x180", href: "/rowan-apple-touch-v2.png" },
       { rel: "manifest", href: "/manifest.webmanifest" },
       { rel: "preconnect", href: "https://fonts.googleapis.com" },
       { rel: "preconnect", href: "https://fonts.gstatic.com", crossOrigin: "anonymous" },

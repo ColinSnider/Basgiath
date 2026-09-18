@@ -179,6 +179,10 @@ const command = z.discriminatedUnion("type", [
       startedAt: moment.nullable(),
       unit: z.enum(["page", "second", "percent"]),
       position: z.number().int().nonnegative(),
+      edition: z.object({
+        format: z.enum(["book", "ebook", "audiobook"]),
+        total: z.number().int().positive().max(2147483647).nullable(),
+      }).strict().optional(),
     })
     .strict(),
   z
@@ -639,6 +643,7 @@ export const rowanHistory = createServerFn({ method: "POST" })
         total: s.total,
         position: s.position,
         loggedProgress: s.loggedProgress,
+        format: s.format,
         version: s.version,
         startedAt: s.startedAt?.toISOString() ?? null,
         finishedAt: s.finishedAt?.toISOString() ?? null,

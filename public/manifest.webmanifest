@@ -6,6 +6,7 @@
   "background_color": "#f7f1e8",
   "theme_color": "#5a1a25",
   "icons": [
-    { "src": "/rowan-mark.png", "sizes": "1254x1254", "type": "image/png", "purpose": "any" }
+    { "src": "/rowan-icon-192-v2.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "/rowan-icon-512-v2.png", "sizes": "512x512", "type": "image/png", "purpose": "any" }
   ]
 }

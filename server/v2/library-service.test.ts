@@ -814,4 +814,43 @@ test("v2 catalog and reading lifecycle work against isolated PostgreSQL", async 
       );
     },
   );
+  await t.test("rereads switch format without changing previous editions or progress", async () => {
+    const saved = await service.saveWork(actor, { key: key(), ref: { ...ref, externalId: "reread-formats" } });
+    const versions = async () => (await service.readingHistory(actor, saved.userBookId)).userBookVersion;
+    const first = await service.startReading(actor, {
+      key: key(), userBookId: saved.userBookId, expectedVersion: await versions(),
+      startedAt: start, unit: "page",
+    });
+    await service.transitionReading(actor, {
+      key: key(), sessionId: first.sessionId!, expectedVersion: 0, action: "finish", occurredAt: later,
+    });
+    const original = (await service.readingHistory(actor, saved.userBookId)).sessions[0];
+    const audioCommand = {
+      key: key(), userBookId: saved.userBookId, expectedVersion: await versions(),
+      startedAt: later, unit: "second" as const,
+      edition: { format: "audiobook" as const, total: 36000 },
+    };
+    await assert.rejects(service.startReading(other, audioCommand), code("NOT_FOUND"));
+    const audio = await service.startReading(actor, audioCommand);
+    assert.deepEqual(await service.startReading(actor, audioCommand), audio);
+    let history = await service.readingHistory(actor, saved.userBookId);
+    assert.equal(history.sessions.length, 2);
+    assert.deepEqual(history.sessions.find((s) => s.id === first.sessionId), original);
+    const listening = history.sessions.find((s) => s.id === audio.sessionId)!;
+    assert.equal(listening.format, "audiobook");
+    assert.equal(listening.total, 36000);
+    assert.notEqual(listening.editionId, original.editionId);
+    await service.transitionReading(actor, {
+      key: key(), sessionId: audio.sessionId!, expectedVersion: 0, action: "finish", occurredAt: later,
+    });
+    const print = await service.startReading(actor, {
+      key: key(), userBookId: saved.userBookId, expectedVersion: await versions(),
+      startedAt: later, unit: "page", edition: { format: "book", total: 450 },
+    });
+    history = await service.readingHistory(actor, saved.userBookId);
+    assert.equal(history.sessions.find((s) => s.id === print.sessionId)!.total, 450);
+    assert.equal(history.sessions.find((s) => s.id === audio.sessionId)!.total, 36000);
+    assert.equal(history.sessions.find((s) => s.id === first.sessionId)!.total, 300);
+    assert.equal(history.sessions.filter((s) => s.state === "completed").length, 2);
+  });
 });
