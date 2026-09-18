@@ -8,6 +8,23 @@
 
 ## 0. How to use this brief
 
+### Current implementation checkpoint — September 16, 2026
+
+Use [the current refinement report](../docs/v2/REFINEMENT_STATUS.md) for implemented features, verification and remaining deployment work. The original unchecked lists below are historical acceptance criteria, not a list of features to rebuild. Latest code refinements cover full shelf membership, direct Series/Queue/Shelves tabs, mobile filters and active-filter chips, goal progress and editing, all-time insights, calendar margins and bounded book selection. Home remains unchanged. Railway recovery verification, native iOS, offline sync and public API work are not claimed complete.
+
+### Current scope decision — September 12, 2026
+
+This decision supersedes the larger original scope below wherever they conflict. Rowan is a personal reading app for the current users. The remaining book record, history, and catalog work should be modest improvements to the working app, not another rebuild.
+
+- **Home:** preserve the accepted layout. The later September 12 clarification removes the per-book quick-action toggles and the redundant Continue reading link; the book itself remains clickable. No further redesign or dashboard expansion is planned.
+- **Book record:** make the user's saved book clear and reliable: personal title/author/cover corrections, format and length, current progress, margins, and reading history. Improve confusing labels and controls within the current layout. A uniform canonical record across users is no longer a product requirement.
+- **History:** prioritize a readable sequence of reading attempts, progress, and timed sessions; clear dates and unknown-date states; modest corrections of mistakes; and accurate reread/completion summaries. Preserve imported history without inventing sessions or dates. Reuse existing correction flows instead of building another history system.
+- **Catalog and editions:** keep search, manual entry, personal metadata correction, and basic format/length controls dependable. Retain useful provider/ISBN information already available. Defer an extensive edition browser, cross-user catalog normalization, canonical merge tooling, and broad enrichment unless a concrete problem requires them. Changing a preferred format or length must not rewrite earlier reading attempts.
+- **Preserve the foundation:** keep ownership isolation, save retries, backups, and existing identifiers/links working. Reduced product scope does not call for destructive schema cleanup or discarding data.
+- **Previously removed scope stays removed:** ratings, tags, and community/social features are not pending work. Historical references to those features below are archival, not instructions to reintroduce them.
+
+Remaining acceptance for this area: a user can understand their book record, correct its basic details, inspect and correct their reading history, and trust that old attempts and margins remain intact. No Home redesign or global catalog consistency project is needed to meet that goal.
+
 Read this document before implementation. Inspect the current repository and any applicable `AGENTS.md` instructions again: the checkout may have changed since this audit. Treat the repository inventory below as a verified snapshot, and the v2 sections as proposed implementation requirements. SQL and TypeScript examples describe contracts and invariants; they are not ready-to-run production migrations.
 
 This document was requested as a planning deliverable. Its creation did not authorize or perform production access, backups, migrations, deployments, account changes, or destructive operations. A later implementation task should proceed autonomously on local code, fixtures, isolated databases, tests, and reviewable changes within its authorized scope. Obtain any necessary production access and cutover authorization only after the relevant artifacts and checks are ready.
@@ -661,18 +678,7 @@ Retain deep links to existing book pages through owner-aware legacy mappings or 
 
 ### Home — the next reading action
 
-The primary action is updating what is currently being read.
-
-- Current reading cards support page/audio/percentage entry, add-margin, pause, and finish.
-- Show multiple current books rather than forcing an arbitrary single current title.
-- Last is the most recent known completion; unknown dates do not sort as “just finished.”
-- Next honors a pinned user selection, then a curated queue, then a confidently known next series installment already relevant to the library. Label suggestions; never silently add or start a book.
-- Last/Current/Next should degrade gracefully when one column is empty.
-- Optional compact diary/goal/recent-margin modules support the central action.
-- Preserve dashboard customization, mapping old widget settings where possible and retaining unmapped preferences for recovery.
-- Quick progress steps are unit-aware, bounded, undoable, and never silently finish a book merely because a total is reached.
-
-Acceptance: from Home, update progress with one obvious action; the confirmed value survives refresh and matches Book detail and the diary. A failed save visibly restores or marks pending state without showing false success.
+Accepted as currently implemented, per the September 12 scope decision. No further redesign, modules, or quick-action expansion is planned. Preserve the current appearance and behavior; address actual defects without turning them into a redesign.
 
 ### Library — the centerpiece
 
@@ -1076,9 +1082,9 @@ Exit: synthetic adversarial corpus fully reconciles; restored production clone p
 
 ### M3 — catalog v2
 
-Deliver work-grouped search, lazy seeding, optional edition selection, manual fallback, provider abstraction, strong mapping resolution, and merge manifests. Google enrichment stays optional behind a flag.
+Remaining scope: dependable search, manual fallback, personal metadata correction, and basic format/length controls. Extensive edition selection, global canonical consistency, and merge tooling are deferred under the September 12 scope decision.
 
-Exit: duplicate/non-duplicate fixture behavior is correct; save races are safe; provider outage degrades gracefully; no personal data loss through merges.
+Exit: saves are safe, provider outages have a usable fallback, and metadata/format edits preserve personal history.
 
 ### M4 — reading, ratings, favorites, shelves
 
@@ -1088,7 +1094,7 @@ Exit: end-to-end read lifecycle, concurrency, rollback of failed saves, and full
 
 ### M5 — web redesign
 
-Deliver Home Last/Current/Next, Library overview, All Books controls, coherent three-view browsing, book detail, and responsive navigation. Preserve personalization.
+Preserve the accepted Home and navigation. Finish focused Library browsing and book-detail refinements within the existing UI. Preserve personalization.
 
 Exit: filtered parity across views; accessibility pass; representative large-library performance; old deep links and preferences work.
 
@@ -1141,10 +1147,10 @@ Each row should become a focused change or small PR. Do not mechanically commit 
 | 19 | `feat: add reversible catalog merge workflow` | Manifest, redirects, conflict handling, unmerge limits |
 | 20 | `feat: implement reading attempts and idempotent progress` | Start/pause/finish/reread, corrections, unit tests |
 | 21 | `feat: add half-star ratings favorites and custom shelves` | Independent concepts, owner-safe membership |
-| 22 | `feat: redesign home around current reading` | Last/Current/Next, preserve widget preferences |
+| 22 | Closed: preserve accepted Home | No further Home redesign or expansion |
 | 23 | `feat: build library overview and all-books browser` | Server filters/sorts/pagination and URL state |
 | 24 | `feat: unify list grid and bookshelf presentation` | Result parity, accessible spine interactions |
-| 25 | `feat: rebuild work detail and reading history` | Work-first detail, edition controls, old-link mapping |
+| 25 | `feat: refine personal book record and history` | Modest clarity/correction improvements, basic format/length controls, preserve old attempts and links |
 | 26 | `feat: expand margins and add Markdown export` | Exact text preservation, locations, tags/search/drafts |
 | 27 | `feat: add reading diary series and defined insights` | Reliable metrics, incomplete-data handling, timezone tests |
 | 28 | `feat: add private-by-default community rating aggregates` | Consent, threshold, update/delete/merge invalidation |

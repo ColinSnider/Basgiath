@@ -5,9 +5,13 @@ import { fileURLToPath } from "node:url";
 import { drizzle } from "drizzle-orm/node-postgres";
 import { migrate } from "drizzle-orm/node-postgres/migrator";
 import pg from "pg";
+import { rowanMigrationConfig } from "./scripts/rowan-migration-config.mjs";
 
 const __dirname = fileURLToPath(new URL(".", import.meta.url));
-const CLIENT_DIR = join(__dirname, "dist/client");
+const standalone = process.env.ROWAN_STANDALONE !== "false";
+process.env.ROWAN_STANDALONE = String(standalone);
+const outputDirectory = standalone ? "dist-rowan" : "dist";
+const CLIENT_DIR = join(__dirname, outputDirectory, "client");
 const RESOLVED_CLIENT_DIR = resolve(CLIENT_DIR);
 const STATIC_ROOT = `${RESOLVED_CLIENT_DIR}${sep}`;
 
@@ -28,7 +32,26 @@ async function runMigrations() {
   }
 }
 
-await runMigrations();
+async function runRowanMigrations() {
+  if (!process.env.ROWAN_DATABASE_URL) return;
+  const pool = new pg.Pool({ connectionString: process.env.ROWAN_DATABASE_URL });
+  try {
+    const db = drizzle(pool);
+    await migrate(db, { migrationsFolder: join(__dirname, "migrations") });
+    await migrate(
+      db,
+      standalone ? rowanMigrationConfig : { migrationsFolder: join(__dirname, "migrations-v2") },
+    );
+    console.log("Rowan database migrations applied successfully.");
+  } finally {
+    await pool.end();
+  }
+}
+
+if (!standalone) {
+  await runMigrations();
+}
+await runRowanMigrations();
 
 const MIME = {
   ".html": "text/html; charset=utf-8",
@@ -36,6 +59,7 @@ const MIME = {
   ".mjs": "text/javascript",
   ".css": "text/css",
   ".json": "application/json",
+  ".webmanifest": "application/manifest+json",
   ".png": "image/png",
   ".jpg": "image/jpeg",
   ".jpeg": "image/jpeg",
@@ -48,7 +72,7 @@ const MIME = {
   ".webp": "image/webp",
 };
 
-const worker = (await import("./dist/server/server.js")).default;
+const worker = (await import(`./${outputDirectory}/server/server.js`)).default;
 
 function safeStaticPath(pathname) {
   const candidate = pathname.replace(/^\/+/, "");
@@ -103,8 +127,10 @@ const server = createServer(async (req, res) => {
     }
 
     const forwardedProto = req.headers["x-forwarded-proto"];
-    const protocolCandidate = typeof forwardedProto === "string" ? forwardedProto.split(",")[0].trim() : "";
-    const protocol = protocolCandidate === "https" || protocolCandidate === "http" ? protocolCandidate : undefined;
+    const protocolCandidate =
+      typeof forwardedProto === "string" ? forwardedProto.split(",")[0].trim() : "";
+    const protocol =
+      protocolCandidate === "https" || protocolCandidate === "http" ? protocolCandidate : undefined;
     const host = req.headers.host ?? "localhost";
     const url = `${protocol ?? "http"}://${host}${req.url ?? "/"}`;
     const headers = new Headers();
@@ -151,5 +177,5 @@ const server = createServer(async (req, res) => {
 const parsedPort = Number.parseInt(process.env.PORT ?? "", 10);
 const port = Number.isFinite(parsedPort) && parsedPort > 0 ? parsedPort : 5000;
 server.listen(port, "0.0.0.0", () => {
-  console.log(`Basgiath running on http://0.0.0.0:${port}`);
+  console.log(`${standalone ? "Rowan" : "Basgiath"} running on http://0.0.0.0:${port}`);
 });

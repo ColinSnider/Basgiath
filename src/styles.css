@@ -1,5 +1,6 @@
 @import "tailwindcss" source(none);
 @source "../src";
+@source "../apps/rowan";
 @import "tw-animate-css";
 
 @custom-variant dark (&:is(.dark *));
@@ -100,14 +101,323 @@
   * {
     border-color: var(--color-border);
   }
-  html, body {
+  html,
+  body {
     background-color: var(--color-background);
     color: var(--color-foreground);
     font-family: var(--font-sans);
     -webkit-font-smoothing: antialiased;
   }
-  h1, h2, h3, h4, .font-display {
+  h1,
+  h2,
+  h3,
+  h4,
+  .font-display {
     font-family: var(--font-display);
     letter-spacing: -0.01em;
   }
+}
+html[data-rowan-compact="true"] #library-heading ~ div {
+  gap: 0.5rem;
+}
+html[data-rowan-compact="true"] main section {
+  padding: 0.75rem;
+}
+
+/* Rowan uses Basgiath's existing palette and typography. */
+@media (min-width: 1024px) {
+  .rowan-workspace {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(280px, 340px);
+    gap: 24px;
+    max-width: 1640px;
+    min-height: 100vh;
+    padding: 32px 40px 64px 264px;
+    align-items: start;
+  }
+  .rowan-workspace > * {
+    min-width: 0;
+    margin-block: 0;
+    grid-column: 1 / -1;
+  }
+  .rowan-workspace [id] { scroll-margin-top: 24px; }
+  .rowan-workspace .rowan-navigation {
+    position: fixed;
+    inset: 0 auto 0 0;
+    width: 224px;
+    height: 100dvh;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    flex-wrap: nowrap;
+    align-items: stretch;
+    gap: 6px;
+    padding: 32px 16px 24px;
+    border-bottom: 0;
+    border-right: 1px solid var(--border);
+    background: var(--card);
+  }
+  .rowan-brand {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 10px;
+    padding: 0 12px 28px;
+    color: var(--primary);
+    border-bottom: 1px solid var(--border);
+  }
+  .rowan-brand p {
+    width: 100%;
+    font-size: 11px;
+    color: var(--muted-foreground);
+  }
+  .rowan-nav-label {
+    display: block;
+    margin: 22px 12px 8px;
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: .15em;
+    color: var(--muted-foreground);
+  }
+  .rowan-navigation a {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    border: 0;
+    background: transparent;
+    color: var(--muted-foreground);
+    padding: 11px 12px;
+  }
+  .rowan-navigation a:hover,
+  .rowan-navigation a:focus-visible {
+    background: var(--muted);
+    color: var(--primary);
+  }
+  .rowan-navigation > button {
+    margin-top: auto;
+    text-align: left;
+    background: var(--background);
+  }
+  .rowan-header {
+    padding-bottom: 24px;
+    border-bottom: 1px solid var(--border);
+  }
+  .rowan-header h1 { margin-top: 6px; }
+  .rowan-overview {
+    padding: 24px;
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-top: 3px solid var(--primary);
+    border-radius: 16px;
+  }
+  .rowan-reading-cards { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .rowan-reading-cards > :nth-child(2) {
+    grid-column: 1 / -1;
+    grid-row: 1;
+    background: color-mix(in oklch, var(--primary) 5%, var(--card));
+  }
+  .rowan-reading-cards > :nth-child(2) ul {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 20px;
+  }
+  .rowan-reading-cards > :nth-child(2) li { margin: 0; }
+  .rowan-workspace #reading-history { grid-column: 1; }
+  .rowan-workspace #find-books { grid-column: 2; }
+  .rowan-workspace > details {
+    grid-column: 2;
+    background: var(--card);
+  }
+  .rowan-notice:empty { display: none; }
+  .rowan-library {
+    padding: 24px;
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    background: var(--card);
+  }
+  .rowan-library > div:first-child {
+    padding-bottom: 20px;
+    border-bottom: 1px solid var(--border);
+  }
+  .rowan-workspace button[aria-pressed="true"] {
+    background: var(--primary);
+    color: var(--primary-foreground);
+    border-color: var(--primary);
+  }
+  .rowan-workspace progress { accent-color: var(--primary); height: 6px; }
+}
+
+/* Feature pages retain the Rowan shell while giving the active section full width. */
+.rowan-navigation a[aria-current="page"] { background: var(--muted); color: var(--primary); font-weight: 600; }
+.rowan-mobile-tabs { display: none; }
+.rowan-page-intro { padding: 8px 4px; }
+.rowan-page-intro h2 { margin-top: 6px; color: var(--primary); }
+.rowan-account-page { max-width: 920px; }
+@media (min-width: 1024px) {
+  .rowan-workspace[data-standalone] #reading-history,
+  .rowan-workspace[data-standalone] #find-books,
+  .rowan-workspace[data-standalone] > details { grid-column: 1 / -1; }
+}
+
+/* Warm paper, saturated ink, and gold light: Rowan's reading surfaces. */
+.rowan-workspace {
+  background: radial-gradient(ellipse at 100% 0, color-mix(in oklch, var(--gold) 12%, transparent), transparent 48%), var(--background);
+}
+.rowan-workspace .rowan-header {
+  padding: clamp(24px, 4vw, 44px);
+  border: 1px solid color-mix(in oklch, var(--gold) 40%, var(--primary));
+  border-radius: 24px;
+  background: radial-gradient(ellipse at top right, color-mix(in oklch, var(--gold) 38%, transparent), transparent 65%), linear-gradient(125deg, var(--primary), color-mix(in oklch, var(--primary) 78%, black));
+  color: var(--primary-foreground);
+  box-shadow: 0 16px 44px -30px var(--primary);
+}
+.rowan-header h1, .rowan-header p { color: inherit; }
+.rowan-header p { opacity: .82; }
+.rowan-header button, .rowan-header a { background: transparent; color: inherit; border-color: color-mix(in oklch, var(--primary-foreground) 35%, transparent); }
+.rowan-navigation { box-shadow: 8px 0 40px -32px var(--primary); }
+.rowan-navigation a[aria-current="page"] { background: linear-gradient(110deg, var(--primary), color-mix(in oklch, var(--primary) 82%, var(--gold))); color: var(--primary-foreground); border-radius: 12px; }
+.rowan-overview, .rowan-library, .rowan-workspace > section:not(.rowan-book-page) { box-shadow: 0 12px 36px -30px var(--primary); }
+.rowan-overview { background: linear-gradient(145deg, color-mix(in oklch, var(--gold) 9%, var(--card)), var(--card) 65%); }
+.rowan-workspace button, .rowan-workspace a { transition: background-color .18s, box-shadow .18s; }
+.rowan-workspace :is(button,a,input,select,summary):focus-visible { outline: 2px solid var(--ring); outline-offset: 4px; }
+.rowan-book-page { overflow: hidden; border: 1px solid var(--border); border-radius: 24px; background: var(--card); box-shadow: 0 20px 60px -42px var(--primary); }
+.rowan-book-back { display: flex; align-items: center; gap: 8px; padding: 18px 24px; color: var(--muted-foreground); font-size: .875rem; }
+.rowan-book-hero { position: relative; isolation: isolate; display: grid; grid-template-columns: 180px minmax(0, 1fr); align-items: center; gap: 36px; padding: clamp(24px, 4vw, 48px); overflow: hidden; background: radial-gradient(ellipse at 78% 18%, var(--book-glow, color-mix(in oklch, var(--gold) 26%, transparent)), transparent 60%), linear-gradient(135deg, var(--book-accent, var(--primary)), var(--book-deep, color-mix(in oklch, var(--primary) 75%, black))); color: var(--primary-foreground); }
+.rowan-book-hero::after { position: absolute; inset: 0; z-index: 1; content: ""; background: linear-gradient(90deg, #0005, transparent 52%, #0002); pointer-events: none; }
+.rowan-book-hero > :not(.rowan-book-backdrop) { position: relative; z-index: 2; }
+.rowan-book-backdrop { position: absolute; z-index: 0; inset: -10%; width: 120%; height: 120%; object-fit: cover; opacity: .24; filter: blur(30px) saturate(1.35); transform: scale(1.08); pointer-events: none; }
+.rowan-book-cover { position: relative; display: grid; place-items: center; width: 100%; aspect-ratio: 2 / 3; background: linear-gradient(140deg, var(--primary), var(--gold)); border: 1px solid color-mix(in oklch, var(--gold) 65%, transparent); border-radius: 4px 12px 12px 4px; box-shadow: 8px 16px 28px #0005, inset 5px 0 8px #0003; overflow: hidden; }
+.rowan-book-cover img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; z-index: 1; }
+.rowan-book-cover img[hidden] { display: none; }
+.rowan-eyebrow { font-size: .7rem; font-weight: 600; letter-spacing: .2em; text-transform: uppercase; opacity: .8; }
+.rowan-book-intro h2 { margin-top: 14px; font-size: clamp(2rem, 4vw, 3.5rem); line-height: 1.12; overflow-wrap: anywhere; text-wrap: balance; }
+.rowan-book-author { margin-top: 14px; font-size: 1.1rem; opacity: .85; }
+.rowan-book-badges { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 24px; }
+.rowan-book-badges span { display: inline-flex; align-items: center; gap: 6px; font-size: .75rem; padding: 7px 12px; border-radius: 999px; border: 1px solid #fff4; background: #0002; }
+.rowan-hero-progress { max-width: 420px; margin-top: 24px; }
+.rowan-hero-progress p { display: flex; justify-content: space-between; gap: 12px; font-size: .8rem; margin-bottom: 8px; }
+.rowan-workspace .rowan-hero-progress progress { width: 100%; height: 7px; accent-color: var(--gold); }
+.rowan-book-content { padding: clamp(20px, 4vw, 40px); background: linear-gradient(180deg, color-mix(in oklch, var(--book-accent, var(--primary)) 3%, var(--card)), var(--card) 22%); }
+.rowan-reading-controls { padding: 24px; border: 1px solid color-mix(in oklch, var(--gold) 40%, var(--border)); border-radius: 18px; background: linear-gradient(140deg, color-mix(in oklch, var(--gold) 8%, var(--card)), var(--card)); }
+@media (max-width: 600px) {
+  body:has(.rowan-workspace) { padding-bottom: 76px; }
+  .rowan-mobile-tabs {
+    position: fixed;
+    z-index: 50;
+    display: grid;
+    grid-template-columns: repeat(5, 1fr);
+    right: 12px;
+    bottom: max(12px, env(safe-area-inset-bottom));
+    left: 12px;
+    padding: 8px 6px;
+    border: 1px solid color-mix(in oklch, var(--gold) 35%, var(--border));
+    border-radius: 20px;
+    background: color-mix(in oklch, var(--card) 90%, transparent);
+    box-shadow: 0 12px 35px -18px var(--primary);
+    backdrop-filter: blur(18px);
+  }
+  .rowan-mobile-tabs a {
+    display: grid;
+    justify-items: center;
+    gap: 3px;
+    padding: 7px 4px;
+    color: var(--muted-foreground);
+    font-size: 10px;
+    font-weight: 600;
+  }
+  .rowan-mobile-tabs a[aria-current="page"] { color: var(--primary); }
+  .rowan-navigation { display: none; }
+  .rowan-workspace { padding: 14px 14px 92px; gap: 20px; }
+  .rowan-workspace .rowan-header { padding: 22px 18px; border-radius: 20px; }
+  .rowan-book-hero { grid-template-columns: 90px minmax(0,1fr); gap: 20px; padding: 24px 18px; align-items: start; }
+  .rowan-book-intro h2 { font-size: 1.8rem; }
+  .rowan-book-author { font-size: .9rem; }
+  .rowan-book-badges { margin-top: 16px; }
+  .rowan-reading-controls { padding: 18px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .rowan-workspace button, .rowan-workspace a { transition: none; }
+}
+
+.rowan-organization {
+  border: 1px solid var(--border);
+  border-radius: 20px;
+  padding: clamp(16px, 3vw, 28px);
+  background: var(--card);
+}
+.rowan-series-card {
+  padding: 20px;
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  background: linear-gradient(
+    135deg,
+    color-mix(in srgb, var(--primary) 5%, var(--background)),
+    var(--background)
+  );
+}
+.rowan-series-progress {
+  width: 100%;
+  height: 8px;
+  accent-color: var(--primary);
+}
+.rowan-series-book {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 0;
+  border-bottom: 1px solid var(--border);
+}
+.rowan-series-book-link {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex: 1;
+  min-width: 150px;
+  text-align: left;
+}
+.rowan-series-book-link img {
+  width: 40px;
+  height: 60px;
+  object-fit: cover;
+  border-radius: 4px;
+}
+.rowan-series-book-link small,
+.rowan-series-number small {
+  display: block;
+  color: var(--muted-foreground);
+}
+.rowan-series-number {
+  min-width: 30px;
+  font-family: var(--font-display);
+  font-size: 20px;
+}
+.rowan-organization form label {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+}
+.rowan-organization input,
+.rowan-organization select {
+  max-width: 100%;
+  min-width: 0;
+}
+.rowan-book-facts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px 28px;
+  margin: 20px 0;
+}
+.rowan-book-facts dt {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  opacity: 0.75;
+}
+.rowan-book-facts dd {
+  font-size: 15px;
+  font-weight: 600;
+  margin-top: 4px;
 }

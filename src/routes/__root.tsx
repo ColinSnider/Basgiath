@@ -129,17 +129,20 @@ function AppShell() {
   const navigate = useNavigate();
 
   useEffect(() => {
+    if (pathname === "/rowan") return;
     document.documentElement.classList.toggle("dark", !!settings.darkMode);
-  }, [settings.darkMode]);
+  }, [settings.darkMode, pathname]);
 
   // Apply font scale
   useEffect(() => {
+    if (pathname === "/rowan") return;
     const scale = settings.fontScale ?? "md";
     document.documentElement.style.fontSize =
       scale === "sm" ? "14px" : scale === "lg" ? "18px" : "16px";
-  }, [settings.fontScale]);
+  }, [settings.fontScale, pathname]);
 
   useEffect(() => {
+    if (pathname === "/rowan") return;
     const root = document.documentElement;
     const prefs = normalizeUserPreferences(preferences);
     if (!prefs.useCustomFont) {
@@ -155,10 +158,11 @@ function AppShell() {
       DISPLAY_FONT_CHOICES.find((f) => f.id === "playfair")?.cssVar;
     if (bodyFont) root.style.setProperty("--font-sans", bodyFont);
     if (displayFont) root.style.setProperty("--font-display", displayFont);
-  }, [preferences]);
+  }, [preferences, pathname]);
 
   // Apply accent color as CSS variables on :root
   useEffect(() => {
+    if (pathname === "/rowan") return;
     const root = document.documentElement;
 
     const prefs = normalizeUserPreferences(preferences);
@@ -205,7 +209,7 @@ function AppShell() {
         root.style.removeProperty(v);
       }
     }
-  }, [settings.accentColor, settings.darkMode, preferences]);
+  }, [settings.accentColor, settings.darkMode, preferences, pathname]);
 
   // Redirect to login if not authenticated (after loading)
   // Exception: "/" shows the landing page, so no redirect needed there
@@ -258,6 +262,9 @@ function AppShell() {
 }
 
 function InnerApp() {
+  const { pathname } = useLocation();
+  // Rowan owns its state; entering the development workspace must not load the legacy store.
+  if (pathname === "/rowan") return <Outlet />;
   return (
     <StoreProvider>
       <AppShell />

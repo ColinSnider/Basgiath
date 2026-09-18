@@ -1,3 +1,5 @@
+import type { ImportData } from "./import-contract";
+
 export type FontScale = "sm" | "md" | "lg";
 export type FontChoice = "inter" | "lora" | "source-sans" | "system";
 export type DisplayFontChoice = "playfair" | "merriweather" | "lora" | "system";
@@ -314,9 +316,9 @@ export function normalizeUserPreferences(input: unknown): UserPreferences {
 export type ExportData = {
   version: 1;
   exportedAt: string;
-  books: unknown[];
-  margins: unknown[];
-  goals: unknown[];
+  books: ImportData["books"];
+  margins: ImportData["margins"];
+  goals: ImportData["goals"];
   settings: {
     darkMode: boolean;
     accentColor: string;

@@ -1,0 +1,11 @@
+{
+  "name": "Rowan",
+  "short_name": "Rowan",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#f7f1e8",
+  "theme_color": "#5a1a25",
+  "icons": [
+    { "src": "/rowan-mark.png", "sizes": "1254x1254", "type": "image/png", "purpose": "any" }
+  ]
+}

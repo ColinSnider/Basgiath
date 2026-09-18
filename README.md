@@ -135,3 +135,7 @@ npm run start
 - `DATABASE_URL must be set`: set `DATABASE_URL` on the app service before deploying.
 - Migration errors: run `npm run db:migrate` as a separate one-off job or manual step, not as part of the web service startup.
 - App does not bind correctly: ensure Railway `PORT` is not overridden with an invalid value.
+
+## Standalone Rowan
+
+Rowan has its own application entry and dedicated database. See [standalone setup](docs/v2/STANDALONE_ROWAN.md) for local commands and the separate Railway configuration.
