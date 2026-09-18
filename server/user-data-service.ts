@@ -1,6 +1,7 @@
 import { and, eq } from "drizzle-orm";
+import { createHash } from "node:crypto";
 import type { db } from "./db.ts";
-import { books, margins, goals, userSettings } from "../shared/schema.ts";
+import { books, margins, goals, userSettings, users } from "../shared/schema.ts";
 import { importDataSchema } from "../src/lib/import-contract.ts";
 
 // Session validation remains at the transport boundary; actor IDs are server-derived.
@@ -140,6 +141,37 @@ export function createUserDataService(database: typeof db) {
       // Validate here too, so every future caller gets pre-deletion validation.
       const data = importDataSchema.parse(input);
       await database.transaction(async (tx) => {
+        // Serialize replacements for this account. Export IDs belong to their
+        // source account; new imports need stable destination-owned identities.
+        requireRow(
+          (
+            await tx.select({ id: users.id }).from(users).where(eq(users.id, userId)).for("update")
+          )[0],
+        );
+        const ownedBooks = new Set(
+          (await tx.select({ id: books.id }).from(books).where(eq(books.userId, userId))).map(
+            (row) => row.id,
+          ),
+        );
+        const ownedMargins = new Set(
+          (await tx.select({ id: margins.id }).from(margins).where(eq(margins.userId, userId))).map(
+            (row) => row.id,
+          ),
+        );
+        const ownedGoals = new Set(
+          (await tx.select({ id: goals.id }).from(goals).where(eq(goals.userId, userId))).map(
+            (row) => row.id,
+          ),
+        );
+        const destinationId = (kind: string, id: string, owned: Set<string>) =>
+          owned.has(id)
+            ? id
+            : `import:${userId}:${createHash("sha256")
+                .update(JSON.stringify([kind, id]))
+                .digest("hex")}`;
+        const bookIds = new Map(
+          data.books.map((book) => [book.id, destinationId("book", book.id, ownedBooks)]),
+        );
         await tx.delete(margins).where(eq(margins.userId, userId));
         await tx.delete(goals).where(eq(goals.userId, userId));
         await tx.delete(books).where(eq(books.userId, userId));
@@ -147,7 +179,7 @@ export function createUserDataService(database: typeof db) {
         if (data.books.length) {
           await tx.insert(books).values(
             data.books.map((book) => ({
-              id: book.id,
+              id: bookIds.get(book.id)!,
               userId,
               title: book.title,
               author: book.author,
@@ -168,9 +200,9 @@ export function createUserDataService(database: typeof db) {
         if (data.margins.length) {
           await tx.insert(margins).values(
             data.margins.map((margin) => ({
-              id: margin.id,
+              id: destinationId("margin", margin.id, ownedMargins),
               userId,
-              bookId: margin.bookId,
+              bookId: bookIds.get(margin.bookId)!,
               type: margin.type,
               text: margin.text,
               page: margin.page ?? null,
@@ -182,7 +214,7 @@ export function createUserDataService(database: typeof db) {
         if (data.goals.length) {
           await tx.insert(goals).values(
             data.goals.map((goal) => ({
-              id: goal.id,
+              id: destinationId("goal", goal.id, ownedGoals),
               userId,
               metric: goal.metric,
               target: goal.target,

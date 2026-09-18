@@ -131,8 +131,10 @@ test("personal-data operations preserve data and isolate owners on PostgreSQL", 
     const before = await database.select().from(schema.books);
     const beforeMargins = await database.select().from(schema.margins);
     const input = archive();
-    input.goals[0].id = "other-goal"; // A global PK collision fails after book/margin inserts.
+    await client.exec(`CREATE FUNCTION fail_import_goal() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN RAISE EXCEPTION 'injected failure'; END $$;
+      CREATE TRIGGER fail_import BEFORE INSERT ON goals FOR EACH ROW EXECUTE FUNCTION fail_import_goal();`);
     await assert.rejects(service.importUserData(1, input));
+    await client.exec("DROP TRIGGER fail_import ON goals; DROP FUNCTION fail_import_goal();");
     assert.deepEqual(await database.select().from(schema.books), before);
     assert.deepEqual(await database.select().from(schema.margins), beforeMargins);
   });
@@ -193,11 +195,39 @@ test("personal-data operations preserve data and isolate owners on PostgreSQL", 
   await t.test("exports contain only the owner snapshot without account credentials", async () => {
     const snapshot = await service.exportUserData(1);
     assert.equal(snapshot.books.length, 1);
-    assert.equal(snapshot.books[0].id, "restored");
-    assert.equal(snapshot.margins[0].bookId, "restored");
+    assert.equal(snapshot.margins[0].bookId, snapshot.books[0].id);
     assert.deepEqual(Object.keys(snapshot).sort(), ["books", "goals", "margins", "settings"]);
     assert.deepEqual(snapshot.books[0].metadata, metadata);
   });
+
+  await t.test(
+    "an existing account export imports into a fresh account with stable, independent IDs",
+    async () => {
+      await database.insert(schema.users).values({ id: 3, username: "fresh" });
+      const source = await service.exportUserData(1);
+      // Reproduce the old insert's global primary-key collision before importing.
+      await assert.rejects(
+        database.insert(schema.books).values({ ...source.books[0], userId: 3 }),
+        (error: unknown) => (error as { cause?: { code?: string } }).cause?.code === "23505",
+      );
+      const sourceJson = JSON.parse(JSON.stringify(source));
+      await service.importUserData(3, sourceJson);
+      const imported = await service.exportUserData(3);
+      assert.notEqual(imported.books[0].id, source.books[0].id);
+      assert.notEqual(imported.margins[0].id, source.margins[0].id);
+      assert.notEqual(imported.goals[0].id, source.goals[0].id);
+      assert.equal(imported.margins[0].bookId, imported.books[0].id);
+      assert.deepEqual(imported.books[0].reads, source.books[0].reads);
+      assert.deepEqual(imported.books[0].metadata, source.books[0].metadata);
+      assert.equal(imported.margins[0].text, source.margins[0].text);
+      await service.importUserData(3, sourceJson);
+      assert.deepEqual(await service.exportUserData(3), imported);
+      await service.importUserData(3, JSON.parse(JSON.stringify(imported)));
+      assert.deepEqual(await service.exportUserData(3), imported);
+      assert.deepEqual(await service.exportUserData(1), source);
+      await service.clearAllData(3);
+    },
+  );
 
   await t.test("clear is atomic under database failure and affects only its owner", async () => {
     await client.exec(`CREATE FUNCTION fail_delete_book() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN RAISE EXCEPTION 'injected failure'; END $$;

@@ -322,7 +322,15 @@ export const rowanImportLegacy = createServerFn({ method: "POST" })
   .handler(async ({ data }) => {
     const { database, actor } = await context(data.sessionId, false);
     const userData = createUserDataService(db);
-    await userData.importUserData(actor.userId, data.data);
+    try {
+      await userData.importUserData(actor.userId, data.data);
+    } catch {
+      // The replacement transaction rolls back on failure. Never expose SQL
+      // parameters containing a reader's complete library in an error message.
+      throw new Error(
+        "The Basgiath export could not be imported. No data was changed. Please try again.",
+      );
+    }
     const [source] = await db
       .select({ id: users.id, username: users.username, displayName: users.displayName })
       .from(users)
